@@ -1,0 +1,33 @@
+# Python tooling for GDScript format/lint (`make format` / `make lint`).
+# Installed into a throwaway venv at .venv-lint/ — never system-wide. Same
+# philosophy as the Godot pin in scripts/fetch-godot.sh: reproducible, not
+# ambient "whatever pip resolves today".
+#
+# gdtoolkit is the pin that matters (a floating linter means CI can start
+# failing with no commit to blame); everything below it is `pip freeze`
+# output for that exact version, so the whole dependency graph — not just
+# the top-level package — is locked to one set of versions.
+#
+# No --hash pins here on purpose: PyYAML and regex ship per-platform,
+# per-CPython-version compiled wheels (verified with `pip download`), so
+# hash-pinning would tie this file to one wheel and break `pip install` on
+# any other platform or Python minor version — worse than the drift it
+# would prevent. Exact-version pinning already gives the "no surprise
+# upgrades" guarantee; CI installs with the same Python version the venv
+# recipe below targets (see .github/workflows/ci-godot.yml).
+#
+# To bump gdtoolkit: change the version below, then inside a fresh venv run
+#   pip install gdtoolkit==<new version> && pip freeze
+# and paste the full result back in here. Re-run `make lint` before pushing —
+# a gdtoolkit bump can change formatting/lint output same as a Godot bump can
+# change compiler warnings.
+gdtoolkit==4.5.0
+colorama==0.4.6
+docopt-ng==0.9.0
+lark==1.2.2
+mando==0.7.1
+PyYAML==6.0.3
+radon==6.0.1
+regex==2026.7.19
+setuptools==79.0.1
+six==1.17.0

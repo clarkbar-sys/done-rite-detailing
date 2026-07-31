@@ -37,19 +37,23 @@ startup, and shows the same string on screen.
 
 ## Development
 
-Needs `bash`, `curl`, `unzip` and `make`. The first command downloads Godot
-(~76 MB), and the first `make build` also pulls the export templates (~1.2 GB,
-pruned to ~280 MB on disk). Both are cached in `.godot-sdk/` afterwards.
+Needs `bash`, `curl`, `unzip`, `make` and `python3` (the last only for
+`make lint` / `make format`). The first command downloads Godot (~76 MB), and
+the first `make build` also pulls the export templates (~1.2 GB, pruned to
+~280 MB on disk). Both are cached in `.godot-sdk/` afterwards; `make lint`
+likewise caches a small Python venv in `.venv-lint/`.
 
 ```bash
-make check     # type-check every script — the CI gate
+make check     # type-check every script — a CI gate
 make smoke     # boot the game headless and require a clean run
 make test      # both of the above; run this before you push
+make lint      # gdformat --check + gdlint — a separate, faster CI gate
+make format    # gdformat, rewrites in place
 make build     # export the Linux release binary -> build/linux/
 make editor    # open the project in the Godot editor
 make run       # run the game
-make clean     # remove build outputs (keeps the downloaded toolchain)
-make distclean # also drop .godot-sdk/
+make clean     # remove build outputs (keeps the downloaded toolchains)
+make distclean # also drop .godot-sdk/ and .venv-lint/
 ```
 
 To move to a newer Godot, run `scripts/fetch-godot.sh --update`. It prints the

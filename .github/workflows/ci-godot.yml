@@ -1,12 +1,18 @@
 name: CI (Godot)
 
-# Two stages, fastest feedback first:
+# Three jobs, fastest feedback first:
+#   lint   — gdformat --check + gdlint every script (pure Python, no Godot download)
 #   check  — type-check every script + boot the game headless (editor only, ~76 MB)
 #   build  — export the Linux release binary, run it, upload it as an artifact
 #
-# Both use the sha256-pinned toolchain from scripts/fetch-godot.sh, so CI and a
-# developer's `make` run the identical Godot. The SDK is cached on that script's
-# hash: bumping the pin invalidates the cache automatically.
+# `lint` doesn't `need:` anything and runs in parallel with `check` — it has no
+# Godot dependency, so gating it behind the ~76 MB editor download would only
+# slow down the signal it exists to give quickly.
+#
+# check/build use the sha256-pinned toolchain from scripts/fetch-godot.sh, so CI
+# and a developer's `make` run the identical Godot. The SDK is cached on that
+# script's hash: bumping the pin invalidates the cache automatically. `lint`
+# uses the version pin in requirements-dev.txt the same way.
 
 on:
   push:
@@ -25,6 +31,27 @@ env:
   ARTIFACT: build/linux/done-rite-detailing.x86_64
 
 jobs:
+  lint:
+    name: Format & lint (gdtoolkit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # No Godot involved — gdformat/gdlint are pure-Python source checks —
+      # so pin the interpreter instead of trusting whatever ubuntu-latest
+      # ships, same "reproducible, not ambient" reasoning as the Godot pin.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      # gdformat --check + gdlint over every tracked script; non-zero on any
+      # formatting diff or rule violation. See requirements-dev.txt for the
+      # gdtoolkit version pin and .gdlintrc for the rule set.
+      - name: gdformat --check + gdlint
+        run: make lint
+
   check:
     name: Type check & smoke
     runs-on: ubuntu-latest

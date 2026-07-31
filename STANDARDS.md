@@ -6,7 +6,7 @@ means "let the tools run."
 
 | Language | Format | Lint / analyze | Types | Tests + floor | Enforced by |
 | -------- | ------ | -------------- | ----- | ------------- | ----------- |
-| GDScript | `gdformat` — *pending* | `gdlint` — *pending* | **typed GDScript, warnings-as-errors** | headless smoke; GUT + floor *pending* | `.github/workflows/ci-godot.yml` |
+| GDScript | `gdformat --check` | `gdlint` (`.gdlintrc`) | **typed GDScript, warnings-as-errors** | headless smoke; GUT + floor *pending* | `.github/workflows/ci-godot.yml` |
 
 Run `make test` locally before pushing — CI runs the same commands.
 
@@ -83,13 +83,47 @@ make check   # runs `--check-only` over every .gd; non-zero on any error
 - **Tests live outside the shipped pack** (`tests/` is in the export's
   `exclude_filter`).
 
+### Format & lint
+
+[gdtoolkit](https://github.com/Scony/godot-gdscript-toolkit) (`gdformat` +
+`gdlint`), version-pinned in [`requirements-dev.txt`](./requirements-dev.txt)
+the same way Godot itself is pinned in `scripts/fetch-godot.sh` — a floating
+lint tool means CI can start failing with no commit to blame. Installed into a
+gitignored venv at `.venv-lint/`, never system-wide.
+
+```bash
+make format   # gdformat, rewrites in place
+make lint     # gdformat --check + gdlint, CI-safe (never rewrites)
+```
+
+`gdformat` and `.editorconfig` agree: both want tabs and a final newline for
+`.gd` files, and `gdformat` trims trailing whitespace on top — verified by
+running it over the tree and diffing (no-op) and over a deliberately
+trailing-whitespace / no-final-newline / space-indented file (fixed all
+three, tabs preserved).
+
+`gdlint`'s rules live in [`.gdlintrc`](./.gdlintrc), mostly gdtoolkit's
+defaults — they already match the naming/tabs conventions above without
+edits. One gap: gdtoolkit 4.5.0 has no function-length / cyclomatic-style
+check (max-statements, max-locals, etc. are commented-out placeholders in its
+own source, not implemented) — `.gdlintrc` says so rather than faking it with
+a rule that doesn't exist.
+
+Confirmed against gdtoolkit 4.5.0 (latest on PyPI as of this writing):
+typed signals, `static var`, `_static_init`, `@onready var x: Label = %Name`
+and `##` doc comments all parse, format, and lint cleanly — the toolkit's
+lagging parser is not a problem for the 4.7 syntax this repo actually uses.
+
+To bump the pin: install the new `gdtoolkit==<version>` in a scratch venv,
+`pip freeze` it back into `requirements-dev.txt`, then run `gdlint -d` and
+diff the dump against `.gdlintrc` in case a new gdtoolkit release changed a
+default. Re-run `make lint` before pushing.
+
 ### Parked
 
-`gdformat` / `gdlint` (from
-[gdtoolkit](https://github.com/Scony/godot-gdscript-toolkit)), unit tests with
-[GUT](https://github.com/bitwes/Gut), and a coverage floor to match the 80% the
-rest of the house standard uses. Tracked as sub-issues of the day-0 initiative;
-this table gets its missing cells then.
+Unit tests with [GUT](https://github.com/bitwes/Gut) and a coverage floor to
+match the 80% the rest of the house standard uses. Tracked as a sub-issue of
+the day-0 initiative; this table gets its last missing cell then.
 
 ---
 
