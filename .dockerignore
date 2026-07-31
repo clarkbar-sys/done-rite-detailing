@@ -1,0 +1,6 @@
+# The build fetches s7 itself; the only thing it needs from the context is the
+# fetch script. Keep the rest out.
+*
+!scripts/
+scripts/*
+!scripts/fetch-s7.sh

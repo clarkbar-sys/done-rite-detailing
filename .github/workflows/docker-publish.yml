@@ -1,0 +1,70 @@
+name: Publish container (s7)
+
+# Publishes the rolling `latest` s7 image to the GitHub Container Registry
+# (GHCR) on every push to main, so you can `docker pull` it anywhere:
+#   docker run --rm -it ghcr.io/<owner>/<repo>            # REPL
+#   docker run --rm -v "$PWD:/work" ghcr.io/<owner>/<repo> script.scm
+#
+# Versioned images (vX.Y.Z) are published by release.yml when a release is cut.
+#
+# No extra secrets needed — the built-in GITHUB_TOKEN can push to this repo's
+# GHCR namespace (that's what `packages: write` below grants).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "scripts/fetch-s7.sh"
+      - ".github/workflows/docker-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    name: Build & push to GHCR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-qemu-action@v3      # enables the arm64 cross-build
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags & labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
