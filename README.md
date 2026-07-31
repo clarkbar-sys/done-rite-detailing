@@ -9,8 +9,9 @@
 
 Done Rite Detailing is an in-development game. Today the project is at **day 0**:
 a Godot 4 project that type-checks, boots headlessly, and exports a playable
-build — in your browser, or as a Linux binary — from CI. Gameplay comes next —
-see the
+build — in your browser, or as a Linux binary — from CI. It opens on a title
+screen with a Start button, and Start leads to a main menu that is, so far, a
+sign saying it's coming soon. Gameplay comes next — see the
 [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.
 
@@ -90,8 +91,9 @@ top of that script, then re-run `make test build` before pushing.
 ```
 project.godot          engine + project settings (typed-GDScript gates live here)
 export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make build-web`
-src/core/              cross-cutting code (shared helpers, process-global facts)
-src/main/              the entry scene
+src/core/              cross-cutting code (shared helpers, game states, process-global facts)
+src/main/              the entry scene — owns the state machine and swaps screens
+src/screens/           one scene per game state, all of them a `GameScreen`
 tests/unit/            tests for pure logic — no scene tree
 tests/integration/     tests that need a scene tree
 scripts/               developer tooling (toolchain fetch, build stamping, gates)

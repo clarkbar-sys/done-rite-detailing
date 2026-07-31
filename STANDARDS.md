@@ -81,6 +81,16 @@ make check   # runs `--check-only` over every .gd; non-zero on any error
   compile-time check when you do.
 - **Scenes stay small and composable.** If a scene needs a paragraph to explain,
   split it.
+- **Anything a finger has to hit** clears `TouchTarget.min_design_size()` on
+  both axes — 164 design px today, and a test asserts it rather than a review
+  noticing it. The design is scaled to about a third on a phone, so a control
+  that looks generous at 1280×720 can be 18 px tall in a hand, and a target
+  nobody can hit reads as a game that ignores them, not as a small button.
+- **One state, one screen.** What the game is doing is a `GameState` subclass in
+  `src/core/` (Node-free, so a transition is a unit test); what the player sees
+  is a `GameScreen` scene in `src/screens/`. A screen asks `GameStateMachine`
+  for the state it wants next and nothing else — `src/main/main.gd` is the only
+  script that loads or frees a screen, so screens never name each other.
 - **Prefer a seam over a stub.** If a function can only be tested by planting a
   file somewhere real, split the parsing out of the I/O and test that.
   `BuildInfo.parse_stamp` is the worked example.
@@ -255,11 +265,16 @@ download):
 | ---- | ---------------- |
 | R1 | every `.gd` under `src/` is named by at least one test — by its path, its `class_name`, or the `.tscn` that carries it |
 | R2 | every `.gd` under `src/core/` has its own `tests/unit/test_<name>.gd` |
-| R3 | every `.gd` under `src/core/` extends a Node-free base (`RefCounted`, `Resource`, `Object`), so R2 can always be satisfied honestly instead of by moving the file |
+| R3 | every `.gd` under `src/core/` extends a Node-free base (`RefCounted`, `Resource`, `Object`) — directly, or through a first-party class that does — so R2 can always be satisfied honestly instead of by moving the file |
 
 R3 is the load-bearing one. It is what makes "keep game logic in plain
 testable classes" a rule rather than advice, and it is an allow-list, so a base
-class nobody has listed fails the check instead of slipping through. Together
+class nobody has listed fails the check instead of slipping through. The
+allow-list holds **engine** classes only: a first-party base is resolved rather
+than listed — `TitleScreenGameState extends GameState` is judged by what
+`GameState` itself extends, all the way up. Listing first-party names instead
+would be the hole it exists to close, because re-basing one of them onto a
+`Node` would go on passing for every subclass. Together
 with `make gut`'s risky-test gate — which fails a test that asserts nothing —
 the pair cannot be satisfied by an empty file. All four failure modes verified
 by breaking them one at a time; each exits 1.
@@ -325,10 +340,21 @@ renderer everywhere. It doesn't, because the split costs zero lines and
 SSIL/SSAO, the Vulkan-only parts of the sky and light pipeline — is simply
 absent from the build most people will click on, and no gate here can see that:
 CI exports the bundle, it does not look at pixels. So the rule is: **anything
-visual is checked in the web build before it is called done.** That is
-advisory, exactly like "keep logic out of `Node` subclasses" under
-[Coverage](#coverage), and for the same reason — it is a review
-responsibility, not a mechanical one.
+visual is checked in the web build before it is called done** — and **on a
+phone-shaped screen, with a tap**, because that is the shape most people will
+open the link in. That is advisory, exactly like "keep logic out of `Node`
+subclasses" under [Coverage](#coverage), and for the same reason — it is a
+review responsibility, not a mechanical one.
+
+Both halves of it were learned the expensive way. On an emulated Pixel 7
+(411×838 CSS px), `window/stretch/aspect="keep"` turned the game into a 411×231
+strip with three quarters of the screen dead black, and a Start button that
+looked comfortable at 1280×720 measured 70×18 CSS px — so taps missed it and the
+game looked like it had stopped responding. A browser's device emulation
+reproduces both in about a minute, which is how those numbers were arrived at.
+What came out of it is written where it can't be forgotten: `project.godot`
+carries the stretch measurement, and `TouchTarget` in `src/core/` turns "big
+enough for a finger" into a number the tests gate.
 
 **When to revisit.** The first time a Forward+-only feature is actually wanted.
 Decide then, with something real to look at: either drop desktop to

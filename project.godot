@@ -48,10 +48,33 @@ gdscript/warnings/unused_signal=2
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
-; Pick the whole window up and scale it, letterboxing as needed, so the game
-; looks the same at any window size instead of revealing more/less world.
+; Pick the whole window up and scale it, so the game looks the same at any
+; window size instead of revealing more or less of the world.
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
+
+; "expand" and not "keep", decided on a phone rather than in the abstract.
+; "keep" letterboxes this 16:9 design into a portrait screen: measured in a real
+; browser on an emulated Pixel 7 (411x838 CSS px), the game was a 411x231 strip
+; with three quarters of the screen dead black, and a tap 25 px below the Start
+; button landed in the black and did nothing. "expand" keeps the scale and the
+; aspect ratio and grows the *viewport* to fill the window instead, so every
+; pixel the player can see is the game's and every tap reaches it. Nothing is
+; positioned absolutely — the UI is anchored and centred — so it simply lands in
+; the middle of whatever it's handed.
+;
+; What this does NOT fix is how *small* everything gets: the scale still comes
+; from the window's width against the 1280 above, so a control's size on a phone
+; is roughly a third of what it says here. That is what `TouchTarget` in
+; src/core/ exists to state as a number, and what the Start button is sized by.
+window/stretch/aspect="expand"
+
+; Touch input needs nothing configured here. `input_devices/pointing/
+; emulate_mouse_from_touch` is on by default, which is what turns a tap into the
+; click a Button understands — verified in a real browser on an emulated phone,
+; where a tap on Start moves to the menu. It is not written out because the
+; editor deletes any setting equal to its default (see the renderer note below),
+; so the fact lives in a comment instead. Turning it off would break every
+; button in the game on every touchscreen at once.
 
 [rendering]
 

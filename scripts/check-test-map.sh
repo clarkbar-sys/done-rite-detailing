@@ -38,6 +38,12 @@ cd "$DIR"
 # and doesn't belong in src/core/" or "add the base here", and both are a
 # reviewable commit rather than a silent hole. Deny-listing Node types instead
 # would mean every Godot class we forgot to list quietly passed.
+#
+# ENGINE classes only. A first-party base is not listed and never needs to be:
+# `root_base` below follows `extends GameState` to whatever GameState itself
+# extends, so a subclass is judged by the engine class at the top of its chain.
+# Listing first-party names here instead would be the silent hole — it would go
+# on passing after someone re-based that class onto a Node.
 NODE_FREE_BASES=(RefCounted Resource Object)
 
 fail=0
@@ -65,6 +71,31 @@ fi
 # characters a regex would read as syntax.
 named_in() { # needle dir
   grep -qrF --include='*.gd' -e "$1" "$2"
+}
+
+# The engine class at the top of an `extends` chain: follows a first-party base
+# to the file that declares it, and repeats. `GameState` extends RefCounted, so
+# a state that extends GameState resolves to RefCounted and satisfies R3
+# honestly, without RefCounted having to be spelled out in every subclass.
+#
+# Prints the empty string for a script with no `extends` at all (implicitly
+# RefCounted) — the caller already treats that as Node-free.
+#
+# `|| true` on both lookups: this script runs under `set -e -o pipefail`, where
+# a grep that matches nothing would otherwise abort the whole run. The depth cap
+# is a cycle guard; a chain that deep is broken in a way Godot would reject
+# first, and stopping there fails R3, which is the safe direction.
+root_base() { # base
+  local base="$1" declaring="" depth=0
+  while [ -n "$base" ] && [ "$depth" -lt 16 ]; do
+    # The class name must match whole, or `GameState` would resolve through
+    # `GameStateMachine` and report whatever *that* extends.
+    declaring="$(grep -rlE --include='*.gd' "^class_name ${base}([^A-Za-z0-9_]|\$)" src | head -1 || true)"
+    [ -n "$declaring" ] || break
+    base="$(sed -n 's/^extends \([A-Za-z0-9_]*\).*/\1/p' "$declaring" | head -1)"
+    depth=$((depth + 1))
+  done
+  echo "$base"
 }
 
 # The .tscn files that carry a given script, by resource path or by UID —
@@ -119,16 +150,23 @@ for src in "${sources[@]}"; do
     # bare AND-list whose test fails is a footgun waiting for whoever edits
     # this next, even though bash happens to let this one through.
     node_free=0
-    if [ -z "$base" ]; then
+    root="$(root_base "$base")"
+    if [ -z "$root" ]; then
       node_free=1
     fi
     for allowed in "${NODE_FREE_BASES[@]}"; do
-      if [ "$base" = "$allowed" ]; then
+      if [ "$root" = "$allowed" ]; then
         node_free=1
       fi
     done
     if [ "$node_free" -ne 1 ]; then
-      bad "$src extends $base; src/core/ is the Node-free tier (R3): ${NODE_FREE_BASES[*]}"
+      # Name the whole chain, so "extends GameScreen" doesn't read as a mystery
+      # when the thing actually being rejected is the Control underneath it.
+      chain="$base"
+      if [ "$root" != "$base" ]; then
+        chain="$base -> $root"
+      fi
+      bad "$src extends $chain; src/core/ is the Node-free tier (R3): ${NODE_FREE_BASES[*]}"
     fi
   fi
 
