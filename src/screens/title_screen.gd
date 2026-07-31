@@ -1,7 +1,11 @@
 ## The title screen: the project's name, which build this is, and Start —
-## played over the same detailing bay the main menu and play screen show,
-## rather than a blank background, so the car is the first thing a player sees
-## instead of something they wait a screen for.
+## played over the same detailing bay the play screen shows, rather than a
+## blank background, so the car is the first thing a player sees instead of
+## something they wait a screen for.
+##
+## Start leads straight into [PlayGameState] — there is no menu screen between
+## the title card and the game, on purpose. A player who has already seen the
+## title has nothing left to decide before the room they're about to work in.
 ##
 ## The two labels are the day-0 screen this project started as, moved intact
 ## into a state of its own — the same text CI's smoke run and the integration
@@ -23,4 +27,4 @@ func _ready() -> void:
 
 
 func _on_start_pressed() -> void:
-	request_transition(MainMenuGameState.new())
+	request_transition(PlayGameState.new())

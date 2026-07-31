@@ -33,13 +33,14 @@
 class_name Garage
 extends SubViewportContainer
 
-## Whether the camera circles the car. The menu leaves it on to show the car
-## off; the play screen turns it off and holds the shot.
+## Whether the camera circles the car. The title screen leaves it on to show
+## the car off; the play screen turns it off and holds the shot.
 @export var orbiting: bool = true
 
 ## Where on its circle the camera starts, in degrees. [code]0[/code] is head-on
 ## from the front of the room; the play screen uses a three-quarter angle so the
-## cut out of the menu reads as a chosen shot rather than a camera that stopped.
+## cut out of the title screen reads as a chosen shot rather than a camera that
+## stopped.
 @export var start_angle_degrees: float = 0.0
 
 ## How far the camera stands from the car, on the ground plane. Kept under the
@@ -54,7 +55,8 @@ extends SubViewportContainer
 @export var orbit_height: float = 2.6
 
 ## How fast the camera circles. 12°/s is a full turn every thirty seconds —
-## slow enough to sit behind a menu without pulling the eye off the button.
+## slow enough to sit behind a title screen without pulling the eye off the
+## button.
 @export var orbit_degrees_per_second: float = 12.0
 
 var _orbit: CameraOrbit = null

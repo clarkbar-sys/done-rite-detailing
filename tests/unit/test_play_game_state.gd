@@ -1,6 +1,6 @@
 ## Unit tests for [PlayGameState] — the same facts
-## [code]tests/unit/test_main_menu_game_state.gd[/code] pins, for the state
-## Start Game leads to.
+## [code]tests/unit/test_title_screen_game_state.gd[/code] pins, for the state
+## Start leads to.
 extends GutTest
 
 
@@ -19,10 +19,10 @@ func test_its_scene_exists() -> void:
 	assert_true(ResourceLoader.exists(state.scene_path), "no scene at %s" % state.scene_path)
 
 
-func test_it_is_a_different_state_from_the_menu() -> void:
+func test_it_is_a_different_state_from_the_title_screen() -> void:
 	# The two screens show the same garage, which is exactly why this is worth
 	# asserting: they are distinct because they name different scenes, and a
-	# copy-paste that left SCENE_PATH pointing at the menu would strand the
-	# player on a screen whose Start Game button reloads it forever.
-	assert_ne(PlayGameState.SCENE_PATH, MainMenuGameState.SCENE_PATH)
-	assert_ne(PlayGameState.ID, MainMenuGameState.ID)
+	# copy-paste that left SCENE_PATH pointing at the title screen would strand
+	# the player on a screen whose Start button reloads it forever.
+	assert_ne(PlayGameState.SCENE_PATH, TitleScreenGameState.SCENE_PATH)
+	assert_ne(PlayGameState.ID, TitleScreenGameState.ID)

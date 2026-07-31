@@ -9,11 +9,11 @@
 
 Done Rite Detailing is an in-development game: a Godot 4 project that
 type-checks, boots headlessly, and exports a playable build — in your browser,
-or as a Linux binary — from CI. It opens on a title screen; Start leads to a
-main menu played over the detailing bay itself, with the camera circling the
-car; and Start Game drops you into that same room with the menu gone and the
-camera parked. There is nothing to do in there yet — the room is boxes and the
-car is a green one — but the flow through it is real. Gameplay comes next; see
+or as a Linux binary — from CI. It opens on a title screen played over the
+detailing bay itself, with the camera circling the car; Start drops you
+straight into that same room with the camera parked. There is nothing to do
+in there yet — the room is boxes and the car is a green one — but the flow
+through it is real. Gameplay comes next; see
 the [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.
 
