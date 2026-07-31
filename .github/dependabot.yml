@@ -16,6 +16,19 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # gdtoolkit is the only direct dependency; everything below it in
+    # requirements-dev.txt is `pip freeze` output for that exact version, i.e. a
+    # lockfile. Bumping one of those transitive pins on its own is unresolvable —
+    # gdtoolkit 4.5.0 requires lark==1.2.2 exactly, and its radon==6.0.1 requires
+    # mando<0.8, so those PRs can only ever fail `make lint` (see #21, #23).
+    # The correct way to move them is to bump gdtoolkit and regenerate the whole
+    # freeze block, per the recipe at the top of requirements-dev.txt.
+    #
+    # Trade-off: this also suppresses security advisories for the transitive
+    # pins. Accepted — they only ever run in the throwaway .venv-lint/ against
+    # first-party GDScript, never in the shipped game.
+    allow:
+      - dependency-name: "gdtoolkit"
 
   # Uncomment the block matching your stack once you add a dependency manifest:
   #
