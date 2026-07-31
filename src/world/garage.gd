@@ -172,6 +172,21 @@ func _process(delta: float) -> void:
 	_aim()
 
 
+## The hands the eye is looking past, and through them the [ToolBelt] driving
+## what is in them.
+##
+## Public because the room owns the viewmodel but not the game: the play screen
+## has a roll-up that needs to change the equipped tool, and it must change
+## [i]this[/i] belt rather than build one of its own — two belts is a UI that
+## rings one tool while the player holds another. Handing out the node instead
+## of forwarding a `belt()` of our own keeps the room from growing an opinion
+## about the belt it is merely carrying.
+##
+## Present on the title screen too, where it is hidden and nobody asks.
+func view_model() -> ViewModel:
+	return _view_model
+
+
 ## Puts the camera where the orbit says it should be, looking at the car.
 func _aim() -> void:
 	_camera.global_position = _orbit.eye(_car.global_position)
