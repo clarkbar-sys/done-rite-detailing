@@ -70,7 +70,7 @@ func test_it_shows_the_garage_behind_the_title() -> void:
 
 
 func test_the_title_camera_circles_the_car() -> void:
-	assert_true(_garage().orbiting, "the title screen shows the car off, same as the main menu")
+	assert_true(_garage().orbiting, "the title screen shows the car off before the player starts")
 
 
 func test_title_shows_the_project_name() -> void:
@@ -89,14 +89,14 @@ func test_it_offers_a_start_button() -> void:
 	assert_not_null(_start_button(), "the title screen must have a Start button")
 
 
-func test_start_asks_for_the_main_menu() -> void:
+func test_start_asks_for_the_play_state() -> void:
 	# Through the button's own signal rather than by calling the handler, so a
 	# connection dropped in `_ready()` fails here rather than in the browser.
 	_start_button().pressed.emit()
 	assert_eq(_requested.size(), 1, "Start must request exactly one transition")
 	if _requested.size() != 1:
 		return
-	assert_true(_requested[0] is MainMenuGameState, "Start must lead to the main menu")
+	assert_true(_requested[0] is PlayGameState, "Start must lead straight into the game")
 
 
 func test_it_asks_for_nothing_on_its_own() -> void:
@@ -124,10 +124,10 @@ func _tap(at: Vector2) -> void:
 	Input.flush_buffered_events()
 
 
-func test_a_tap_on_start_asks_for_the_main_menu() -> void:
+func test_a_tap_on_start_asks_for_the_play_state() -> void:
 	_tap(_start_button().get_global_rect().get_center())
 	await wait_process_frames(1)
-	assert_eq(_requested.size(), 1, "a tap on Start must ask for the menu")
+	assert_eq(_requested.size(), 1, "a tap on Start must ask for the game")
 
 
 func test_start_is_big_enough_for_a_finger() -> void:

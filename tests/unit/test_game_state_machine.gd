@@ -48,20 +48,20 @@ func test_the_state_is_already_current_when_the_change_is_announced() -> void:
 	# elsewhere; if those two ever disagreed, the bug would surface a frame
 	# later and somewhere else entirely.
 	_machine.changed.connect(_assert_current_matches)
-	_machine.enter(MainMenuGameState.new())
+	_machine.enter(PlayGameState.new())
 
 
 func _assert_current_matches(state: GameState) -> void:
 	assert_eq(_machine.current(), state)
 
 
-func test_it_walks_from_the_title_screen_to_the_menu() -> void:
+func test_it_walks_from_the_title_screen_to_the_game() -> void:
 	var title: TitleScreenGameState = TitleScreenGameState.new()
-	var menu: MainMenuGameState = MainMenuGameState.new()
+	var play: PlayGameState = PlayGameState.new()
 	_machine.enter(title)
-	_machine.enter(menu)
-	assert_eq(_machine.current(), menu)
-	var expected: Array[GameState] = [title, menu]
+	_machine.enter(play)
+	assert_eq(_machine.current(), play)
+	var expected: Array[GameState] = [title, play]
 	assert_eq(_announced, expected)
 
 
