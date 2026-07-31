@@ -14,4 +14,4 @@ script = ExtResource("1_play")
 
 [node name="Garage" parent="." instance=ExtResource("2_garage")]
 orbiting = false
-start_angle_degrees = 35.0
+first_person = true

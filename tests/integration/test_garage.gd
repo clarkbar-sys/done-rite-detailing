@@ -119,6 +119,25 @@ func test_the_camera_never_orbits_into_a_wall() -> void:
 	assert_lt(_garage.orbit_radius, _inner_half_width(), "the camera circle must fit in the room")
 
 
+func test_the_room_orbits_unless_a_screen_says_otherwise() -> void:
+	# The defaults are the title screen's shot, and the title screen overrides
+	# nothing but the starting angle. If either of these flipped, the title card
+	# would come up on a motionless view from somebody's eye socket.
+	assert_true(_garage.orbiting, "the room's own shot is the slow circuit")
+	assert_false(_garage.first_person, "standing in the bay is the game's idea, not the room's")
+
+
+func test_the_view_model_anchor_is_hidden_while_the_camera_circles() -> void:
+	# Both screens instance this one scene, so the anchor is here on the title
+	# screen too — and a tool hanging in the corner of an outside-in shot of a car
+	# reads as a rendering fault, not as something being held. It exists and it is
+	# switched off, and `is_visible_in_tree` rather than `visible` because what
+	# matters is that nothing under it is drawn.
+	var anchor: Node3D = _garage.get_node("%ViewModel") as Node3D
+	assert_not_null(anchor, "the anchor is part of the room's scene, not the play screen's")
+	assert_false(anchor.is_visible_in_tree(), "nobody is standing here to hold anything")
+
+
 func test_the_camera_never_orbits_up_through_the_roof() -> void:
 	# The other half of the same fence, and the easier one to trip: the height
 	# is measured from the middle of the car rather than from the floor, so it
