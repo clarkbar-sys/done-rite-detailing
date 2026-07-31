@@ -81,6 +81,11 @@ make check   # runs `--check-only` over every .gd; non-zero on any error
   compile-time check when you do.
 - **Scenes stay small and composable.** If a scene needs a paragraph to explain,
   split it.
+- **One state, one screen.** What the game is doing is a `GameState` subclass in
+  `src/core/` (Node-free, so a transition is a unit test); what the player sees
+  is a `GameScreen` scene in `src/screens/`. A screen asks `GameStateMachine`
+  for the state it wants next and nothing else — `src/main/main.gd` is the only
+  script that loads or frees a screen, so screens never name each other.
 - **Prefer a seam over a stub.** If a function can only be tested by planting a
   file somewhere real, split the parsing out of the I/O and test that.
   `BuildInfo.parse_stamp` is the worked example.
@@ -255,11 +260,16 @@ download):
 | ---- | ---------------- |
 | R1 | every `.gd` under `src/` is named by at least one test — by its path, its `class_name`, or the `.tscn` that carries it |
 | R2 | every `.gd` under `src/core/` has its own `tests/unit/test_<name>.gd` |
-| R3 | every `.gd` under `src/core/` extends a Node-free base (`RefCounted`, `Resource`, `Object`), so R2 can always be satisfied honestly instead of by moving the file |
+| R3 | every `.gd` under `src/core/` extends a Node-free base (`RefCounted`, `Resource`, `Object`) — directly, or through a first-party class that does — so R2 can always be satisfied honestly instead of by moving the file |
 
 R3 is the load-bearing one. It is what makes "keep game logic in plain
 testable classes" a rule rather than advice, and it is an allow-list, so a base
-class nobody has listed fails the check instead of slipping through. Together
+class nobody has listed fails the check instead of slipping through. The
+allow-list holds **engine** classes only: a first-party base is resolved rather
+than listed — `TitleScreenGameState extends GameState` is judged by what
+`GameState` itself extends, all the way up. Listing first-party names instead
+would be the hole it exists to close, because re-basing one of them onto a
+`Node` would go on passing for every subclass. Together
 with `make gut`'s risky-test gate — which fails a test that asserts nothing —
 the pair cannot be satisfied by an empty file. All four failure modes verified
 by breaking them one at a time; each exits 1.
