@@ -3,7 +3,7 @@ name: CI (Godot)
 # Four jobs, fastest feedback first:
 #   lint   — gdformat --check + gdlint every script (pure Python, no Godot download)
 #   check  — type-check every script + boot the game headless (editor only, ~76 MB)
-#   test   — the GUT unit + integration suites in tests/, headless
+#   test   — the test map check, then the GUT unit + integration suites, headless
 #   build  — export the Linux release binary, run it, upload it as an artifact
 #
 # `lint` doesn't `need:` anything and runs in parallel with `check` — it has no
@@ -14,10 +14,13 @@ name: CI (Godot)
 # the same editor download and the same import pass. Two reasons, both about the
 # signal rather than the seconds: a red PR check reading "Unit & integration
 # tests" says something different from one reading "Type check & smoke", and the
-# two can be required independently in branch protection. It also gives issue
-# #12's coverage gate a job to hang off instead of a fifth step buried in
-# `check`. Between them the two jobs run exactly what `make test` runs locally —
-# `check` takes the first two targets, `test` the third.
+# two can be required independently in branch protection. Between them the two
+# jobs run exactly what `make test` runs locally — `check` takes the first two
+# targets, `test` the last two.
+#
+# There is no coverage job. GDScript has no line-coverage instrumentation this
+# project is willing to gate on; `make tested` is what stands in its place, and
+# it runs as the first step of `test`. STANDARDS.md "Coverage" has the numbers.
 #
 # check/test/build use the sha256-pinned toolchain from scripts/fetch-godot.sh,
 # so CI and a developer's `make` run the identical Godot. The SDK is cached on
@@ -98,6 +101,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Before the caches on purpose: this is grep over the checkout, it needs
+      # neither Godot nor GUT, and it is the gate that replaces the line
+      # coverage floor this project decided not to have (STANDARDS.md
+      # "Coverage"). Failing it in two seconds beats failing it after a 76 MB
+      # download. See scripts/check-test-map.sh for the three rules.
+      - name: Every src/ script is reached by a test
+        run: make tested
+
       - name: Cache Godot editor
         uses: actions/cache@v6
         with:
@@ -116,9 +127,10 @@ jobs:
       # `make gut` does NOT trust GUT's exit code on its own. GUT 9.7.1 exits 0
       # when it collects no test scripts at all — a deleted tests/ directory, a
       # renamed file, a bad -gdir — and prints "Nothing was run." on its way
-      # out. The recipe therefore checks the run summary as well, the same way
-      # `make smoke` checks its log rather than believing Godot's exit status.
-      # See the Makefile's `gut` target for the verification behind that.
+      # out, and it exits 0 for a test that asserts nothing too ("risky"). The
+      # recipe therefore checks the run summary as well, the same way `make
+      # smoke` checks its log rather than believing Godot's exit status.
+      # See the Makefile's `gut` target for the verification behind both.
       - name: GUT suites
         run: make gut
 

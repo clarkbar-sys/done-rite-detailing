@@ -8,11 +8,17 @@
 #   make check     type-check every script (the CI gate)
 #   make smoke     boot the game headless and require a clean exit
 #   make gut       run the GUT suites in tests/ headless
-#   make test      check + smoke + gut (what CI runs)
+#   make tested    require every src/ script to be reached by a test
+#   make test      check + smoke + gut + tested (what CI runs)
 #   make lint      gdformat --check + gdlint every script (a separate CI gate)
 #   make format    gdformat every script in place
 #   make build     export the Linux release binary -> build/linux/
 #   make editor    open the project in the Godot editor
+#
+# There is deliberately no `make coverage`. GDScript has no line-coverage
+# instrumentation this project is willing to gate on; `make tested` is what
+# stands in its place. STANDARDS.md "Coverage" has the measurements behind
+# that decision — read it before adding a percentage to this file.
 
 # Recipes pipe Godot's output through `tee`, and make's default /bin/sh reports
 # the exit status of the *last* command in a pipeline. Without pipefail a hard
@@ -46,7 +52,7 @@ SOURCES := $(shell find . -name '*.gd' \
              -not -path './.godot/*' -not -path './.godot-sdk/*' \
              -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-.PHONY: all sdk editor-sdk gut-sdk import check smoke gut lint format test build stamp run editor clean distclean
+.PHONY: all sdk editor-sdk gut-sdk import check smoke gut tested lint format test build stamp run editor clean distclean
 
 all: check build
 
@@ -149,6 +155,17 @@ smoke: import
 #    So the exit code is not the gate on its own, exactly as with `make smoke`
 #    above: the summary must show at least one script was collected.
 #
+#  - THE OTHER TRAP: a test that asserts nothing exits 0 too. GUT calls it
+#    "risky" and prints "[Risky]: <name> did not assert" plus a
+#    "Risky/Pending" line in the summary — and still returns 0. Verified with
+#    a test whose whole body is `pass`: "Risky/Pending 1", "---- 1
+#    pending/risky tests. ----", exit 0. That matters more here than in a repo
+#    with a coverage floor, because `make tested` only checks that a test
+#    *exists* for each logic script; without this line the pair would be
+#    satisfied by an empty file. `pending()` tests land in the same total and
+#    fail here too, on purpose — a pending test on main is a TODO wearing a
+#    test's clothes.
+#
 # `-gdisable_colors` so the log greps cleanly and CI's plain-text view is
 # readable; without it the ANSI escapes sit between the ^ and the word.
 gut: import
@@ -160,7 +177,21 @@ gut: import
 	  echo "GUT collected no test scripts — a suite that runs nothing is not a pass."; \
 	  exit 1; \
 	fi
+	@if grep -qE '^Risky/Pending +[1-9]' $(LOG_DIR)/gut.log; then \
+	  echo "GUT reported risky/pending tests (above) — a test that asserts nothing is not a test."; \
+	  exit 1; \
+	fi
 	@echo "GUT suites passed."
+
+# What this repo gates on instead of a line-coverage floor: every script under
+# src/ has to be reached by a test, and src/core/ has to stay unit-testable.
+# scripts/check-test-map.sh states the three rules and what they can't see;
+# STANDARDS.md "Coverage" has the evidence for why there is no percentage here.
+#
+# No Godot and no addon — it is grep over the working tree — so it runs in a
+# second and is the first thing CI's `test` job does, before any download.
+tested:
+	@scripts/check-test-map.sh .
 
 # The one command CI and humans run before pushing. Deliberately check, smoke
 # and gut but not lint: those three are "does the game still work", gated by
@@ -171,8 +202,10 @@ gut: import
 # other to wait. Run `make test lint` to get both locally.
 #
 # smoke before gut: a project that can't boot at all turns every GUT failure
-# into a red herring, so let the coarse gate report first.
-test: check smoke gut
+# into a red herring, so let the coarse gate report first. `tested` is last
+# because it is the only one that can be satisfied by writing a file rather
+# than by fixing the game — hearing about it after the real failures is right.
+test: check smoke gut tested
 
 # ---- format / lint ----------------------------------------------------------
 
