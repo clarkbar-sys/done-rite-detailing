@@ -7,6 +7,8 @@
 #
 #   make check     type-check every script (the CI gate)
 #   make smoke     boot the game headless and require a clean exit
+#   make gut       run the GUT suites in tests/ headless
+#   make test      check + smoke + gut (what CI runs)
 #   make lint      gdformat --check + gdlint every script (a separate CI gate)
 #   make format    gdformat every script in place
 #   make build     export the Linux release binary -> build/linux/
@@ -21,6 +23,8 @@ SHELL      := /bin/bash
 
 SDK        := .godot-sdk
 GODOT      := $(SDK)/bin/godot
+GUT        := addons/gut
+GUT_PLUGIN := $(GUT)/plugin.cfg
 BUILD_DIR  := build/linux
 TARGET     := $(BUILD_DIR)/done-rite-detailing.x86_64
 PRESET     := Linux
@@ -42,7 +46,7 @@ SOURCES := $(shell find . -name '*.gd' \
              -not -path './.godot/*' -not -path './.godot-sdk/*' \
              -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-.PHONY: all sdk editor-sdk import check smoke lint format test build stamp run editor clean distclean
+.PHONY: all sdk editor-sdk gut-sdk import check smoke gut lint format test build stamp run editor clean distclean
 
 all: check build
 
@@ -61,11 +65,31 @@ editor-sdk: $(GODOT)
 $(GODOT):
 	@scripts/fetch-godot.sh --editor-only $(SDK)
 
+# The GUT test addon (~3 MB), pinned by commit + tree sha256 in
+# scripts/fetch-gut.sh. Same treatment as the Godot SDK and the lint venv:
+# fetched on demand, gitignored, never vendored. A real file target, so the
+# clone happens once; re-triggered when the pin script changes, and that
+# script's own version check decides whether to actually reinstall.
+gut-sdk: $(GUT_PLUGIN)
+
+$(GUT_PLUGIN): scripts/fetch-gut.sh
+	@scripts/fetch-gut.sh $(GUT)
+
 # ---- develop ---------------------------------------------------------------
 
 # Populate .godot/ (import icon.svg -> .ctex, build the UID cache, register
 # global classes). Required once before anything can load the project.
-import: $(GODOT)
+#
+# GUT is a prerequisite, not an afterthought, and the ordering is load-bearing
+# in both directions:
+#   - the import pass is what registers `GutTest` and friends as global class
+#     names, and every script in tests/ extends GutTest — so `make check` can't
+#     even parse them until GUT is on disk *and* imported;
+#   - if it isn't, gut_cmdln.gd prints "Some GUT class_names have not been
+#     imported" and calls quit(0). Verified: with .godot/ removed, the runner
+#     exits 0 having run nothing at all. Make guarantees both prerequisites
+#     complete before this recipe runs, including under `-j`.
+import: $(GODOT) $(GUT_PLUGIN)
 	$(GODOT) --headless --path . --import
 
 # The quality gate. `--check-only` parses and type-checks a script and exits
@@ -100,14 +124,55 @@ smoke: import
 	fi
 	@echo "Smoke test passed."
 
-# The one command CI and humans run before pushing. Deliberately check+smoke
-# only, not lint: those two are "does the game still work", gated by CI's
-# `check` job; lint is "does the style pass", gated by CI's own `lint` job.
-# CONTRIBUTING.md already treats "test" and "lint" as separate steps, and
-# splitting them here means the slow one (check/smoke needs the Godot editor)
-# and the fast one (lint needs no download, see below) don't force each other
-# to wait. Run `make test lint` to get both locally.
-test: check smoke
+# The real tests: every tests/**/test_*.gd, run by GUT's headless CLI.
+# tests/unit/ is pure logic, tests/integration/ is anything that needs a scene
+# tree; -ginclude_subdirs is what makes both run from the one -gdir.
+#
+# THE EXIT CODE, MEASURED RATHER THAN ASSUMED (GUT 9.7.1, this Godot):
+#
+#  - A failing assert really does exit 1. Verified by adding a deliberately
+#    failing test: 15 passing => 0, 15 passing + 1 failing => 1, and `make test`
+#    with it in place exited 2 (make's own code for a failed recipe).
+#
+#  - `-gexit` turns out to be belt-and-braces here: GutRunner._handle_quit
+#    quits if the flag is set OR the run is headless, and 9.6.0 added that
+#    headless clause precisely because people forgot the flag. Measured both
+#    ways, failing suite, headless: 1 with the flag and 1 without. It stays
+#    because the flag is the documented contract and the headless shortcut is
+#    a recent, removable convenience — not because it changes today's answer.
+#
+#  - THE TRAP: a run that collects nothing exits 0. Verified three ways —
+#    `-gdir` at a directory containing no test scripts, `-gdir` at a directory
+#    that doesn't exist, and GUT's own class names not yet imported. The first
+#    two print "[GUT ERROR]: Nothing was run.", the third "Some GUT class_names
+#    have not been imported"; all three exit 0 with no run summary at all.
+#    So the exit code is not the gate on its own, exactly as with `make smoke`
+#    above: the summary must show at least one script was collected.
+#
+# `-gdisable_colors` so the log greps cleanly and CI's plain-text view is
+# readable; without it the ANSI escapes sit between the ^ and the word.
+gut: import
+	@mkdir -p $(LOG_DIR)
+	@$(GODOT) --headless --path . -s res://$(GUT)/gut_cmdln.gd \
+	  -gdir=res://tests -ginclude_subdirs -gdisable_colors -gexit \
+	  2>&1 | tee $(LOG_DIR)/gut.log
+	@if ! grep -qE '^Scripts +[1-9]' $(LOG_DIR)/gut.log; then \
+	  echo "GUT collected no test scripts — a suite that runs nothing is not a pass."; \
+	  exit 1; \
+	fi
+	@echo "GUT suites passed."
+
+# The one command CI and humans run before pushing. Deliberately check, smoke
+# and gut but not lint: those three are "does the game still work", gated by
+# CI's `check` and `test` jobs; lint is "does the style pass", gated by CI's own
+# `lint` job. CONTRIBUTING.md already treats "test" and "lint" as separate
+# steps, and splitting them here means the slow ones (they need the Godot
+# editor) and the fast one (lint needs no download, see below) don't force each
+# other to wait. Run `make test lint` to get both locally.
+#
+# smoke before gut: a project that can't boot at all turns every GUT failure
+# into a red herring, so let the coarse gate report first.
+test: check smoke gut
 
 # ---- format / lint ----------------------------------------------------------
 
@@ -168,4 +233,4 @@ clean:
 
 # Also drops the downloaded toolchains (forces a re-fetch/reinstall next time).
 distclean: clean
-	rm -rf $(SDK) $(LINT_VENV)
+	rm -rf $(SDK) $(LINT_VENV) $(GUT)

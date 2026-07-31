@@ -1,18 +1,29 @@
 name: CI (Godot)
 
-# Three jobs, fastest feedback first:
+# Four jobs, fastest feedback first:
 #   lint   — gdformat --check + gdlint every script (pure Python, no Godot download)
 #   check  — type-check every script + boot the game headless (editor only, ~76 MB)
+#   test   — the GUT unit + integration suites in tests/, headless
 #   build  — export the Linux release binary, run it, upload it as an artifact
 #
 # `lint` doesn't `need:` anything and runs in parallel with `check` — it has no
 # Godot dependency, so gating it behind the ~76 MB editor download would only
 # slow down the signal it exists to give quickly.
 #
-# check/build use the sha256-pinned toolchain from scripts/fetch-godot.sh, so CI
-# and a developer's `make` run the identical Godot. The SDK is cached on that
-# script's hash: bumping the pin invalidates the cache automatically. `lint`
-# uses the version pin in requirements-dev.txt the same way.
+# `test` is its own job rather than a step inside `check`, even though both need
+# the same editor download and the same import pass. Two reasons, both about the
+# signal rather than the seconds: a red PR check reading "Unit & integration
+# tests" says something different from one reading "Type check & smoke", and the
+# two can be required independently in branch protection. It also gives issue
+# #12's coverage gate a job to hang off instead of a fifth step buried in
+# `check`. Between them the two jobs run exactly what `make test` runs locally —
+# `check` takes the first two targets, `test` the third.
+#
+# check/test/build use the sha256-pinned toolchain from scripts/fetch-godot.sh,
+# so CI and a developer's `make` run the identical Godot. The SDK is cached on
+# that script's hash: bumping the pin invalidates the cache automatically.
+# `lint` uses the version pin in requirements-dev.txt the same way, and the GUT
+# addon is cached on scripts/fetch-gut.sh's hash for the same reason.
 
 on:
   push:
@@ -65,14 +76,66 @@ jobs:
           path: .godot-sdk/bin
           key: godot-editor-${{ hashFiles('scripts/fetch-godot.sh') }}
 
+      # Everything under tests/ extends GutTest, and `check` type-checks every
+      # .gd in the tree — so this job needs the addon on disk even though it
+      # never runs a test. See the Makefile's `import` target.
+      - name: Cache GUT
+        uses: actions/cache@v6
+        with:
+          path: addons/gut
+          key: gut-${{ hashFiles('scripts/fetch-gut.sh') }}
+
       # Fails on any untyped/unsafe GDScript (project.godot promotes those
       # warnings to errors) and on any error logged during a headless boot.
+      # Not `make test`: that would also run the suites this workflow's `test`
+      # job runs, for no extra signal.
       - name: Type check & headless smoke test
-        run: make test
+        run: make check smoke
+
+  test:
+    name: Unit & integration tests (GUT)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache Godot editor
+        uses: actions/cache@v6
+        with:
+          path: .godot-sdk/bin
+          key: godot-editor-${{ hashFiles('scripts/fetch-godot.sh') }}
+
+      # The addon is pinned by commit + tree sha256 in scripts/fetch-gut.sh and
+      # gitignored, so it is fetched, not checked out. Keyed on that script so a
+      # version bump re-clones instead of serving the old cache.
+      - name: Cache GUT
+        uses: actions/cache@v6
+        with:
+          path: addons/gut
+          key: gut-${{ hashFiles('scripts/fetch-gut.sh') }}
+
+      # `make gut` does NOT trust GUT's exit code on its own. GUT 9.7.1 exits 0
+      # when it collects no test scripts at all — a deleted tests/ directory, a
+      # renamed file, a bad -gdir — and prints "Nothing was run." on its way
+      # out. The recipe therefore checks the run summary as well, the same way
+      # `make smoke` checks its log rather than believing Godot's exit status.
+      # See the Makefile's `gut` target for the verification behind that.
+      - name: GUT suites
+        run: make gut
+
+      # The log is the evidence when a test fails on a runner and not locally.
+      # `if: always()` so it survives the step above going red — which is the
+      # only time anyone wants it.
+      - name: Upload the test log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gut-log
+          path: build/logs/gut.log
+          if-no-files-found: warn
 
   build:
     name: Export Linux build
-    needs: check
+    needs: [check, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -83,6 +146,15 @@ jobs:
         with:
           path: .godot-sdk
           key: godot-sdk-${{ hashFiles('scripts/fetch-godot.sh') }}
+
+      # `make build` runs `check` first, which type-checks tests/ too. The addon
+      # is excluded from the export itself (export_presets.cfg) — it is here to
+      # make the type check possible, not to ship.
+      - name: Cache GUT
+        uses: actions/cache@v6
+        with:
+          path: addons/gut
+          key: gut-${{ hashFiles('scripts/fetch-gut.sh') }}
 
       # Stamp the branch head, not the synthetic refs/pull/N/merge commit a PR
       # build checks out — the merge commit isn't a SHA anyone can find in the

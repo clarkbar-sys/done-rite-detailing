@@ -9,9 +9,12 @@ Thanks for contributing! This guide keeps changes smooth and consistent.
 2. **Commit** in small, logical units. We follow
    [Conventional Commits](https://www.conventionalcommits.org/) — e.g.
    `feat: add rate limiter`, `fix: handle empty input`.
-3. **Test & lint** locally before pushing. Follow the house
-   [Coding Standards](./STANDARDS.md) — formatting, linting, types, and the
-   coverage floor are all gated in CI, so run the tools before you push.
+3. **Test & lint** locally before pushing — `make test` (type check, headless
+   smoke, and the GUT suites in `tests/`) and `make lint`. Follow the house
+   [Coding Standards](./STANDARDS.md); formatting, linting, types and tests are
+   all gated in CI, so run the tools rather than waiting for the red X. New
+   behaviour comes with a test: `tests/unit/` for pure logic, and
+   `tests/integration/` when it needs a scene tree.
 4. **Open a PR** against `main`, fill out the PR template, and link the issue it closes.
 5. At least **one approval** and **green CI** are required before merge.
 
