@@ -50,7 +50,8 @@ venv in `.venv-lint/`.
 make check     # type-check every script — a CI gate
 make smoke     # boot the game headless and require a clean run
 make gut       # run the tests/ suites headless with GUT — a CI gate
-make test      # all three of the above; run this before you push
+make tested    # require every src/ script to be reached by a test — a CI gate
+make test      # all four of the above; run this before you push
 make lint      # gdformat --check + gdlint — a separate, faster CI gate
 make format    # gdformat, rewrites in place
 make build     # export the Linux release binary -> build/linux/
@@ -74,8 +75,12 @@ src/core/              cross-cutting code (shared helpers, process-global facts)
 src/main/              the entry scene
 tests/unit/            tests for pure logic — no scene tree
 tests/integration/     tests that need a scene tree
-scripts/               developer tooling (toolchain fetch, build stamping)
+scripts/               developer tooling (toolchain fetch, build stamping, gates)
 ```
+
+There is no coverage percentage, deliberately: GDScript has no line-coverage
+instrumentation worth gating on, and `make tested` stands in its place. The
+[Coding Standards](./STANDARDS.md#coverage) record what was measured and why.
 
 `tests/` and `addons/gut/` are excluded from the exported game — see
 `export_presets.cfg`.

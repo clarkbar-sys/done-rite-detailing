@@ -6,7 +6,7 @@ means "let the tools run."
 
 | Language | Format | Lint / analyze | Types | Tests + floor | Enforced by |
 | -------- | ------ | -------------- | ----- | ------------- | ----------- |
-| GDScript | `gdformat --check` | `gdlint` (`.gdlintrc`) | **typed GDScript, warnings-as-errors** | **GUT unit + integration, headless, gated**; headless smoke; coverage floor *pending* | `.github/workflows/ci-godot.yml` |
+| GDScript | `gdformat --check` | `gdlint` (`.gdlintrc`) | **typed GDScript, warnings-as-errors** | **GUT unit + integration, headless, gated**; headless smoke; **no line-coverage floor — [see below](#coverage)**, a test-map gate instead | `.github/workflows/ci-godot.yml` |
 
 Run `make test` locally before pushing — CI runs the same commands, split
 across the `check` and `test` jobs.
@@ -131,8 +131,9 @@ SHA plus a sha256 over the extracted addon tree rather than a tarball digest;
 that script explains why at length.
 
 ```bash
-make gut    # the suites, headless
-make test   # check + smoke + gut — run this before you push
+make gut     # the suites, headless
+make tested  # every src/ script is reached by a test (see Coverage below)
+make test    # check + smoke + gut + tested — run this before you push
 ```
 
 Layout, and the rule for choosing:
@@ -154,9 +155,12 @@ those entries — 1.46 MB with the framework and the tests in it, 9.7 KB without
 **Trust the output, not the exit code.** GUT 9.7.1 exits `1` on a failing
 assert (verified: deliberate failure ⇒ `make test` non-zero), but it also exits
 `0` when it runs *nothing at all* — a missing `tests/` directory, a bad
-`-gdir`, or its own class names not yet imported. All three verified. So
-`make gut` gates on the run summary as well, exactly like `make smoke` gates on
-its log; the Makefile records the specifics.
+`-gdir`, or its own class names not yet imported. All three verified. It exits
+`0` for a test that asserts nothing, too: GUT calls that "risky", prints
+`[Risky]: <name> did not assert`, and returns success. Verified with a test
+whose entire body is `pass`. So `make gut` gates on the run summary as well —
+at least one script collected, zero risky/pending tests — exactly like
+`make smoke` gates on its log; the Makefile records the specifics.
 
 #### Why GUT and not GdUnit4
 
@@ -178,12 +182,100 @@ coverage, so that didn't decide it.
 
 WAT was not considered further: last release v6.0.1, no 4.x line.
 
-#### Parked
+#### Coverage
 
-A coverage floor to match the 80% the rest of the house standard uses. GUT
-9.7.1 ships no coverage instrumentation of any kind, so this is a genuinely
-open question rather than a switch to flip — tracked separately. This table
-gets its last missing cell then.
+**Decision: no line-coverage floor for GDScript.** The 80% the rest of the
+house standard enforces (`gcovr` for C, `pytest-cov` for Python) has no honest
+equivalent here. What is gated instead is `make tested`, below.
+
+This is a measurement, not an opinion. Every candidate was run, not read:
+
+| Candidate | Version | Verdict |
+| --------- | ------- | ------- |
+| GUT | 9.7.1 | no coverage of any kind — `grep -ril coverage addons/gut/` matches nothing |
+| GdUnit4 | 6.2.0 (`d6e65c6`) | none either; the word only appears in prose and issue-number comments. Not a reason to reopen the framework choice |
+| `dsnopek/godot-gdscript-coverage` | — | **does not exist.** `git ls-remote https://github.com/dsnopek/godot-gdscript-coverage.git` cannot resolve it while sibling repos under the same owner resolve fine. The URL in issue #12 is wrong; there is no such add-on to evaluate |
+| `jamie-pate/godot-code-coverage` | `main` @ `3c92852` (2025-12-17) | the only real candidate. Fails, in two independent ways — below |
+| `IgorBayerl/nano-coverage-godot` | v0.4.0 (`fce7a0a`, 2026-06-13) | alpha, self-described "developer preview", C++ GDExtension with no published binaries and no release automation, tags stop at v0.1.1 so there is nothing to pin. Integrates with GdUnit4 only ("GUT" is on the roadmap). Its own v0.4.0 changelog: for several releases the GdUnit4 hook was registered under a settings key *no GdUnit4 version reads*, so "any CLI/CI test run silently produced no coverage." A coverage tool that has already shipped a silent zero is the exact failure this section exists to avoid |
+| `koalafr/godot-coverage-hack` | v1.0.0 (2022) | matches `Foo.gd` to `test_Foo.gd` by filename and, in its own words, "ignores file content". That is not coverage; it is the ritual number issue #12 warns about, with a Cobertura extension |
+
+##### Why the real candidate fails
+
+`godot-code-coverage` rewrites each script's source at test time, injecting a
+counter before every statement, then calls `Script.reload()`. Run against this
+project on Godot 4.7.1:
+
+1. **It does not compile.** `addons/coverage/coverage.gd:462` overrides
+   `get_coverage_collector()` in an inner class and returns `self`; the base
+   declares `-> ScriptCoverageCollector`. Godot 4.7.1 rejects the override —
+   `Cannot return value of type "NullCoverage" because the function return
+   type is "ScriptCoverageCollector"`. A hard parse error, so
+   `exclude_addons=true` does not help. And the run still went green: GUT
+   printed `---- All tests passed! ----` and exited 0 with the post-run hook
+   erroring and coverage never collected.
+2. **The instrumented code it emits is untyped.** After forking that one line,
+   every first-party script failed to reload: `Variable "__cl__" has no static
+   type`, `The method "append()" is not present on the inferred type
+   "Variant"`. Reported coverage: **0.0%**. Relaxing the warning levels at
+   runtime from the pre-run hook does not help — the parser reads them at
+   startup. The only way to a number is to demote the warnings-as-errors in
+   `project.godot`, which is the single strongest gate this repo has.
+
+##### And the number it produces is not defensible
+
+With the fork applied *and* the typing gates switched off, it reports 93.75%
+(30/32 lines) for this project. That number is wrong in both directions, and
+the reasons are structural rather than fixable:
+
+- **`match` bodies are invisible.** The instrumenter only counts the `match`
+  line itself. A function whose whole body is a five-arm `match`, tested with
+  exactly one input, reports **100.0%** — measured, not inferred. `match` is
+  the dominant branch construct in GDScript, so the metric is at its weakest
+  exactly where a game's logic is densest. `elif`/`else` lines are skipped too
+  (deliberately, in its source).
+- **Lines inside `"""` strings are counted as executable** and get counter
+  calls spliced into them — the tool's own source says it ignores multiline
+  strings. So a docstring-style constant both inflates the denominator with
+  lines that can never be covered and corrupts the constant's value under test.
+- The denominator is whatever instrumented successfully. A file that fails to
+  instrument leaves the denominator entirely, which moves the percentage *up*.
+
+A metric that reads 100% for a five-way branch with one case tested is worse
+than no metric: it converts a real signal into a ritual. So it is not adopted,
+and no percentage is published anywhere in this repo.
+
+##### What is gated instead
+
+[`scripts/check-test-map.sh`](./scripts/check-test-map.sh), wired as
+`make tested`, run as the first step of CI's `test` job (no Godot needed — it
+is grep over the checkout, so it fails in seconds rather than after a 76 MB
+download):
+
+| Rule | What it requires |
+| ---- | ---------------- |
+| R1 | every `.gd` under `src/` is named by at least one test — by its path, its `class_name`, or the `.tscn` that carries it |
+| R2 | every `.gd` under `src/core/` has its own `tests/unit/test_<name>.gd` |
+| R3 | every `.gd` under `src/core/` extends a Node-free base (`RefCounted`, `Resource`, `Object`), so R2 can always be satisfied honestly instead of by moving the file |
+
+R3 is the load-bearing one. It is what makes "keep game logic in plain
+testable classes" a rule rather than advice, and it is an allow-list, so a base
+class nobody has listed fails the check instead of slipping through. Together
+with `make gut`'s risky-test gate — which fails a test that asserts nothing —
+the pair cannot be satisfied by an empty file. All four failure modes verified
+by breaking them one at a time; each exits 1.
+
+**What this does not do, said plainly.** It checks that a test *exists* and
+runs, not that it is *thorough*. Logic that lives in a scene-tier script
+(`src/main/*.gd`) only has to be named by an integration test, not exercised
+by one. Keeping logic out of `Node` subclasses, and making each test deep
+enough to be worth its line count, is **advisory** — a review responsibility,
+not a mechanical one. A coverage percentage would not have made it mechanical
+either; it would only have made it look mechanical.
+
+**When to revisit.** When the engine grows first-party coverage, or when a
+tool exists that instruments without rewriting source into untyped GDScript
+and counts `match` arms. Both are checkable claims. Nothing about this
+decision changes because the project got bigger.
 
 ---
 
@@ -200,6 +292,6 @@ gets its last missing cell then.
   built from (`build_stamp.json` → the `BuildInfo` class).
 - **Editors:** [`.editorconfig`](./.editorconfig) is the source of truth for
   charset, line endings, final newline, and indentation.
-- **CI gates before merge:** type check, headless smoke, the GUT suites, and a
-  successful export that boots must all be green. Enable branch protection on
-  `main` and add the `ci-godot` jobs as required checks.
+- **CI gates before merge:** type check, headless smoke, the test map, the GUT
+  suites, and a successful export that boots must all be green. Enable branch
+  protection on `main` and add the `ci-godot` jobs as required checks.
