@@ -1,10 +1,12 @@
 name: CI (Godot)
 
-# Four jobs, fastest feedback first:
-#   lint   — gdformat --check + gdlint every script (pure Python, no Godot download)
-#   check  — type-check every script + boot the game headless (editor only, ~76 MB)
-#   test   — the test map check, then the GUT unit + integration suites, headless
-#   build  — export the Linux release binary, run it, upload it as an artifact
+# Six jobs, fastest feedback first:
+#   lint      — gdformat --check + gdlint every script (pure Python, no Godot download)
+#   check     — type-check every script + boot the game headless (editor only, ~76 MB)
+#   test      — the test map check, then the GUT unit + integration suites, headless
+#   build     — export the Linux release binary, run it, upload it as an artifact
+#   build-web — export the web bundle and upload it (as a Pages artifact on main)
+#   pages     — publish that bundle to GitHub Pages; `main` only
 #
 # `lint` doesn't `need:` anything and runs in parallel with `check` — it has no
 # Godot dependency, so gating it behind the ~76 MB editor download would only
@@ -22,7 +24,14 @@ name: CI (Godot)
 # project is willing to gate on; `make tested` is what stands in its place, and
 # it runs as the first step of `test`. STANDARDS.md "Coverage" has the numbers.
 #
-# check/test/build use the sha256-pinned toolchain from scripts/fetch-godot.sh,
+# `build-web` is split from `build` rather than bolted onto it. They export the
+# same project from the same SDK cache, but they fail for different reasons —
+# a missing web template, a preset filter, a renderer the browser can't take —
+# and "Export web bundle" going red while "Export Linux build" stays green is
+# the whole signal. It also keeps `pages` waiting on one short job instead of
+# on the Linux export and its boot check.
+#
+# check/test/build/build-web use the pinned toolchain from scripts/fetch-godot.sh,
 # so CI and a developer's `make` run the identical Godot. The SDK is cached on
 # that script's hash: bumping the pin invalidates the cache automatically.
 # `lint` uses the version pin in requirements-dev.txt the same way, and the GUT
@@ -43,6 +52,7 @@ concurrency:
 
 env:
   ARTIFACT: build/linux/done-rite-detailing.x86_64
+  WEB_DIR: build/web
 
 jobs:
   lint:
@@ -214,3 +224,141 @@ jobs:
           name: done-rite-detailing-linux-x86_64
           path: ${{ env.ARTIFACT }}
           if-no-files-found: error
+
+  build-web:
+    name: Export web bundle
+    needs: [check, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same cache as `build` — one SDK, keyed on the fetch script, and that
+      # script now also unpacks the web_nothreads_* templates. Bumping it
+      # invalidates both jobs' caches together, which is the point.
+      - name: Cache Godot SDK
+        uses: actions/cache@v6
+        with:
+          path: .godot-sdk
+          key: godot-sdk-${{ hashFiles('scripts/fetch-godot.sh') }}
+
+      # `make build-web` runs `check` first, and `check` type-checks tests/,
+      # which extends GutTest. The addon is excluded from the bundle itself
+      # (export_presets.cfg) — see the identical note on `build`.
+      - name: Cache GUT
+        uses: actions/cache@v6
+        with:
+          path: addons/gut
+          key: gut-${{ hashFiles('scripts/fetch-gut.sh') }}
+
+      # Stamped exactly like the Linux export: the branch head, not the
+      # synthetic merge commit — see the note on `build`. The web build prints
+      # the same `v<version> (<sha>)` line to the browser console that the
+      # Linux binary prints to stdout, so the stamp is how you tell which
+      # commit the page you are looking at was built from.
+      - name: Export
+        env:
+          BUILD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: make build-web
+
+      # The web pack is a separate preset with its own exclude_filter, and
+      # nothing makes the two presets agree — so check the bundle rather than
+      # trusting that someone kept them in step. This is the gate that would
+      # have caught GUT being packed into every Linux build (see
+      # export_presets.cfg); it costs one grep.
+      - name: The bundle ships no tests and no GUT
+        shell: bash
+        run: |
+          if strings -a "$WEB_DIR/index.pck" | grep -qE 'res://(tests|addons/gut)/'; then
+            echo "::error::tests/ or addons/gut/ leaked into the web pack"
+            strings -a "$WEB_DIR/index.pck" | grep -E 'res://(tests|addons/gut)/' | head
+            exit 1
+          fi
+          echo "no res://tests/ or res://addons/gut/ entries in index.pck"
+
+      - name: Summarise
+        run: |
+          {
+            echo "### Web bundle"
+            echo
+            echo "| File | Size |"
+            echo "|---|---|"
+            for f in "$WEB_DIR"/*; do
+              echo "| \`$(basename "$f")\` | $(du -h "$f" | cut -f1) |"
+            done
+            echo
+            echo "Total: $(du -sh "$WEB_DIR" | cut -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Two uploads, on purpose, because they are read by different people.
+      # This one is an ordinary artifact a reviewer can download from a PR and
+      # serve locally (`python3 -m http.server` in the unzipped directory) —
+      # it exists on every branch and every PR.
+      - name: Upload the bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: done-rite-detailing-web
+          path: ${{ env.WEB_DIR }}
+          if-no-files-found: error
+
+      # And this one is the Pages payload, which only means anything on `main`.
+      # It is a fixed-name ("github-pages") tarball that `actions/deploy-pages`
+      # knows how to find; uploading it from a PR would be dead weight nobody
+      # can deploy, so it is skipped there.
+      - name: Upload the bundle as a Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ env.WEB_DIR }}
+
+  pages:
+    name: Publish to GitHub Pages
+    needs: build-web
+    # `main` only. A PR must not be able to overwrite the published game, and a
+    # Pages deployment is repo-global — there is no per-branch preview to fall
+    # back on. workflow_dispatch on main is allowed through so the page can be
+    # re-published without an empty commit.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    # The workflow-wide grant is `contents: read`; a job-level block REPLACES it
+    # rather than adding to it, so everything this job needs is listed here.
+    #   pages: write    — create the deployment (actions/deploy-pages)
+    #   id-token: write — deploy-pages authenticates to the Pages API with an
+    #                     OIDC token rather than a PAT; without it the deploy
+    #                     fails on a missing id-token permission
+    #   contents: read  — kept because it is what GitHub's own Pages template
+    #                     grants. This job checks nothing out and so looks like
+    #                     it could drop to none, but that is a guess nobody can
+    #                     test from a branch (a Pages deployment only ever runs
+    #                     on `main`), and guessing wrong breaks the published
+    #                     game. Narrow it when there's a green run to compare
+    #                     against, not before.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    # Names the deployment target and hangs the live URL off the job in the
+    # Actions UI, so the run page itself links to the playable build.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # Reads the repo's Pages configuration (base URL and so on) and fails
+      # loudly if Pages has never been enabled — which is the one part of this
+      # nobody can do from a workflow. Settings -> Pages -> Build and
+      # deployment -> Source must be set to "GitHub Actions" once, by hand,
+      # or every run of this job stops here.
+      - uses: actions/configure-pages@v6
+
+      # Publishes the "github-pages" artifact from `build-web`. No Jekyll: the
+      # artifact is served exactly as uploaded, which is what a .wasm/.pck
+      # bundle needs.
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+      - name: Summarise
+        run: |
+          echo "### Playable at ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"

@@ -13,6 +13,7 @@
 #   make lint      gdformat --check + gdlint every script (a separate CI gate)
 #   make format    gdformat every script in place
 #   make build     export the Linux release binary -> build/linux/
+#   make build-web export the web bundle            -> build/web/
 #   make editor    open the project in the Godot editor
 #
 # There is deliberately no `make coverage`. GDScript has no line-coverage
@@ -36,6 +37,13 @@ TARGET     := $(BUILD_DIR)/done-rite-detailing.x86_64
 PRESET     := Linux
 LOG_DIR    := build/logs
 
+# The web bundle is a directory, not a file: Godot emits index.html plus the
+# .js/.wasm/.pck/worklet/icon siblings beside it, all named after the .html.
+# `index.html` so a bare directory URL serves the game — see export_presets.cfg.
+WEB_DIR    := build/web
+WEB_TARGET := $(WEB_DIR)/index.html
+WEB_PRESET := Web
+
 # Godot resolves export templates under $XDG_DATA_HOME/godot; pointing it at the
 # SDK keeps the pinned templates out of the developer's real ~/.local/share.
 export XDG_DATA_HOME := $(abspath $(SDK)/data)
@@ -52,7 +60,7 @@ SOURCES := $(shell find . -name '*.gd' \
              -not -path './.godot/*' -not -path './.godot-sdk/*' \
              -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-.PHONY: all sdk editor-sdk gut-sdk import check smoke gut tested lint format test build stamp run editor clean distclean
+.PHONY: all sdk editor-sdk gut-sdk import check smoke gut tested lint format test build build-web stamp run editor clean distclean
 
 all: check build
 
@@ -83,6 +91,40 @@ $(GUT_PLUGIN): scripts/fetch-gut.sh
 
 # ---- develop ---------------------------------------------------------------
 
+# An empty marker that hides build/ from Godot's filesystem scan. It exists for
+# a bug that only appeared once something started exporting images into the
+# project directory — i.e. once the web preset landed.
+#
+# THE BUG, MEASURED. Godot's filesystem scan walks the whole project directory,
+# and build/ is inside it. The web export writes index.png, index.icon.png and
+# index.apple-touch-icon.png; the next scan imported all three, wrote .import
+# sidecars *into build/web/*, and — because both presets use
+# export_filter="all_resources" — the export after that packed them. Verified
+# by reading the pack: res://build/web/index.png and friends plus their .ctex,
+# and index.pck grew from 9,776 to 30,988 bytes. It compounds, because every
+# build re-exports the icons the previous one left behind, and it is not
+# web-only: the Linux binary packs them too. Same family as GUT quietly
+# shipping inside every build (see export_presets.cfg) and found the same way,
+# by looking in the pack instead of trusting the filter.
+#
+# An empty `.gdignore` makes the scanner skip a directory outright, so the
+# files never become resources at all. That is why it is the fix and
+# `exclude_filter` is not: a filter would keep them out of the pack but the
+# sidecars would still be written into build/web/ and published to Pages with
+# the rest of the bundle. Verified after adding it: no sidecars, no
+# .godot/imported entries, zero res://build/ strings in a fresh export.
+#
+# A real file target, and `import` depends on it, so it is in place before the
+# first scan — including via `make editor`, which is how the GUI gets opened.
+# Created here rather than committed because `make clean` is `rm -rf build`,
+# and a tracked file inside a directory `clean` deletes would leave every
+# `make clean` with a dirty tree.
+GDIGNORE := build/.gdignore
+
+$(GDIGNORE):
+	@mkdir -p $(dir $@)
+	@touch $@
+
 # Populate .godot/ (import icon.svg -> .ctex, build the UID cache, register
 # global classes). Required once before anything can load the project.
 #
@@ -95,7 +137,7 @@ $(GUT_PLUGIN): scripts/fetch-gut.sh
 #     imported" and calls quit(0). Verified: with .godot/ removed, the runner
 #     exits 0 having run nothing at all. Make guarantees both prerequisites
 #     complete before this recipe runs, including under `-j`.
-import: $(GODOT) $(GUT_PLUGIN)
+import: $(GODOT) $(GUT_PLUGIN) $(GDIGNORE)
 	$(GODOT) --headless --path . --import
 
 # The quality gate. `--check-only` parses and type-checks a script and exits
@@ -250,6 +292,39 @@ build: check stamp sdk
 	@mkdir -p $(BUILD_DIR)
 	$(GODOT) --headless --path . --export-release "$(PRESET)" $(abspath $(TARGET))
 	@echo ">> $(TARGET) ($$(du -h $(TARGET) | cut -f1))"
+
+# The web bundle — what GitHub Pages serves and what a release ships zipped.
+#
+# Same shape as `build` above, and deliberately the same `--headless
+# --export-release` invocation: exporting for the web needs no display and no
+# special flags. What it does need is the `web_nothreads_*` templates, which is
+# why this depends on `sdk` and why scripts/fetch-godot.sh keeps them.
+#
+# `mkdir -p` is doing more than tidying up here. Godot's web exporter bails with
+# "Target folder does not exist or is inaccessible" rather than creating the
+# directory (export_plugin.cpp checks DirAccess::exists(base_dir) before writing
+# anything) — verified, so on a clean checkout the export fails without it.
+#
+# `rm -rf` first, and the file check after, are both about a partial bundle
+# rather than about the exit code. Measured, and unlike `make smoke`/`make gut`:
+# a failed web export really does exit 1 — deleting web_nothreads_release.zip
+# gave "Could not open template for export" and status 1, twice, piped and
+# direct. But that same failed run had *already written index.pck* before it
+# noticed, so the previous export's index.html/.js/.wasm were left sitting
+# beside a pack from a different build. Exporting into a directory that is
+# emptied first makes "what is in build/web/" mean one export and no other, and
+# the check then says that export was complete. index.pck is in the list on its
+# own account: a bundle whose pack is missing still has a perfectly good
+# index.html that boots to a blank canvas.
+build-web: check stamp sdk
+	@rm -rf $(WEB_DIR)
+	@mkdir -p $(WEB_DIR)
+	$(GODOT) --headless --path . --export-release "$(WEB_PRESET)" $(abspath $(WEB_TARGET))
+	@for f in index.html index.js index.wasm index.pck; do \
+	  [ -s "$(WEB_DIR)/$$f" ] || { echo "Web export FAILED — $(WEB_DIR)/$$f is missing or empty."; exit 1; }; \
+	done
+	@echo ">> $(WEB_DIR)/ ($$(du -sh $(WEB_DIR) | cut -f1))"
+	@ls -1sh $(WEB_DIR)
 
 # ---- interactive -----------------------------------------------------------
 
