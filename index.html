@@ -92,6 +92,35 @@ body {
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+<style>
+  @media screen and (max-width: 768px) and (orientation: portrait) {
+    html {
+      width: 100vh;
+      height: 100vw;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      transform: rotate(-90deg);
+      transform-origin: left top;
+      overflow: hidden;
+    }
+  }
+</style>
+<script>
+(function () {
+  var media = window.matchMedia('(max-width: 768px) and (orientation: portrait)');
+  var widthGetter = Object.getOwnPropertyDescriptor(window, 'innerWidth').get;
+  var heightGetter = Object.getOwnPropertyDescriptor(window, 'innerHeight').get;
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    get: function () { return media.matches ? heightGetter.call(window) : widthGetter.call(window); }
+  });
+  Object.defineProperty(window, 'innerHeight', {
+    configurable: true,
+    get: function () { return media.matches ? widthGetter.call(window) : heightGetter.call(window); }
+  });
+})();
+</script>
 
 	</head>
 	<body>
