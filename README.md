@@ -3,7 +3,7 @@
 > A game built with the [Godot](https://godotengine.org) engine.
 
 [![CI (Godot)](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml/badge.svg)](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml)
-[![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](./LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 ## Overview
 
@@ -94,4 +94,4 @@ public issue for security reports.
 
 ## License
 
-Distributed under the terms of the [GNU GPL v2](./LICENSE).
+Distributed under the terms of the [MIT license](./LICENSE).
