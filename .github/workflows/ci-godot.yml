@@ -33,7 +33,7 @@ jobs:
 
       # Editor only — `check` and `smoke` never touch the export templates.
       - name: Cache Godot editor
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .godot-sdk/bin
           key: godot-editor-${{ hashFiles('scripts/fetch-godot.sh') }}
@@ -52,7 +52,7 @@ jobs:
 
       # Editor + the pruned export templates (~280 MB).
       - name: Cache Godot SDK
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .godot-sdk
           key: godot-sdk-${{ hashFiles('scripts/fetch-godot.sh') }}
