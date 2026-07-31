@@ -207,12 +207,6 @@ func test_the_anchor_is_showing_here() -> void:
 	assert_true(_view_model().is_visible_in_tree(), "the play screen is where hands exist")
 
 
-func test_the_anchor_is_empty_until_something_is_held() -> void:
-	# #41 lands the anchor and nothing in it; #42 fills it. Asserted rather than
-	# assumed so "the viewmodel is invisible" can only ever have one cause.
-	assert_eq(_view_model().get_child_count(), 0, "the anchor holds nothing yet")
-
-
 func test_the_anchor_hangs_in_front_of_the_lens_and_to_one_side() -> void:
 	# In the camera's own space, so this survives the eye being moved: -Z is
 	# forward, +X is the right of the frame, -Y is the bottom of it.

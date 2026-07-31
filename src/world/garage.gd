@@ -58,11 +58,13 @@
 ## hope, and it was measured rather than hoped at: with the eye at
 ## [member eye_position], the anchor stands 0.79 m clear of the car's box, which
 ## is the nearest thing in the room to it by a wide margin (the walls are metres
-## away), and 0.50 m in front of a 0.05 m near plane. Both are asserted in
-## [code]tests/integration/test_play_screen.gd[/code] as a distance to the car's
-## own bounding box, so the day the eye learns to walk, those go red and the
-## second viewport gets built then — with something real to look at, rather than
-## as insurance against a camera that cannot move.
+## away), and 0.50 m in front of a 0.05 m near plane. Held proxies eat into that:
+## the longest of them, the power wash wand, still finishes 0.50 m clear of the
+## car. All of it is asserted against the car's own bounding box — the anchor in
+## [code]tests/integration/test_play_screen.gd[/code], every proxy corner in
+## [code]tests/integration/test_view_model.gd[/code] — so the day the eye learns
+## to walk, those go red and the second viewport gets built then, with something
+## real to look at rather than as insurance against a camera that cannot move.
 class_name Garage
 extends SubViewportContainer
 
@@ -126,8 +128,9 @@ var _orbit: CameraOrbit = null
 @onready var _camera: Camera3D = %Camera
 @onready var _car: Node3D = %Car
 
-## Where held things render: a child of the camera, so it travels with the eye
-## and never has to be re-aimed.
+## Where held things render: a [ViewModel] parented to the camera, so it travels
+## with the eye and never has to be re-aimed. What hangs in it is that class's
+## business; where it hangs is this one's.
 ##
 ## Its pose lives in the scene file, like the room's box sizes, and the three
 ## numbers there are the whole "this is in your hand" illusion. 0.45 m down the
@@ -137,7 +140,7 @@ var _orbit: CameraOrbit = null
 ## rises into the corner of the shot with its far end running off the bottom of
 ## the screen, which is what a held thing looks like; dead centre at arm's length
 ## is what a thing floating in front of your face looks like.
-@onready var _view_model: Node3D = %ViewModel
+@onready var _view_model: ViewModel = %ViewModel
 
 
 func _ready() -> void:
