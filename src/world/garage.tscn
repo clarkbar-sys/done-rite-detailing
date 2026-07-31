@@ -1,6 +1,7 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://src/world/garage.gd" id="1_garage"]
+[ext_resource type="Script" path="res://src/world/view_model.gd" id="2_view_model"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_unit"]
 size = Vector3(1, 1, 1)
@@ -132,3 +133,9 @@ unique_name_in_owner = true
 keep_aspect = 0
 current = true
 fov = 75.0
+
+[node name="ViewModel" type="Node3D" parent="View/World/Camera"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.17, -0.15, -0.45)
+visible = false
+script = ExtResource("2_view_model")
