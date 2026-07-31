@@ -29,5 +29,5 @@ mando==0.7.1
 PyYAML==6.0.3
 radon==6.0.1
 regex==2026.7.19
-setuptools==79.0.1
+setuptools==83.0.0
 six==1.17.0
