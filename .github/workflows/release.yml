@@ -55,7 +55,10 @@ jobs:
       - name: Export
         run: make build
 
+      # `shell: bash` is load-bearing — see the note in ci-godot.yml: the default
+      # `run:` shell has no pipefail, so a crashed binary would pass this step.
       - name: Verify the release binary boots
+        shell: bash
         run: |
           ./build/linux/done-rite-detailing.x86_64 --headless --quit-after 120 2>&1 | tee run.log
           if grep -qE '(^|[[:space:]])(SCRIPT |USER )?ERROR:' run.log; then

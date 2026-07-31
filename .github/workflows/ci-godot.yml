@@ -62,7 +62,12 @@ jobs:
 
       # The export succeeding is not the same as the game working. Boot the
       # actual artifact — this is the "I can see the build run" gate.
+      #
+      # `shell: bash` is load-bearing: the default shell for a `run:` step is
+      # `bash -e` *without* pipefail, so `binary | tee` would report tee's exit
+      # status and a crashed game would pass this step silently.
       - name: Run the exported game
+        shell: bash
         run: |
           "$ARTIFACT" --headless --quit-after 120 2>&1 | tee run.log
           if grep -qE '(^|[[:space:]])(SCRIPT |USER )?ERROR:' run.log; then

@@ -10,6 +10,13 @@
 #   make build     export the Linux release binary -> build/linux/
 #   make editor    open the project in the Godot editor
 
+# Recipes pipe Godot's output through `tee`, and make's default /bin/sh reports
+# the exit status of the *last* command in a pipeline. Without pipefail a hard
+# crash (segfault, missing binary) is reported as success — verified: `make
+# smoke` printed "Smoke test passed" for a run that exited 139.
+SHELL      := /bin/bash
+.SHELLFLAGS := -o pipefail -c
+
 SDK        := .godot-sdk
 GODOT      := $(SDK)/bin/godot
 BUILD_DIR  := build/linux
