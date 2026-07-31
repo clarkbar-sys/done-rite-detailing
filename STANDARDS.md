@@ -279,6 +279,141 @@ decision changes because the project got bigger.
 
 ---
 
+## Distribution
+
+The cheapest thing anyone can do with the game is click a link, so that is the
+channel that gets kept working. Three decisions hold it up; all three were
+measured rather than argued, and each one names the thing that should make us
+reopen it.
+
+| Channel | What it is | Refreshed |
+| ------- | ---------- | --------- |
+| **GitHub Pages** | the web bundle from `main` | every push to `main` (`ci-godot.yml`'s `pages` job) |
+| **Release assets** | `…-linux-x86_64` and `…-web.zip` | every tagged release (`release.yml`) |
+| **CI artifacts** | both, per run | every push and PR |
+
+```bash
+make build      # the Linux binary  -> build/linux/
+make build-web  # the web bundle    -> build/web/
+```
+
+Pages has to be switched on **by hand, once**: *Settings → Pages → Build and
+deployment → Source → **GitHub Actions***. Until someone does, the `pages` job
+fails at `actions/configure-pages` on every push to `main`.
+
+### Renderer: Forward+ on desktop, `gl_compatibility` on the web
+
+The engine owns this split; there is no configuration to maintain. Godot 4.7.1
+registers `rendering/renderer/rendering_method.web` itself as a **one-value
+enum** whose only value is `gl_compatibility` — `main/main.cpp`, with the
+comment "This is a bit of a hack until we have WebGPU support" — and a
+feature-tagged override beats the plain key. So `project.godot` keeps saying
+`forward_plus` and the web build renders in Compatibility anyway. Verified in
+the browser, not inferred: the exported bundle logs
+
+```
+OpenGL API OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium)) - Compatibility
+```
+
+There was never a third option — Vulkan is not available to a browser, so
+"ship Forward+ to the web" is not a thing that can be chosen. The genuine
+question was whether **desktop** should drop to `gl_compatibility` too, for one
+renderer everywhere. It doesn't, because the split costs zero lines and
+`forward_plus` is strictly more capable where it runs.
+
+**The cost, stated plainly.** A Forward+-only feature — SDFGI, volumetric fog,
+SSIL/SSAO, the Vulkan-only parts of the sky and light pipeline — is simply
+absent from the build most people will click on, and no gate here can see that:
+CI exports the bundle, it does not look at pixels. So the rule is: **anything
+visual is checked in the web build before it is called done.** That is
+advisory, exactly like "keep logic out of `Node` subclasses" under
+[Coverage](#coverage), and for the same reason — it is a review
+responsibility, not a mechanical one.
+
+**When to revisit.** The first time a Forward+-only feature is actually wanted.
+Decide then, with something real to look at: either drop desktop to
+`gl_compatibility` (one line, and the divergence is gone) or accept the
+divergence knowingly. Settling it now, at day 0, is the point — there is
+nothing to lose today, which will not be true later.
+
+### Threads: the `nothreads` template, not COOP/COEP
+
+`export_presets.cfg` sets `variant/thread_support=false`, and
+`scripts/fetch-godot.sh` therefore unpacks `web_nothreads_release.zip` /
+`web_nothreads_debug.zip` rather than the threaded pair. Godot 4.7.1 ships all
+eight web templates (threads/nothreads × dlink/plain × debug/release), so this
+is a live choice, not a workaround for something missing.
+
+A threaded Godot web build needs `SharedArrayBuffer`, which browsers only give
+to a cross-origin-isolated page, which needs the **server** to send
+`Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`. GitHub Pages sends neither and
+has no way to configure headers.
+
+Measured, both ways, against a local `python3 -m http.server` — which sends no
+COOP/COEP either, so it reproduces Pages exactly:
+
+| Bundle | Result in a real browser |
+| ------ | ------------------------ |
+| `thread_support=false` | boots. `crossOriginIsolated: false`, no `SharedArrayBuffer`, and it does not care — `Build configuration: Emscripten 4.0.20, single-threaded, no GDExtension support.` then the game's own startup line |
+| `thread_support=true` | refuses. "The following features required to run Godot projects on the Web are missing: Cross-Origin Isolation … SharedArrayBuffer …" and a 300×150 canvas that never initialises |
+
+The template explains the asymmetry: `godot.js`'s `getMissingFeatures()` wraps
+both checks in `if (supportsThreads)`, and the emitted `index.html` bakes in
+`const GODOT_THREADS_ENABLED = false`.
+
+The two alternatives, and why neither won:
+
+- **A host that can set headers** (itch.io, Cloudflare Pages). Works, and buys
+  real threads. Rejected for now because it is another account, another
+  deploy credential and another thing to keep in sync with `main`, to buy
+  performance a title screen cannot spend. Revisit when the game is heavy
+  enough that single-threaded is measurably the problem — and measure it,
+  don't assume it.
+- **Godot's own service-worker shim** (`progressive_web_app/enabled` +
+  `progressive_web_app/ensure_cross_origin_isolation_headers`), where
+  `godot.service.worker.js` intercepts fetches and adds the two headers itself.
+  Real, and it is in the 4.7.1 template. Rejected because it only isolates the
+  page *after* the worker installs and the page reloads, and because a service
+  worker caches the previous build — directly against "the link is always
+  current `main`". With the PWA off, the exporter skips
+  `godot.service.worker.js` and `godot.offline.html` entirely, so the published
+  bundle has no cache layer at all. Verified: neither file is in `build/web/`.
+
+Cost of the decision: no `SharedArrayBuffer`, so no threaded audio or physics
+in the browser, and WebAssembly SIMD is the only parallelism available.
+Accepted.
+
+### Windows and macOS: not now
+
+**Not built.** The trigger to revisit is somebody asking — a real report of
+"I couldn't try it", not a guess that someone might.
+
+The reasoning is that they are two different problems wearing one label:
+
+- **Windows** is genuinely cheap. It cross-compiles from Linux CI with the
+  templates already in the archive `scripts/fetch-godot.sh` downloads; the
+  whole change is a preset, two `KEEP_TEMPLATES` entries and a job. It is not
+  free, though — Windows binaries without a code-signing certificate get
+  SmartScreen's "Windows protected your PC" wall, which is a worse first
+  experience than the web build it would be competing with.
+- **macOS** is not cheap. An unsigned, un-notarised `.app` from the internet is
+  refused outright by Gatekeeper on current macOS, and the workaround is a
+  right-click dance most people will not do. Notarisation needs a paid Apple
+  Developer account, a Developer ID certificate, and `notarytool` credentials
+  in CI secrets. Shipping an unsigned macOS build is hostile to exactly the
+  person who was curious enough to download it.
+
+The web build makes both of them less urgent rather than more: it is the
+platform-neutral answer to "can I try it", it needs no certificate on any
+platform, and it is refreshed on every push. So the honest answer is that
+desktop builds are a **packaging** problem to solve when someone wants to keep
+a copy, and until then the effort belongs on the game. When that day comes,
+Windows first and alone; macOS only with a signing identity in hand, because a
+macOS build without one is worse than no macOS build.
+
+---
+
 ## Cross-cutting
 
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/)
@@ -288,10 +423,16 @@ decision changes because the project got bigger.
   [`scripts/fetch-godot.sh`](./scripts/fetch-godot.sh). A Godot bump is a
   reviewable commit that changes those pins — never an ambient "whatever is
   installed".
-- **Builds are traceable:** every exported binary carries the commit it was
-  built from (`build_stamp.json` → the `BuildInfo` class).
+- **Builds are traceable:** every exported build carries the commit it was
+  built from (`build_stamp.json` → the `BuildInfo` class) — the Linux binary
+  prints it to stdout, the web build prints the same line to the browser
+  console and shows it on screen.
+- **Distribution:** the game is playable from a link, refreshed on every push
+  to `main` — see [Distribution](#distribution) for the renderer, threading and
+  desktop-platform decisions behind that.
 - **Editors:** [`.editorconfig`](./.editorconfig) is the source of truth for
   charset, line endings, final newline, and indentation.
 - **CI gates before merge:** type check, headless smoke, the test map, the GUT
-  suites, and a successful export that boots must all be green. Enable branch
-  protection on `main` and add the `ci-godot` jobs as required checks.
+  suites, a Linux export that boots, and a web export whose pack contains
+  neither `tests/` nor GUT must all be green. Enable branch protection on
+  `main` and add the `ci-godot` jobs as required checks.

@@ -55,6 +55,30 @@ window/stretch/aspect="keep"
 
 [rendering]
 
-; Forward+ is the default and the most capable desktop renderer. Revisit if we
-; ever target the web or low-end mobile, where "gl_compatibility" is required.
+; DECIDED (issue #13, when the web export landed): Forward+ on desktop,
+; gl_compatibility on the web, and the engine — not this file — owns the split.
+;
+; The web half is not a preference. Godot 4.7.1 registers
+; `rendering/renderer/rendering_method.web` itself, as a one-value enum whose
+; only value is "gl_compatibility", with the source comment "This is a bit of a
+; hack until we have WebGPU support" (main/main.cpp). Feature-tagged overrides
+; beat the plain key, so a web build ignores the line below no matter what it
+; says. Measured, not assumed: the exported bundle logs "OpenGL API OpenGL ES
+; 3.0 (WebGL 2.0 ...) - Compatibility" in the browser console while this stays
+; "forward_plus". There is no configuration to add and none to maintain.
+;
+; So we do run two renderers, and the cost is real: a Forward+-only feature
+; (SDFGI, volumetric fog, SSIL/SSAO, the Vulkan-only bits of the sky and light
+; pipeline) is simply absent from the build people click on. Nothing in the
+; project uses one today — day 0 is a Label on a Control — which is why this is
+; settled now rather than after visual work exists. The rule that comes with
+; the decision, and the trigger to revisit it (drop desktop to gl_compatibility
+; too), are in STANDARDS.md "Distribution".
+;
+; Redundant on purpose is what this line is NOT: it equals the engine default,
+; and ProjectSettings::save_custom() skips any setting whose value matches its
+; initial (`if (v->variant == v->initial) continue;`) — so the editor will drop
+; it the first time anyone opens Project Settings, and dropping it changes
+; nothing. Spelling out `renderer/rendering_method.web` here would be deleted
+; the same way, which is why the decision is written down instead of typed out.
 renderer/rendering_method="forward_plus"

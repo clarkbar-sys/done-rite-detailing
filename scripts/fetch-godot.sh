@@ -25,9 +25,30 @@ TEMPLATES_SHA256="86409db6200b6f8fd3230989c2d2002851f3dd18acf11d7bdbafddf5a0dd0f
 
 # Upstream ships every platform's templates in one ~1.2 GB archive. We keep only
 # the ones our export presets actually use, which is what makes the SDK small
-# enough to cache in CI. Adding a preset (web, windows, macos) means adding its
+# enough to cache in CI. Adding a preset (windows, macos) means adding its
 # template files here — otherwise the export fails with "template not found".
-KEEP_TEMPLATES=(version.txt linux_release.x86_64 linux_debug.x86_64)
+#
+# The web entries are the `_nothreads` variants on purpose, and the name is not
+# cosmetic: platform/web/export/export_plugin.h builds the template filename
+# from the preset, `web` + (`_dlink` if variant/extensions_support) +
+# (`_nothreads` if NOT variant/thread_support) + `_release.zip`. Our Web preset
+# sets thread_support=false — see export_presets.cfg and STANDARDS.md
+# "Distribution" for why — so the threaded `web_release.zip` would never be
+# opened, and keeping it would be ~20 MB of cache for nothing. Verified against
+# the 4.7.1 archive: it ships eight web templates (threads/nothreads x
+# dlink/plain x debug/release) and these two are the pair that preset resolves
+# to.
+#
+# Both debug and release are kept even though has_valid_export_configuration()
+# accepts either one (`valid = dvalid || rvalid`), so a release-only SDK would
+# still export — `make build-web` would work and `--export-debug` would fail at
+# the point of use. That mirrors the Linux pair above; the ~10 MB is worth not
+# having a debug export that only breaks for whoever first reaches for it.
+KEEP_TEMPLATES=(
+  version.txt
+  linux_release.x86_64 linux_debug.x86_64
+  web_nothreads_release.zip web_nothreads_debug.zip
+)
 
 base_url() { echo "https://github.com/godotengine/godot/releases/download/$1"; }
 editor_zip() { echo "Godot_v$1_linux.x86_64.zip"; }

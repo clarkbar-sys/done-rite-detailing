@@ -9,7 +9,8 @@
 
 Done Rite Detailing is an in-development game. Today the project is at **day 0**:
 a Godot 4 project that type-checks, boots headlessly, and exports a playable
-Linux binary in CI. Gameplay comes next — see the
+build — in your browser, or as a Linux binary — from CI. Gameplay comes next —
+see the
 [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.
 
@@ -23,26 +24,43 @@ installed system-wide — it all lands in `.godot-sdk/`. The
 
 ## Play it
 
-Every CI run on `main` and on every pull request uploads a Linux build. Grab it
-from the run's **Artifacts** section on the
-[Actions tab](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml),
-or download a tagged build from
+### 👉 [clarkbar-sys.github.io/done-rite-detailing](https://clarkbar-sys.github.io/done-rite-detailing/)
+
+That's the current `main`, in your browser, republished by CI on every push. No
+download, no `chmod`, nothing to install. It needs WebGL 2 and about 40 MB on
+the first load; there is no service worker, so a refresh always gets the newest
+build rather than a cached one.
+
+Prefer a local copy? Every CI run on `main` and on every pull request uploads
+both a Linux binary and the web bundle — grab them from the run's **Artifacts**
+section on the
+[Actions tab](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml)
+— and every tagged build is attached to
 [Releases](https://github.com/clarkbar-sys/done-rite-detailing/releases):
 
 ```bash
 chmod +x done-rite-detailing-*-linux-x86_64
 ./done-rite-detailing-*-linux-x86_64
+
+# or the web bundle, which is a plain static site
+unzip done-rite-detailing-*-web.zip && (cd web && python3 -m http.server)
 ```
 
-Every binary knows which commit it came from — it prints `v<version> (<sha>)` on
-startup, and shows the same string on screen.
+Every build knows which commit it came from — it prints `v<version> (<sha>)` on
+startup (to stdout on Linux, to the browser console on the web) and shows the
+same string on screen.
+
+There are no Windows or macOS builds, deliberately — the
+[Coding Standards](./STANDARDS.md#windows-and-macos-not-now) say why, and what
+would change that. The web build is the answer in the meantime.
 
 ## Development
 
 Needs `bash`, `curl`, `unzip`, `git`, `make` and `python3` (the last only for
 `make lint` / `make format`). The first command downloads Godot (~76 MB) and
-the GUT test addon (~3 MB), and the first `make build` also pulls the export
-templates (~1.2 GB, pruned to ~280 MB on disk). All are cached afterwards in
+the GUT test addon (~3 MB), and the first `make build` / `make build-web` also
+pulls the export templates (~1.2 GB, pruned to ~300 MB on disk — the Linux pair
+plus the two web `nothreads` ones). All are cached afterwards in
 `.godot-sdk/` and `addons/gut/`; `make lint` likewise caches a small Python
 venv in `.venv-lint/`.
 
@@ -55,6 +73,7 @@ make test      # all four of the above; run this before you push
 make lint      # gdformat --check + gdlint — a separate, faster CI gate
 make format    # gdformat, rewrites in place
 make build     # export the Linux release binary -> build/linux/
+make build-web # export the web bundle           -> build/web/
 make editor    # open the project in the Godot editor
 make run       # run the game
 make clean     # remove build outputs (keeps the downloaded toolchains)
@@ -70,7 +89,7 @@ top of that script, then re-run `make test build` before pushing.
 
 ```
 project.godot          engine + project settings (typed-GDScript gates live here)
-export_presets.cfg     export targets; `make build` uses the "Linux" preset
+export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make build-web`
 src/core/              cross-cutting code (shared helpers, process-global facts)
 src/main/              the entry scene
 tests/unit/            tests for pure logic — no scene tree
@@ -82,8 +101,15 @@ There is no coverage percentage, deliberately: GDScript has no line-coverage
 instrumentation worth gating on, and `make tested` stands in its place. The
 [Coding Standards](./STANDARDS.md#coverage) record what was measured and why.
 
-`tests/` and `addons/gut/` are excluded from the exported game — see
-`export_presets.cfg`.
+`tests/` and `addons/gut/` are excluded from the exported game — in **both**
+presets, which filter independently — see `export_presets.cfg`. CI checks the
+web pack for them rather than trusting the filters.
+
+The web build renders in Compatibility (WebGL 2) while the desktop build uses
+Forward+; that is Godot's own per-platform override rather than a second
+configuration, and the
+[Coding Standards](./STANDARDS.md#renderer-forward-on-desktop-gl_compatibility-on-the-web)
+record what it costs.
 
 ## Contributing
 
@@ -100,7 +126,9 @@ Releases are automated with
 `chore:` …) and a **Release PR** is opened and kept up to date automatically —
 it bumps the version (including `config/version` in `project.godot`) and updates
 [CHANGELOG.md](./CHANGELOG.md). Merge that PR to tag the release; the same
-workflow then exports the game and attaches it to the release.
+workflow then exports the game — the Linux binary and the web bundle — and
+attaches both to the release. The [link above](#play-it) is always current
+`main`; a release asset is the version you can still get back to in a year.
 
 ## Security
 

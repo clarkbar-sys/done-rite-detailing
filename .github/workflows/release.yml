@@ -2,7 +2,13 @@ name: Release
 
 # release-please keeps a "Release PR" that bumps the version and updates
 # CHANGELOG.md from Conventional Commits. Merging that PR tags the release; this
-# same run then exports the game and attaches it to the GitHub Release.
+# same run then exports the game — the Linux binary and the web bundle — and
+# attaches both to the GitHub Release.
+#
+# The web bundle is attached here as well as being continuously published to
+# GitHub Pages (ci-godot.yml), because they answer different questions: Pages
+# is always whatever `main` is right now, and the release asset is the version
+# someone can still get back to in a year.
 #
 # The bump also rewrites `config/version` in project.godot (see the
 # `x-release-please-version` marker there), so the version the game prints at
@@ -52,8 +58,10 @@ jobs:
           path: .godot-sdk
           key: godot-sdk-${{ hashFiles('scripts/fetch-godot.sh') }}
 
+      # Both distribution channels, from the one checkout of the tag, so the
+      # binary and the web bundle on a release are provably the same commit.
       - name: Export
-        run: make build
+        run: make build build-web
 
       # `shell: bash` is load-bearing — see the note in ci-godot.yml: the default
       # `run:` shell has no pipefail, so a crashed binary would pass this step.
@@ -66,6 +74,11 @@ jobs:
             exit 1
           fi
 
+      # There is no equivalent boot check for the web bundle here: running it
+      # needs a browser, and CI's `build-web` job already gated this commit on
+      # the export succeeding and on tests/ and GUT staying out of the pack.
+      # What is checked is that the archive is not a lie — it must contain the
+      # entry the whole thing exists for.
       - name: Attach to the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -73,4 +86,17 @@ jobs:
         run: |
           out="done-rite-detailing-${TAG}-linux-x86_64"
           cp build/linux/done-rite-detailing.x86_64 "$out"
-          gh release upload "$TAG" "$out" --clobber
+
+          # Zipped, not loose: a web build is nine files that only work
+          # together, and `gh release upload` takes files. Zipped from inside
+          # build/ so the archive root is `web/` — `-j` would flatten it and
+          # scatter index.* over whatever directory someone unzipped into — and
+          # from a subshell with an absolute destination so nothing is moved
+          # into the project directory, which Godot would scan (see the
+          # Makefile's build/.gdignore).
+          web="$PWD/done-rite-detailing-${TAG}-web.zip"
+          ( cd build && zip -qr "$web" web )
+          unzip -l "$web" | grep -q 'web/index.html' \
+            || { echo "::error::$web has no web/index.html"; exit 1; }
+
+          gh release upload "$TAG" "$out" "$web" --clobber
