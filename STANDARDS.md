@@ -81,6 +81,11 @@ make check   # runs `--check-only` over every .gd; non-zero on any error
   compile-time check when you do.
 - **Scenes stay small and composable.** If a scene needs a paragraph to explain,
   split it.
+- **Anything a finger has to hit** clears `TouchTarget.min_design_size()` on
+  both axes — 164 design px today, and a test asserts it rather than a review
+  noticing it. The design is scaled to about a third on a phone, so a control
+  that looks generous at 1280×720 can be 18 px tall in a hand, and a target
+  nobody can hit reads as a game that ignores them, not as a small button.
 - **One state, one screen.** What the game is doing is a `GameState` subclass in
   `src/core/` (Node-free, so a transition is a unit test); what the player sees
   is a `GameScreen` scene in `src/screens/`. A screen asks `GameStateMachine`
@@ -335,10 +340,21 @@ renderer everywhere. It doesn't, because the split costs zero lines and
 SSIL/SSAO, the Vulkan-only parts of the sky and light pipeline — is simply
 absent from the build most people will click on, and no gate here can see that:
 CI exports the bundle, it does not look at pixels. So the rule is: **anything
-visual is checked in the web build before it is called done.** That is
-advisory, exactly like "keep logic out of `Node` subclasses" under
-[Coverage](#coverage), and for the same reason — it is a review
-responsibility, not a mechanical one.
+visual is checked in the web build before it is called done** — and **on a
+phone-shaped screen, with a tap**, because that is the shape most people will
+open the link in. That is advisory, exactly like "keep logic out of `Node`
+subclasses" under [Coverage](#coverage), and for the same reason — it is a
+review responsibility, not a mechanical one.
+
+Both halves of it were learned the expensive way. On an emulated Pixel 7
+(411×838 CSS px), `window/stretch/aspect="keep"` turned the game into a 411×231
+strip with three quarters of the screen dead black, and a Start button that
+looked comfortable at 1280×720 measured 70×18 CSS px — so taps missed it and the
+game looked like it had stopped responding. A browser's device emulation
+reproduces both in about a minute, which is how those numbers were arrived at.
+What came out of it is written where it can't be forgotten: `project.godot`
+carries the stretch measurement, and `TouchTarget` in `src/core/` turns "big
+enough for a finger" into a number the tests gate.
 
 **When to revisit.** The first time a Forward+-only feature is actually wanted.
 Decide then, with something real to look at: either drop desktop to
