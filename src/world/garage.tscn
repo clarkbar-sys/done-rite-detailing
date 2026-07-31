@@ -1,0 +1,134 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://src/world/garage.gd" id="1_garage"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_unit"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.29, 0.3, 0.33, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wall"]
+albedo_color = Color(0.62, 0.63, 0.66, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_toolbox"]
+albedo_color = Color(0.78, 0.13, 0.13, 1)
+metallic = 0.2
+roughness = 0.45
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_car"]
+albedo_color = Color(0.13, 0.66, 0.27, 1)
+roughness = 0.55
+
+[sub_resource type="Environment" id="Environment_bay"]
+background_mode = 1
+background_color = Color(0.04, 0.05, 0.07, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.48, 0.5, 0.56, 1)
+ambient_light_energy = 0.9
+
+[node name="Garage" type="SubViewportContainer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+script = ExtResource("1_garage")
+
+[node name="View" type="SubViewport" parent="."]
+own_world_3d = true
+handle_input_locally = false
+size = Vector2i(1280, 720)
+render_target_update_mode = 4
+
+[node name="World" type="Node3D" parent="View"]
+
+[node name="Environment" type="WorldEnvironment" parent="View/World"]
+environment = SubResource("Environment_bay")
+
+[node name="Key" type="DirectionalLight3D" parent="View/World"]
+transform = Transform3D(0.8192, 0, -0.5736, -0.4699, 0.5736, -0.671, 0.329, 0.8192, 0.4699, 0, 6, 0)
+light_energy = 1.5
+
+[node name="StripFront" type="OmniLight3D" parent="View/World"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 3.5)
+light_color = Color(1, 0.96, 0.89, 1)
+light_energy = 2.2
+omni_range = 16.0
+
+[node name="StripBack" type="OmniLight3D" parent="View/World"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, -3.5)
+light_color = Color(1, 0.96, 0.89, 1)
+light_energy = 2.2
+omni_range = 16.0
+
+[node name="Room" type="Node3D" parent="View/World"]
+
+[node name="Floor" type="MeshInstance3D" parent="View/World/Room"]
+transform = Transform3D(12.4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_floor")
+
+[node name="Ceiling" type="MeshInstance3D" parent="View/World/Room"]
+transform = Transform3D(12.4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, 0, 4.6, 0)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="WallBack" type="MeshInstance3D" parent="View/World/Room"]
+transform = Transform3D(12.4, 0, 0, 0, 4.5, 0, 0, 0, 0.2, 0, 2.25, -6.6)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="WallFront" type="MeshInstance3D" parent="View/World/Room"]
+transform = Transform3D(12.4, 0, 0, 0, 4.5, 0, 0, 0, 0.2, 0, 2.25, 6.6)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="WallLeft" type="MeshInstance3D" parent="View/World/Room"]
+transform = Transform3D(0.2, 0, 0, 0, 4.5, 0, 0, 0, 13.4, -6.1, 2.25, 0)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="WallRight" type="MeshInstance3D" parent="View/World/Room"]
+transform = Transform3D(0.2, 0, 0, 0, 4.5, 0, 0, 0, 13.4, 6.1, 2.25, 0)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="Toolboxes" type="Node3D" parent="View/World"]
+
+[node name="LockerLeft" type="MeshInstance3D" parent="View/World/Toolboxes"]
+transform = Transform3D(1.1, 0, 0, 0, 2.1, 0, 0, 0, 0.6, -3.8, 1.05, -6.1)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_toolbox")
+
+[node name="LockerRight" type="MeshInstance3D" parent="View/World/Toolboxes"]
+transform = Transform3D(1.1, 0, 0, 0, 2.1, 0, 0, 0, 0.6, -2.6, 1.05, -6.1)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_toolbox")
+
+[node name="Bench" type="MeshInstance3D" parent="View/World/Toolboxes"]
+transform = Transform3D(2.8, 0, 0, 0, 1, 0, 0, 0, 0.7, 2, 0.5, -6.05)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_toolbox")
+
+[node name="Chest" type="MeshInstance3D" parent="View/World/Toolboxes"]
+transform = Transform3D(0.9, 0, 0, 0, 1.6, 0, 0, 0, 0.6, 3.9, 0.8, -6.1)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_toolbox")
+
+[node name="Car" type="MeshInstance3D" parent="View/World"]
+unique_name_in_owner = true
+transform = Transform3D(1.9, 0, 0, 0, 1.4, 0, 0, 0, 4.3, 0, 0.7, 0)
+mesh = SubResource("BoxMesh_unit")
+material_override = SubResource("StandardMaterial3D_car")
+
+[node name="Camera" type="Camera3D" parent="View/World"]
+unique_name_in_owner = true
+keep_aspect = 0
+current = true
+fov = 75.0

@@ -7,12 +7,14 @@
 
 ## Overview
 
-Done Rite Detailing is an in-development game. Today the project is at **day 0**:
-a Godot 4 project that type-checks, boots headlessly, and exports a playable
-build — in your browser, or as a Linux binary — from CI. It opens on a title
-screen with a Start button, and Start leads to a main menu that is, so far, a
-sign saying it's coming soon. Gameplay comes next — see the
-[day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
+Done Rite Detailing is an in-development game: a Godot 4 project that
+type-checks, boots headlessly, and exports a playable build — in your browser,
+or as a Linux binary — from CI. It opens on a title screen; Start leads to a
+main menu played over the detailing bay itself, with the camera circling the
+car; and Start Game drops you into that same room with the menu gone and the
+camera parked. There is nothing to do in there yet — the room is boxes and the
+car is a green one — but the flow through it is real. Gameplay comes next; see
+the [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.
 
 The Godot editor and export templates are **not vendored**. They're downloaded
@@ -94,6 +96,7 @@ export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make
 src/core/              cross-cutting code (shared helpers, game states, process-global facts)
 src/main/              the entry scene — owns the state machine and swaps screens
 src/screens/           one scene per game state, all of them a `GameScreen`
+src/world/             the places the game happens in, instanced by the screens that show them
 tests/unit/            tests for pure logic — no scene tree
 tests/integration/     tests that need a scene tree
 scripts/               developer tooling (toolchain fetch, build stamping, gates)

@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://src/screens/main_menu.gd" id="1_menu"]
+[ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -11,17 +12,39 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Center" type="CenterContainer" parent="."]
+[node name="Garage" parent="." instance=ExtResource("2_garage")]
+start_angle_degrees = 20.0
+
+[node name="Heading" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 40.0
+offset_bottom = 116.0
+grow_horizontal = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.75)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 48
+text = "Done Rite Detailing"
+horizontal_alignment = 1
+
+[node name="Layout" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+alignment = 2
 
-[node name="Message" type="Label" parent="Center"]
+[node name="Start" type="Button" parent="Layout"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(480, 176)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
-text = "Menu coming soon!"
-horizontal_alignment = 1
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 64
+text = "Start Game"
+
+[node name="BottomGap" type="Control" parent="Layout"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2

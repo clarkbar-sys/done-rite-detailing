@@ -7,13 +7,14 @@
 ##
 ## This overlaps `make smoke` on purpose but is not the same gate. Smoke boots
 ## the whole project and fails on any logged error — it proves the game starts.
-## This proves it starts *on the title screen* and gets to the menu from there,
-## which a clean boot says nothing about.
+## This proves it starts *on the title screen* and walks from there to the menu
+## and into the game, which a clean boot says nothing about.
 extends GutTest
 
 const MAIN_SCENE: String = "res://src/main/main.tscn"
 const TITLE_SCREEN: String = "res://src/screens/title_screen.tscn"
 const MAIN_MENU: String = "res://src/screens/main_menu.tscn"
+const PLAY_SCREEN: String = "res://src/screens/play_screen.tscn"
 
 var _main: Control = null
 
@@ -82,8 +83,23 @@ func test_only_one_screen_is_mounted_at_a_time() -> void:
 	assert_eq(host.get_child_count(), 1)
 
 
-func test_the_menu_says_it_is_coming_soon() -> void:
+func test_start_game_swaps_the_menu_for_the_game() -> void:
+	# The whole walk, through the real buttons: title -> menu -> game. Both
+	# screens name their button `%Start`, so `_press_start` presses whichever one
+	# is currently on screen.
+	await _press_start()
+	await _press_start()
+	assert_eq(_current_screen_path(), PLAY_SCREEN)
+	assert_eq(_current_screen_path(), PlayGameState.SCENE_PATH, "the state decides this")
+
+
+func test_the_menu_does_not_come_along_into_the_game() -> void:
+	# The outgoing screen is removed *and* freed — see `main.gd`. A menu still
+	# mounted would be drawn over the room and still be taking taps, which is
+	# the bug `test_only_one_screen_is_mounted_at_a_time` catches from the other
+	# side, one screen earlier.
+	await _press_start()
 	await _press_start()
 	var host: Control = _main.get_node("%ScreenHost") as Control
-	var message: Label = host.get_child(0).get_node("%Message") as Label
-	assert_string_contains(message.text, "coming soon")
+	assert_eq(host.get_child_count(), 1)
+	assert_false(host.get_child(0).has_node("%Start"), "the game has no Start button on it")
