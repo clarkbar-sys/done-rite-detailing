@@ -1,7 +1,22 @@
-## The menu, as far as it goes today: a sign saying it isn't built yet.
+## The main menu: the car, slowly turning, and the one thing you can do about it.
 ##
-## Deliberately a script with no code rather than no script at all. It is the
-## seam the real menu grows into — buttons, and the [method
-## GameScreen.request_transition] calls behind them — and having it here means
-## adding the first one touches this file only.
+## The room behind the button is the real one — [code]src/world/garage.tscn[/code],
+## the same scene the play screen shows — rather than a picture of it, so the
+## menu cannot drift away from the game it is a menu for. Nothing here reaches
+## into that scene: whether the camera circles is a property set on the instance
+## in this screen's own file, and that is the whole of the difference between
+## this screen and the next one.
 extends GameScreen
+
+@onready var _start: Button = %Start
+
+
+func _ready() -> void:
+	_start.pressed.connect(_on_start_pressed)
+	# Same reason as the title screen: playable from a keyboard or a pad the
+	# moment it opens, not only by whoever brought a mouse.
+	_start.grab_focus()
+
+
+func _on_start_pressed() -> void:
+	request_transition(PlayGameState.new())
