@@ -5,9 +5,18 @@ name: CI (Godot)
 #   check     — type-check every script + boot the game headless (editor only, ~76 MB)
 #   test      — the test map check, then the GUT unit + integration suites, headless
 #   build     — export the Linux release binary, run it, upload it as an artifact
-#   build-web — export the web bundle and upload it (as a Pages artifact on main;
-#               a PR gets a comment linking to the download instead — see #29)
+#   build-web — export the web bundle, upload it, and deploy a live PR preview
 #   pages     — publish that bundle to GitHub Pages; `main` only
+#
+# GitHub Pages is one repo-global site, so `main`'s deploy and a PR's preview
+# can't both be the "github-pages" Actions deployment — only one deployment can
+# hold that environment at a time, and a PR must never be the one holding it.
+# Both now instead push to the `gh-pages` branch: `pages` writes the site root,
+# `build-web` writes a PR's bundle under `pr-preview/pr-<number>/` (rossjrw/
+# pr-preview-action), and `pages-preview-cleanup.yml` deletes that subfolder
+# when the PR closes. Repo setting this depends on, done once by hand: Settings
+# -> Pages -> Build and deployment -> Source = "Deploy from a branch" ->
+# `gh-pages` / `(root)`.
 #
 # `lint` doesn't `need:` anything and runs in parallel with `check` — it has no
 # Godot dependency, so gating it behind the ~76 MB editor download would only
@@ -232,11 +241,12 @@ jobs:
     runs-on: ubuntu-latest
 
     # The workflow-wide grant is `contents: read`; a job-level block REPLACES
-    # it, so `contents: read` is repeated here for the checkout. `pull-requests:
-    # write` is the addition — it's what lets the last step below leave a
-    # comment linking a PR to the bundle it just built.
+    # it. `contents: write` is the PR-preview step below pushing to the
+    # `gh-pages` branch — the same permission `pages` uses to write the site
+    # root, just scoped to the `pr-preview/` subfolder instead. `pull-requests:
+    # write` is that step's sticky preview-link comment.
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     steps:
@@ -299,10 +309,10 @@ jobs:
             echo "Total: $(du -sh "$WEB_DIR" | cut -f1)"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Two uploads, on purpose, because they are read by different people.
-      # This one is an ordinary artifact a reviewer can download from a PR and
-      # serve locally (`python3 -m http.server` in the unzipped directory) —
-      # it exists on every branch and every PR.
+      # Downloadable from the run page / the PR's checks tab, same as `build`'s
+      # Linux binary. `pages` (main) downloads this same artifact rather than
+      # re-exporting, so it and the PR preview below are provably the bundle
+      # this job just checked.
       - name: Upload the bundle
         uses: actions/upload-artifact@v7
         with:
@@ -310,114 +320,59 @@ jobs:
           path: ${{ env.WEB_DIR }}
           if-no-files-found: error
 
-      # And this one is the Pages payload, which only means anything on `main`.
-      # It is a fixed-name ("github-pages") tarball that `actions/deploy-pages`
-      # knows how to find; uploading it from a PR would be dead weight nobody
-      # can deploy, so it is skipped there.
-      - name: Upload the bundle as a Pages artifact
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: ${{ env.WEB_DIR }}
-
-      # GitHub Pages has no per-branch preview to fall back on (see the note on
-      # `pages` below), and standing up a third-party host is a call for
-      # whoever picks that up — not something to wire in silently, since it
-      # means new accounts and secrets. So a PR doesn't get a live URL, but it
-      # shouldn't have to go spelunking in the Checks tab for the bundle
-      # either: this is that link, updated in place on every push instead of
-      # piling up a new comment each time.
-      - name: Comment with a link to the bundle
+      # Live preview for a PR: pushes $WEB_DIR to gh-pages under
+      # pr-preview/pr-<number>/ and drops/updates a sticky comment with the
+      # link (rossjrw/pr-preview-action posts it). `action: deploy` rather than
+      # the default `auto` because this job never runs on a `closed` PR event
+      # in the first place — cleanup on close is pages-preview-cleanup.yml,
+      # which doesn't need a build at all.
+      - name: Deploy the PR preview
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: rossjrw/pr-preview-action@v1
         with:
-          script: |
-            const marker = "<!-- web-preview-link -->";
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = [
-              marker,
-              "### Web build",
-              "",
-              "No hosted preview yet (GitHub Pages only publishes `main` — see #29), " +
-                "but the bundle is built and ready to try:",
-              "",
-              `1. Open the [workflow run](${runUrl}) and download the \`done-rite-detailing-web\` artifact.`,
-              "2. Unzip it.",
-              "3. From the unzipped folder, run `python3 -m http.server` and open http://localhost:8000.",
-            ].join("\n");
-
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find((c) => c.body.includes(marker));
-
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
+          source-dir: ${{ env.WEB_DIR }}
+          action: deploy
 
   pages:
     name: Publish to GitHub Pages
     needs: build-web
-    # `main` only. A PR must not be able to overwrite the published game, and a
-    # Pages deployment is repo-global — there is no per-branch preview to fall
-    # back on. workflow_dispatch on main is allowed through so the page can be
+    # `main` only. A PR must not be able to overwrite the published game — its
+    # bundle goes to a `pr-preview/` subfolder instead (see `build-web`).
+    # workflow_dispatch on main is allowed through so the page can be
     # re-published without an empty commit.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
-    # The workflow-wide grant is `contents: read`; a job-level block REPLACES it
-    # rather than adding to it, so everything this job needs is listed here.
-    #   pages: write    — create the deployment (actions/deploy-pages)
-    #   id-token: write — deploy-pages authenticates to the Pages API with an
-    #                     OIDC token rather than a PAT; without it the deploy
-    #                     fails on a missing id-token permission
-    #   contents: read  — kept because it is what GitHub's own Pages template
-    #                     grants. This job checks nothing out and so looks like
-    #                     it could drop to none, but that is a guess nobody can
-    #                     test from a branch (a Pages deployment only ever runs
-    #                     on `main`), and guessing wrong breaks the published
-    #                     game. Narrow it when there's a green run to compare
-    #                     against, not before.
+    # The workflow-wide grant is `contents: read`; a job-level block REPLACES
+    # it. `contents: write` is this job pushing the site root to `gh-pages`.
     permissions:
-      contents: read
-      pages: write
-      id-token: write
-
-    # Names the deployment target and hangs the live URL off the job in the
-    # Actions UI, so the run page itself links to the playable build.
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: write
 
     steps:
-      # Reads the repo's Pages configuration (base URL and so on) and fails
-      # loudly if Pages has never been enabled — which is the one part of this
-      # nobody can do from a workflow. Settings -> Pages -> Build and
-      # deployment -> Source must be set to "GitHub Actions" once, by hand,
-      # or every run of this job stops here.
-      - uses: actions/configure-pages@v6
+      - uses: actions/checkout@v7
 
-      # Publishes the "github-pages" artifact from `build-web`. No Jekyll: the
-      # artifact is served exactly as uploaded, which is what a .wasm/.pck
-      # bundle needs.
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v5
+      # Same artifact `build-web` just uploaded — downloaded rather than
+      # re-exported, so what gets published is provably the bundle that ran
+      # the "no tests, no GUT" check, not a fresh export of the same commit.
+      - name: Download the web bundle
+        uses: actions/download-artifact@v6
+        with:
+          name: done-rite-detailing-web
+          path: ${{ env.WEB_DIR }}
+
+      # Pushes $WEB_DIR to the root of `gh-pages`. `keep_files: true` is
+      # load-bearing: without it this deploy wipes the whole branch first,
+      # taking every PR's live pr-preview/pr-<number>/ subfolder with it. No
+      # Jekyll (the action writes .nojekyll itself) — the bundle is served
+      # exactly as built, which is what a .wasm/.pck needs.
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ env.WEB_DIR }}
+          publish_branch: gh-pages
+          keep_files: true
 
       - name: Summarise
         run: |
-          echo "### Playable at ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Playable at https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/" >> "$GITHUB_STEP_SUMMARY"
