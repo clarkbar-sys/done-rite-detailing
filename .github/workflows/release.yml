@@ -5,10 +5,14 @@ name: Release
 # same run then exports the game — the Linux binary and the web bundle — and
 # attaches both to the GitHub Release.
 #
-# The web bundle is attached here as well as being continuously published to
-# GitHub Pages (ci-godot.yml), because they answer different questions: Pages
-# is always whatever `main` is right now, and the release asset is the version
-# someone can still get back to in a year.
+# The web bundle is attached here as a zip, and also published live to
+# GitHub Pages under releases/<tag>/ (and mirrored to releases/latest/) —
+# in addition to ci-godot.yml's continuous publish of `main` to the Pages
+# root. All three answer different questions: the Pages root is always
+# whatever `main` is right now, releases/<tag>/ is a permanent URL for the
+# version someone can still link to in a year, and the zip is what they'd
+# download to run offline. Same `gh-pages` branch, same `keep_files: true`
+# contract as ci-godot.yml's `pages` job — see the note there for why.
 #
 # The bump also rewrites `config/version` in project.godot (see the
 # `x-release-please-version` marker there), so the version the game prints at
@@ -24,6 +28,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+
+env:
+  WEB_DIR: build/web
 
 jobs:
   release-please:
@@ -100,3 +107,31 @@ jobs:
             || { echo "::error::$web has no web/index.html"; exit 1; }
 
           gh release upload "$TAG" "$out" "$web" --clobber
+
+      # Same $WEB_DIR the zip above was made from, published live under its own
+      # permanent subfolder rather than overwriting the Pages root — ci-godot.yml's
+      # `pages` job owns the root (`main`, continuously). Two pushes, not one, so a
+      # bad link that hardcodes "latest" and a permanent per-version link both
+      # work; `keep_files: true` on both means neither wipes the other, the root,
+      # or any live `pr-preview/` folder.
+      - name: Publish to GitHub Pages (releases/<tag>)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ env.WEB_DIR }}
+          publish_branch: gh-pages
+          destination_dir: releases/${{ needs.release-please.outputs.tag_name }}
+          keep_files: true
+
+      - name: Publish to GitHub Pages (releases/latest)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ env.WEB_DIR }}
+          publish_branch: gh-pages
+          destination_dir: releases/latest
+          keep_files: true
+
+      - name: Summarise
+        run: |
+          echo "Playable at https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/releases/${{ needs.release-please.outputs.tag_name }}/" >> "$GITHUB_STEP_SUMMARY"
