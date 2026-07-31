@@ -1,0 +1,60 @@
+; Engine configuration file.
+; Hand-maintained: the editor rewrites this file, so keep edits reviewable and
+; keep the comments — they explain *why* the non-default settings are set.
+;
+; Format documented at https://docs.godotengine.org/en/stable/classes/class_projectsettings.html
+
+config_version=5
+
+[application]
+
+config/name="Done Rite Detailing"
+config/version="0.0.0" ; x-release-please-version
+run/main_scene="res://src/main/main.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.svg"
+
+; No autoloads on purpose. `godot --check-only` (what `make check` gates on)
+; resolves global `class_name` identifiers but not autoload names, so anything
+; reached through an autoload drops out of the type check. Prefer a class with
+; static members — see src/core/build_info.gd.
+
+[debug]
+
+; Typed GDScript is the house standard (see STANDARDS.md). Level 2 = error, so
+; the offending script fails to compile and CI's `make check` goes red.
+; Level 1 = warning (visible, non-fatal); level 0 = ignored.
+gdscript/warnings/exclude_addons=true
+gdscript/warnings/untyped_declaration=2
+gdscript/warnings/inferred_declaration=1
+gdscript/warnings/unsafe_property_access=2
+gdscript/warnings/unsafe_method_access=2
+gdscript/warnings/unsafe_cast=2
+gdscript/warnings/unsafe_call_argument=2
+gdscript/warnings/unsafe_void_return=2
+gdscript/warnings/shadowed_variable=2
+gdscript/warnings/shadowed_variable_base_class=2
+gdscript/warnings/return_value_discarded=0
+gdscript/warnings/standalone_expression=2
+gdscript/warnings/standalone_ternary=2
+gdscript/warnings/incompatible_ternary=2
+gdscript/warnings/narrowing_conversion=2
+gdscript/warnings/int_as_enum_without_cast=2
+gdscript/warnings/unused_variable=2
+gdscript/warnings/unused_parameter=1
+gdscript/warnings/unused_signal=2
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+; Pick the whole window up and scale it, letterboxing as needed, so the game
+; looks the same at any window size instead of revealing more/less world.
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+; Forward+ is the default and the most capable desktop renderer. Revisit if we
+; ever target the web or low-end mobile, where "gl_compatibility" is required.
+renderer/rendering_method="forward_plus"

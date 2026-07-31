@@ -1,107 +1,95 @@
 # Coding Standards
 
-House standards for repos created from this template. The goal is *tight and
-enforced*: every rule here is backed by a config file and gated in CI, so
-"following the standard" mostly means "let the tools run."
+House standards for this repo. The goal is *tight and enforced*: every rule here
+is backed by a config file and gated in CI, so "following the standard" mostly
+means "let the tools run."
 
-| Language   | Format        | Lint / analyze              | Types        | Tests + floor            | Enforced by                     |
-| ---------- | ------------- | --------------------------- | ------------ | ------------------------ | ------------------------------- |
-| C / C++    | `clang-format`| `clang-tidy`, `cppcheck`, CodeQL | (compiler)   | ASan + UBSan, **≥80%**   | `.github/workflows/ci-c.yml`    |
-| Python     | `ruff format` | `ruff`, `bandit`, `pip-audit`    | `mypy --strict` | `pytest`, **≥80%**    | `.github/workflows/ci-python.yml` |
-| Scheme (s7)| — parked —    | — parked —                  | —            | —                        | see [§ Scheme](#scheme-s7)      |
+| Language | Format | Lint / analyze | Types | Tests + floor | Enforced by |
+| -------- | ------ | -------------- | ----- | ------------- | ----------- |
+| GDScript | `gdformat` — *pending* | `gdlint` — *pending* | **typed GDScript, warnings-as-errors** | headless smoke; GUT + floor *pending* | `.github/workflows/ci-godot.yml` |
 
-Run everything locally before pushing — CI runs the same commands.
+Run `make test` locally before pushing — CI runs the same commands.
 
 ---
 
-## C / C++
+## GDScript
 
-**Standard:** C sources compile as **C11** (`-std=c11`), C++ sources as
-**C++20** (`-std=c++20`). Warnings are errors: `-Wall -Wextra -Werror -pedantic`.
+**Statically typed, always.** Every variable, parameter and return value carries
+a type. This isn't a style preference: untyped GDScript is interpreted with
+dynamic dispatch, so typing it is both a correctness gate *and* the single
+biggest performance lever the language has.
 
-**Formatting** — [`.clang-format`](./.clang-format), **K&R braces**:
+```gdscript
+## Doc comments use `##` and describe the *why*.
+class_name Client
+extends Node
 
-```c
-int
-main(void)
-{                     /* function: brace on its own line */
-  if (ready) {        /* control statement: brace attached */
-    run();
-  } else {            /* else on the same line as the close brace */
-    wait();
-  }
-  return 0;
-}
+signal cleaned(vehicle: Vehicle)
+
+const MAX_QUEUE: int = 8
+
+var _queue: Array[Vehicle] = []
+
+
+func enqueue(vehicle: Vehicle) -> bool:
+	if _queue.size() >= MAX_QUEUE:
+		return false
+	_queue.append(vehicle)
+	return true
 ```
 
-2-space indent (matches `.editorconfig`), 100-column limit, pointers bind right
-(`int *p`). Check locally:
+Tabs for indentation (the engine's own style — see `.editorconfig`); snake_case
+for functions and variables, PascalCase for classes and nodes, SCREAMING_CASE
+for constants; a leading `_` marks private members and intentionally-unused
+parameters.
+
+### How it's enforced
+
+The typing rules are **compiler-enforced**, not review-enforced. `project.godot`
+sets these GDScript warnings to level 2 (= error), so an offending script fails
+to compile:
+
+| Warning | Why it's an error |
+| ------- | ----------------- |
+| `untyped_declaration` | the core rule — no untyped vars, params or returns |
+| `unsafe_property_access`, `unsafe_method_access` | reaching into a `Variant` hides typos until runtime |
+| `unsafe_cast`, `unsafe_call_argument` | narrow explicitly, at a place you chose |
+| `unsafe_void_return`, `narrowing_conversion`, `int_as_enum_without_cast` | silent type coercion |
+| `shadowed_variable`, `shadowed_variable_base_class` | shadowing reads as a bug |
+| `unused_variable`, `unused_signal`, `standalone_expression` | dead code, or a call you forgot to make |
+
+`inferred_declaration` (`:=`) and `unused_parameter` are level 1 — visible in the
+editor, non-fatal. Addons are exempt (`exclude_addons=true`); third-party code
+plays by its own rules.
 
 ```bash
-clang-format --dry-run --Werror $(git ls-files '*.c' '*.h' '*.cpp' '*.cc' '*.hpp')
-clang-format -i <file>        # apply
+make check   # runs `--check-only` over every .gd; non-zero on any error
 ```
 
-**Static analysis** — [`.clang-tidy`](./.clang-tidy) enables the high-signal
-families (`bugprone`, `cert`, `clang-analyzer`, `performance`, `portability`,
-`readability`). It needs a `compile_commands.json`, so it activates once you
-have a cmake build (`-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`); the CI step is stubbed
-and commented until then. `cppcheck` and CodeQL run unconditionally.
+### Beyond the compiler
 
-**Tests** run under **AddressSanitizer and UndefinedBehaviorSanitizer** (matrix),
-with `abort_on_error` / `halt_on_error` so a sanitizer finding fails the build.
-Both `gcc` and `clang` must build clean.
+- **Nodes:** reach for children with unique names (`%Title`) or `@export`ed
+  `NodePath`s — never a brittle `../../Sibling` chain.
+- **Signals over polling.** Declare them with typed parameters.
+- **Prefer a `class_name` with static members over an autoload.** `--check-only`
+  resolves global class names but *not* autoload names, so every call made
+  through an autoload silently drops out of the type check — the gate above
+  stops applying to exactly the globals everything depends on. `BuildInfo` is
+  the worked example. Reach for an autoload only when you genuinely need a node
+  in the tree (`_process`, signals, lifecycle), and know you're trading away the
+  compile-time check when you do.
+- **Scenes stay small and composable.** If a scene needs a paragraph to explain,
+  split it.
+- **Tests live outside the shipped pack** (`tests/` is in the export's
+  `exclude_filter`).
 
-**Coverage floor: 80%** line coverage, enforced with `gcovr --fail-under-line 80`.
+### Parked
 
-> The build/test steps in `ci-c.yml` are `make` placeholders — wire in your real
-> build system (cmake/meson/make) and the flags above will flow through.
-
----
-
-## Python
-
-**Version:** target **3.11+**; CI tests 3.11 / 3.12 / 3.13. Use a `src/` layout.
-
-**Formatting + linting** — [`pyproject.toml`](./pyproject.toml), one tool:
-[`ruff`](https://docs.astral.sh/ruff/) replaces black, isort, flake8, and
-pyupgrade. Lint selection is broad (`E W F I N UP B A C4 SIM PTH RUF S`),
-100-column lines.
-
-```bash
-ruff format .          # apply formatting
-ruff format --check .  # CI check
-ruff check . --fix     # lint + autofix
-```
-
-**Types** — `mypy --strict`. Everything is annotated; no implicit `Any`, no
-untyped defs. Config lives in `[tool.mypy]`.
-
-```bash
-mypy .
-```
-
-**Security** — `bandit` (SAST over `src`) and `pip-audit` (dependency CVEs) both
-**gate** — no `|| true`.
-
-**Tests + coverage** — `pytest` with branch coverage; **floor 80%**, enforced via
-`--cov-fail-under=80` and `[tool.coverage.report] fail_under`.
-
-```bash
-pip install -e '.[dev]'
-pytest --cov --cov-report=term-missing
-```
-
----
-
-## Scheme (s7)
-
-**Parked — not yet standardized.** Because s7 ships as source you compile
-yourself and its language surface depends on build-time flags, the standard here
-will be a **pinned reference-s7 container** (fixed `S7_VERSION` + fixed build
-flags) that CI runs against, rather than a formatter. Open decisions: whether to
-build with `WITH_PURE_S7`, and which upstream revision to pin. Tracked
-separately; `ci-scheme.yml` stays as-is until then.
+`gdformat` / `gdlint` (from
+[gdtoolkit](https://github.com/Scony/godot-gdscript-toolkit)), unit tests with
+[GUT](https://github.com/bitwes/Gut), and a coverage floor to match the 80% the
+rest of the house standard uses. Tracked as sub-issues of the day-0 initiative;
+this table gets its missing cells then.
 
 ---
 
@@ -110,10 +98,14 @@ separately; `ci-scheme.yml` stays as-is until then.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/)
   (`feat:`, `fix:`, `chore:` …) — required for release-please. See
   [CONTRIBUTING.md](./CONTRIBUTING.md).
+- **Toolchain:** pinned by sha256 in
+  [`scripts/fetch-godot.sh`](./scripts/fetch-godot.sh). A Godot bump is a
+  reviewable commit that changes those pins — never an ambient "whatever is
+  installed".
+- **Builds are traceable:** every exported binary carries the commit it was
+  built from (`build_stamp.json` → the `BuildInfo` autoload).
 - **Editors:** [`.editorconfig`](./.editorconfig) is the source of truth for
-  charset, line endings, final newline, and base indentation. Language
-  formatters are configured to agree with it.
-- **CI gates before merge:** format check, lint, types, tests at/above the
-  coverage floor, and security scans must all be green. Enable branch protection
-  on `main` and add the relevant jobs as required checks (see the README
-  checklist).
+  charset, line endings, final newline, and indentation.
+- **CI gates before merge:** type check, headless smoke, and a successful export
+  that boots must all be green. Enable branch protection on `main` and add the
+  `ci-godot` jobs as required checks.

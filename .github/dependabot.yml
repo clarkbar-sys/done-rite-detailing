@@ -7,6 +7,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 
+  # The Godot toolchain is not a dependabot ecosystem — it is pinned by sha256 in
+  # scripts/fetch-godot.sh. Bump it with `scripts/fetch-godot.sh --update`.
+  #
   # Uncomment the block matching your stack once you add a dependency manifest:
   #
   # - package-ecosystem: "npm"        # package.json / package-lock.json
