@@ -2,7 +2,7 @@
 # Write res://build_stamp.json so an exported binary can say which commit it is.
 #
 # Run immediately before `--export-release`; the file is picked up by the
-# BuildInfo autoload (src/core/build_info.gd) and packed into the game. It is
+# BuildInfo class (src/core/build_info.gd) and packed into the game. It is
 # git-ignored: local/editor runs have no stamp and report the commit as "local".
 #
 # Usage: scripts/stamp-build.sh [PROJECT_DIR]

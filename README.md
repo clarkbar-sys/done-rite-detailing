@@ -17,7 +17,9 @@ The Godot editor and export templates are **not vendored**. They're downloaded
 on demand and **checksum-verified** against the pins in
 [`scripts/fetch-godot.sh`](./scripts/fetch-godot.sh), so the repo stays lean
 while your machine and CI build with the byte-identical toolchain. Nothing is
-installed system-wide — it all lands in `.godot-sdk/`.
+installed system-wide — it all lands in `.godot-sdk/`. The
+[GUT](https://github.com/bitwes/Gut) test addon gets the same treatment via
+[`scripts/fetch-gut.sh`](./scripts/fetch-gut.sh) and lands in `addons/gut/`.
 
 ## Play it
 
@@ -37,38 +39,46 @@ startup, and shows the same string on screen.
 
 ## Development
 
-Needs `bash`, `curl`, `unzip`, `make` and `python3` (the last only for
-`make lint` / `make format`). The first command downloads Godot (~76 MB), and
-the first `make build` also pulls the export templates (~1.2 GB, pruned to
-~280 MB on disk). Both are cached in `.godot-sdk/` afterwards; `make lint`
-likewise caches a small Python venv in `.venv-lint/`.
+Needs `bash`, `curl`, `unzip`, `git`, `make` and `python3` (the last only for
+`make lint` / `make format`). The first command downloads Godot (~76 MB) and
+the GUT test addon (~3 MB), and the first `make build` also pulls the export
+templates (~1.2 GB, pruned to ~280 MB on disk). All are cached afterwards in
+`.godot-sdk/` and `addons/gut/`; `make lint` likewise caches a small Python
+venv in `.venv-lint/`.
 
 ```bash
 make check     # type-check every script — a CI gate
 make smoke     # boot the game headless and require a clean run
-make test      # both of the above; run this before you push
+make gut       # run the tests/ suites headless with GUT — a CI gate
+make test      # all three of the above; run this before you push
 make lint      # gdformat --check + gdlint — a separate, faster CI gate
 make format    # gdformat, rewrites in place
 make build     # export the Linux release binary -> build/linux/
 make editor    # open the project in the Godot editor
 make run       # run the game
 make clean     # remove build outputs (keeps the downloaded toolchains)
-make distclean # also drop .godot-sdk/ and .venv-lint/
+make distclean # also drop .godot-sdk/, .venv-lint/ and addons/gut/
 ```
 
 To move to a newer Godot, run `scripts/fetch-godot.sh --update`. It prints the
 latest upstream stable version and its checksums; update the three pins at the
 top of that script, then re-run `make test build` before pushing.
+`scripts/fetch-gut.sh --update` does the same for the test addon.
 
 ### Layout
 
 ```
 project.godot          engine + project settings (typed-GDScript gates live here)
 export_presets.cfg     export targets; `make build` uses the "Linux" preset
-src/core/              cross-cutting code (autoloads, shared helpers)
+src/core/              cross-cutting code (shared helpers, process-global facts)
 src/main/              the entry scene
+tests/unit/            tests for pure logic — no scene tree
+tests/integration/     tests that need a scene tree
 scripts/               developer tooling (toolchain fetch, build stamping)
 ```
+
+`tests/` and `addons/gut/` are excluded from the exported game — see
+`export_presets.cfg`.
 
 ## Contributing
 

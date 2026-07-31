@@ -32,6 +32,12 @@ __pycache__/
 .godot/
 # Pinned editor + export templates, downloaded by scripts/fetch-godot.sh.
 .godot-sdk/
+# The GUT test addon, pinned by commit + tree sha256 in scripts/fetch-gut.sh
+# and fetched by `make gut`. Same reasoning as the two toolchains above: ~3 MB
+# of third-party GDScript has no business in this repo's history, and the pin
+# file is the reviewable artefact instead. Ignore only what we fetch — a
+# first-party addon added later must still be committed.
+addons/gut/
 # Exported games and the export-time provenance stamp.
 build/
 build_stamp.json
