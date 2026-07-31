@@ -1,0 +1,35 @@
+name: Clean up PR preview
+
+# ci-godot.yml's `build-web` deploys a PR's web bundle to
+# gh-pages:/pr-preview/pr-<number>/ (see the comment on that job). This is the
+# other half: delete that subfolder once the PR closes, merged or not, so
+# gh-pages doesn't accumulate a live copy of every PR that's ever been opened.
+#
+# A separate workflow rather than a step in ci-godot.yml because that
+# workflow's `pull_request` trigger doesn't include `closed`, on purpose —
+# adding it there would re-run lint/check/test/build/build-web on every PR
+# close for no reason, just to reach a cleanup step that needs none of them.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pages-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  remove-preview:
+    name: Remove PR preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Remove the preview and its sticky comment
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          action: remove
