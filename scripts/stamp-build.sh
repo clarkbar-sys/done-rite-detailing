@@ -11,9 +11,14 @@ set -euo pipefail
 DIR="${1:-.}"
 OUT="$DIR/build_stamp.json"
 
-# In CI, GITHUB_SHA is authoritative — a PR build checks out a synthetic merge
-# commit, so `git rev-parse HEAD` there names something that exists nowhere else.
-commit="${GITHUB_SHA:-$(git -C "$DIR" rev-parse HEAD 2>/dev/null || echo unknown)}"
+# What was actually checked out is the honest answer, so `git rev-parse HEAD`
+# leads. GITHUB_SHA is only a last resort — it is NOT interchangeable:
+#   - on `pull_request` it is the synthetic refs/pull/N/merge commit, which is
+#     not the branch head a reviewer is looking at
+#   - in release.yml we check out `ref: <tag>`, so GITHUB_SHA is whatever push
+#     to main triggered the run, not the commit being released
+# BUILD_COMMIT overrides both, which is how CI stamps a PR with its head sha.
+commit="${BUILD_COMMIT:-$(git -C "$DIR" rev-parse HEAD 2>/dev/null || echo "${GITHUB_SHA:-unknown}")}"
 built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 cat > "$OUT" <<EOF

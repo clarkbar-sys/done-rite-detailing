@@ -57,7 +57,12 @@ jobs:
           path: .godot-sdk
           key: godot-sdk-${{ hashFiles('scripts/fetch-godot.sh') }}
 
+      # Stamp the branch head, not the synthetic refs/pull/N/merge commit a PR
+      # build checks out — the merge commit isn't a SHA anyone can find in the
+      # branch's history. On push/dispatch there's no PR, so github.sha is right.
       - name: Export
+        env:
+          BUILD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: make build
 
       # The export succeeding is not the same as the game working. Boot the
