@@ -1,4 +1,7 @@
-## The title screen: the project's name, which build this is, and Start.
+## The title screen: the project's name, which build this is, and Start —
+## played over the same detailing bay the main menu and play screen show,
+## rather than a blank background, so the car is the first thing a player sees
+## instead of something they wait a screen for.
 ##
 ## The two labels are the day-0 screen this project started as, moved intact
 ## into a state of its own — the same text CI's smoke run and the integration

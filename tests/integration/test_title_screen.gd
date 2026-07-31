@@ -55,10 +55,22 @@ func _start_button() -> Button:
 	return _screen.get_node("%Start") as Button
 
 
+func _garage() -> Garage:
+	return _screen.get_node("Garage") as Garage
+
+
 func test_the_screen_is_a_game_screen() -> void:
 	# The host casts to [GameScreen] and refuses anything else, so a scene that
 	# lost its script would boot to an empty window.
 	assert_not_null(_screen, "the title screen must instantiate as a GameScreen")
+
+
+func test_it_shows_the_garage_behind_the_title() -> void:
+	assert_not_null(_garage(), "the title screen is played over the real room, not a picture of it")
+
+
+func test_the_title_camera_circles_the_car() -> void:
+	assert_true(_garage().orbiting, "the title screen shows the car off, same as the main menu")
 
 
 func test_title_shows_the_project_name() -> void:
