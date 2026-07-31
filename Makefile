@@ -7,6 +7,8 @@
 #
 #   make check     type-check every script (the CI gate)
 #   make smoke     boot the game headless and require a clean exit
+#   make lint      gdformat --check + gdlint every script (a separate CI gate)
+#   make format    gdformat every script in place
 #   make build     export the Linux release binary -> build/linux/
 #   make editor    open the project in the Godot editor
 
@@ -40,7 +42,7 @@ SOURCES := $(shell find . -name '*.gd' \
              -not -path './.godot/*' -not -path './.godot-sdk/*' \
              -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-.PHONY: all sdk editor-sdk import check smoke test build stamp run editor clean distclean
+.PHONY: all sdk editor-sdk import check smoke lint format test build stamp run editor clean distclean
 
 all: check build
 
@@ -98,9 +100,48 @@ smoke: import
 	fi
 	@echo "Smoke test passed."
 
-# The one command CI and humans run. Unit tests (GUT) join it next; until then
-# it is the type check plus the headless boot.
+# The one command CI and humans run before pushing. Deliberately check+smoke
+# only, not lint: those two are "does the game still work", gated by CI's
+# `check` job; lint is "does the style pass", gated by CI's own `lint` job.
+# CONTRIBUTING.md already treats "test" and "lint" as separate steps, and
+# splitting them here means the slow one (check/smoke needs the Godot editor)
+# and the fast one (lint needs no download, see below) don't force each other
+# to wait. Run `make test lint` to get both locally.
 test: check smoke
+
+# ---- format / lint ----------------------------------------------------------
+
+# gdtoolkit (gdformat + gdlint), pinned in requirements-dev.txt. Same
+# philosophy as the Godot SDK above: fetched into a gitignored, throwaway venv
+# on demand, never installed system-wide. Stamped so `make lint`/`make format`
+# skip the reinstall once the venv already matches the pin.
+LINT_VENV := .venv-lint
+GDFORMAT  := $(LINT_VENV)/bin/gdformat
+GDLINT    := $(LINT_VENV)/bin/gdlint
+
+$(LINT_VENV)/.installed: requirements-dev.txt
+	python3 -m venv $(LINT_VENV)
+	$(LINT_VENV)/bin/pip install --quiet --upgrade pip
+	$(LINT_VENV)/bin/pip install --quiet -r requirements-dev.txt
+	@touch $@
+
+$(GDFORMAT) $(GDLINT): $(LINT_VENV)/.installed
+
+# Check-only and CI-safe: never rewrites a file, non-zero on any violation.
+# `.gdlintrc` documents the rule set (and the one thing gdtoolkit can't check).
+lint: $(GDFORMAT) $(GDLINT)
+	@fail=0; \
+	echo "  gdformat --check ..."; \
+	$(GDFORMAT) --check $(SOURCES) || fail=1; \
+	echo "  gdlint ..."; \
+	$(GDLINT) $(SOURCES) || fail=1; \
+	[ $$fail -eq 0 ] || { echo "Lint failed."; exit 1; }; \
+	echo "gdformat + gdlint clean."
+
+# Rewrites every script in place. Run this, not `lint`, when you actually want
+# the fix; CI only ever runs `lint`.
+format: $(GDFORMAT)
+	$(GDFORMAT) $(SOURCES)
 
 # ---- build -----------------------------------------------------------------
 
@@ -125,6 +166,6 @@ editor: import
 clean:
 	rm -rf build build_stamp.json .godot
 
-# Also drops the downloaded toolchain (forces a re-fetch on the next build).
+# Also drops the downloaded toolchains (forces a re-fetch/reinstall next time).
 distclean: clean
-	rm -rf $(SDK)
+	rm -rf $(SDK) $(LINT_VENV)

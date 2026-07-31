@@ -1,0 +1,88 @@
+# gdlint config — see STANDARDS.md "GDScript" for the prose version of these
+# rules. Format is gdtoolkit's own (run `gdlint -d` to regenerate a fresh
+# default and diff against this file after a gdtoolkit bump).
+#
+# Mostly gdtoolkit's stock defaults: they already match house style (tabs,
+# snake_case functions/vars, PascalCase classes, SCREAMING_CASE constants,
+# leading `_` for private members) without edits. Deviations from the
+# dumped default are called out below.
+
+# Declaration order within a class body. Verified against both scripts in the
+# repo (src/core/build_info.gd, src/main/main.gd) plus a scratch file
+# exercising a typed signal, `static var`, `@onready var x = %Name`, and
+# `_static_init` together — gdtoolkit 4.5.0 parses and orders all of that
+# correctly, it just wants onready vars declared before any func (static or
+# not), which is also what this repo already does.
+class-definitions-order:
+  - tools
+  - classnames
+  - extends
+  - docstrings
+  - signals
+  - enums
+  - consts
+  - staticvars
+  - exports
+  - pubvars
+  - prvvars
+  - onreadypubvars
+  - onreadyprvvars
+  - others
+
+# Naming — matches STANDARDS.md exactly: snake_case funcs/vars (leading `_`
+# for private/unused), PascalCase classes, SCREAMING_CASE constants.
+class-load-variable-name: (([A-Z][a-z0-9]*)+|_?[a-z][a-z0-9]*(_[a-z0-9]+)*)
+class-name: ([A-Z][a-z0-9]*)+
+class-variable-name: _?[a-z][a-z0-9]*(_[a-z0-9]+)*
+constant-name: _?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*
+enum-element-name: '[A-Z][A-Z0-9]*(_[A-Z0-9]+)*'
+enum-name: ([A-Z][a-z0-9]*)+
+function-argument-name: _?[a-z][a-z0-9]*(_[a-z0-9]+)*
+function-name: (_on_([A-Z][a-z0-9]*)+(_[a-z0-9]+)*|_?[a-z][a-z0-9]*(_[a-z0-9]+)*)
+function-preload-variable-name: ([A-Z][a-z0-9]*)+
+function-variable-name: '[a-z][a-z0-9]*(_[a-z0-9]+)*'
+load-constant-name: (([A-Z][a-z0-9]*)+|_?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)
+loop-variable-name: _?[a-z][a-z0-9]*(_[a-z0-9]+)*
+signal-name: '[a-z][a-z0-9]*(_[a-z0-9]+)*'
+sub-class-name: _?([A-Z][a-z0-9]*)+
+
+# Format / misc checks, all on.
+comparison-with-itself: null
+duplicated-load: null
+expression-not-assigned: null
+mixed-tabs-and-spaces: null
+no-elif-return: null
+no-else-return: null
+trailing-whitespace: null
+unnecessary-pass: null
+unused-argument: null
+
+# Tabs only — matches .editorconfig's `[*.gd] indent_style = tab`.
+tab-characters: 1
+
+# Kept in sync with gdformat's own default (see `make format`); gdformat and
+# gdlint don't share a config file, so if one changes the other has to change
+# by hand.
+max-line-length: 100
+
+# "Function length" (STANDARDS.md / issue #10) is aspirational, not
+# enforced: gdtoolkit 4.5.0 has no max-statements/max-locals/max-nested-blocks
+# check — they're listed as commented-out placeholders in its own source
+# (gdtoolkit/linter/__init__.py), not implemented. These are the closest
+# design checks it actually has; defaults, since two source files isn't
+# enough evidence to justify a tighter number.
+function-arguments-number: 10
+max-file-lines: 1000
+max-public-methods: 20
+max-returns: 6
+
+# Nothing disabled — every implemented check above runs.
+disable: []
+
+excluded_directories:
+  - .git
+  - .godot
+  - .godot-sdk
+  - .venv-lint
+  - build
+  - addons

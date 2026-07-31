@@ -9,14 +9,17 @@ updates:
 
   # The Godot toolchain is not a dependabot ecosystem — it is pinned by sha256 in
   # scripts/fetch-godot.sh. Bump it with `scripts/fetch-godot.sh --update`.
-  #
+
+  # requirements-dev.txt (gdtoolkit — make lint / make format).
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
   # Uncomment the block matching your stack once you add a dependency manifest:
   #
   # - package-ecosystem: "npm"        # package.json / package-lock.json
-  #   directory: "/"
-  #   schedule: { interval: "weekly" }
-  #
-  # - package-ecosystem: "pip"        # requirements.txt / pyproject.toml
   #   directory: "/"
   #   schedule: { interval: "weekly" }
   #
