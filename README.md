@@ -1,72 +1,77 @@
-<!--
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  You are reading the template's own README.                          │
-  │  After clicking "Use this template", delete this comment block and   │
-  │  the "Getting started" section below, then fill in the placeholders. │
-  └─────────────────────────────────────────────────────────────────────┘
--->
+# Done Rite Detailing
 
-# {{PROJECT_NAME}}
+> A game built with the [Godot](https://godotengine.org) engine.
 
-> {{ONE_LINE_DESCRIPTION}}
-
-<!-- Keep the badge(s) for the language(s) this repo uses; delete the rest. -->
-[![CI (C/C++)](https://github.com/clarkbar-sys/{{REPO_NAME}}/actions/workflows/ci-c.yml/badge.svg)](https://github.com/clarkbar-sys/{{REPO_NAME}}/actions/workflows/ci-c.yml)
-[![CI (Scheme)](https://github.com/clarkbar-sys/{{REPO_NAME}}/actions/workflows/ci-scheme.yml/badge.svg)](https://github.com/clarkbar-sys/{{REPO_NAME}}/actions/workflows/ci-scheme.yml)
-[![CI (Python)](https://github.com/clarkbar-sys/{{REPO_NAME}}/actions/workflows/ci-python.yml/badge.svg)](https://github.com/clarkbar-sys/{{REPO_NAME}}/actions/workflows/ci-python.yml)
-[![Publish container (s7)](https://github.com/clarkbar-sys/{{REPO_NAME}}/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/clarkbar-sys/{{REPO_NAME}}/actions/workflows/docker-publish.yml)
+[![CI (Godot)](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml/badge.svg)](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml)
 [![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](./LICENSE)
 
 ## Overview
 
-Describe what this project does and who it's for in 2–3 sentences.
+Done Rite Detailing is an in-development game. Today the project is at **day 0**:
+a Godot 4 project that type-checks, boots headlessly, and exports a playable
+Linux binary in CI. Gameplay comes next — see the
+[day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
+for what's queued.
 
-This repo is set up for **[s7 Scheme](https://ccrma.stanford.edu/software/snd/snd/s7.html)**
-(CCRMA / Stanford) — a tiny, embeddable Scheme that's just two C files. The
-source is fetched from upstream and **checksum-verified at build time**
-([`scripts/fetch-s7.sh`](./scripts/fetch-s7.sh)) rather than vendored, so the
-repo stays lean while builds stay pinned. No Guile, no Racket.
+The Godot editor and export templates are **not vendored**. They're downloaded
+on demand and **checksum-verified** against the pins in
+[`scripts/fetch-godot.sh`](./scripts/fetch-godot.sh), so the repo stays lean
+while your machine and CI build with the byte-identical toolchain. Nothing is
+installed system-wide — it all lands in `.godot-sdk/`.
 
-## Run s7 anywhere
+## Play it
 
-**Container (GitHub Container Registry)** — nothing to install but Docker:
-
-```bash
-# interactive REPL
-docker run --rm -it ghcr.io/clarkbar-sys/{{REPO_NAME}}
-
-# run a script from the current directory
-docker run --rm -v "$PWD:/work" ghcr.io/clarkbar-sys/{{REPO_NAME}} script.scm
-```
-
-**Static binary** — a single dependency-free file attached to each
-[release](https://github.com/clarkbar-sys/{{REPO_NAME}}/releases):
+Every CI run on `main` and on every pull request uploads a Linux build. Grab it
+from the run's **Artifacts** section on the
+[Actions tab](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml),
+or download a tagged build from
+[Releases](https://github.com/clarkbar-sys/done-rite-detailing/releases):
 
 ```bash
-curl -fsSLO https://github.com/clarkbar-sys/{{REPO_NAME}}/releases/latest/download/s7-linux-x86_64
-chmod +x s7-linux-x86_64 && ./s7-linux-x86_64 script.scm
+chmod +x done-rite-detailing-*-linux-x86_64
+./done-rite-detailing-*-linux-x86_64
 ```
 
-**Build it locally** — needs only a C compiler:
-
-```bash
-make build          # -> bin/s7
-make repl           # start a REPL
-./bin/s7 examples/hello.scm
-```
+Every binary knows which commit it came from — it prints `v<version> (<sha>)` on
+startup, and shows the same string on screen.
 
 ## Development
 
+Needs `bash`, `curl`, `unzip` and `make`. The first command downloads Godot
+(~76 MB), and the first `make build` also pulls the export templates (~1.2 GB,
+pruned to ~280 MB on disk). Both are cached in `.godot-sdk/` afterwards.
+
 ```bash
-make build          # fetch (pinned) + compile the s7 interpreter -> bin/s7
-make test           # build, then run every tests/*.scm (each must exit 0)
-make repl           # interactive REPL
-make clean          # remove build outputs
+make check     # type-check every script — the CI gate
+make smoke     # boot the game headless and require a clean run
+make test      # both of the above; run this before you push
+make build     # export the Linux release binary -> build/linux/
+make editor    # open the project in the Godot editor
+make run       # run the game
+make clean     # remove build outputs (keeps the downloaded toolchain)
+make distclean # also drop .godot-sdk/
 ```
 
-The s7 version is pinned by `sha256` in [`scripts/fetch-s7.sh`](./scripts/fetch-s7.sh);
-run `scripts/fetch-s7.sh --update` to see the current upstream checksum/version
-and bump the pin.
+To move to a newer Godot, run `scripts/fetch-godot.sh --update`. It prints the
+latest upstream stable version and its checksums; update the three pins at the
+top of that script, then re-run `make test build` before pushing.
+
+### Layout
+
+```
+project.godot          engine + project settings (typed-GDScript gates live here)
+export_presets.cfg     export targets; `make build` uses the "Linux" preset
+src/core/              cross-cutting code (autoloads, shared helpers)
+src/main/              the entry scene
+scripts/               developer tooling (toolchain fetch, build stamping)
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) and the
+[Coding Standards](./STANDARDS.md) — GDScript here is **statically typed**, and
+that's enforced by the compiler rather than by review. Please also read our
+[Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## Releases
 
@@ -74,14 +79,9 @@ Releases are automated with
 [release-please](https://github.com/googleapis/release-please). Commit using
 [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`,
 `chore:` …) and a **Release PR** is opened and kept up to date automatically —
-it bumps the version and updates [CHANGELOG.md](./CHANGELOG.md). Merge that PR to
-tag the release; `release.yml` then builds and attaches the program artifacts.
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) and the
-[Coding Standards](./STANDARDS.md). Please also read our
-[Code of Conduct](./CODE_OF_CONDUCT.md).
+it bumps the version (including `config/version` in `project.godot`) and updates
+[CHANGELOG.md](./CHANGELOG.md). Merge that PR to tag the release; the same
+workflow then exports the game and attaches it to the release.
 
 ## Security
 
@@ -91,32 +91,3 @@ public issue for security reports.
 ## License
 
 Distributed under the terms of the [GNU GPL v2](./LICENSE).
-
----
-
-<details>
-<summary><strong>📋 New-repo checklist (delete this section once done)</strong></summary>
-
-After creating a repo from this template:
-
-- [ ] Replace `{{PROJECT_NAME}}`, `{{ONE_LINE_DESCRIPTION}}`, `{{REPO_NAME}}` above
-- [ ] Keep the CI workflow(s) for your language(s) (`ci-c` / `ci-scheme` /
-      `ci-python`); delete the rest, and delete the badges to match
-- [ ] **Scheme is pre-wired for s7**: `ci-scheme` + container publish
-      (`docker-publish`) + `release` need no TODOs. Put your Scheme in `src/` /
-      `tests/` (see `examples/` and `tests/smoke.scm`)
-- [ ] For C / Python: fill in the `TODO:` build/test commands, review
-      [STANDARDS.md](./STANDARDS.md), and fill the `{{PLACEHOLDERS}}` in
-      `pyproject.toml` (configs enforce an 80% coverage floor by default)
-- [ ] Update `.github/CODEOWNERS` with the real owning team
-- [ ] Enable branch protection on `main` (require CI + 1 review); add the
-      `ci-scheme` jobs as required status checks
-- [ ] After the first push to `main`, make the GHCR package public if you want
-      `docker pull` without auth (repo → Packages → package settings)
-- [ ] Confirm `SECURITY.md` contact is correct
-- [ ] Releases: commit with [Conventional Commits](https://www.conventionalcommits.org/)
-      so release-please can version + changelog automatically; wire the build step
-      in `.github/workflows/release.yml`
-- [ ] Delete the "Getting started" TODOs once real commands exist
-
-</details>

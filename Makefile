@@ -1,58 +1,123 @@
-# s7 Scheme — fetch the pinned interpreter source, build the standalone
-# interpreter, and run the Scheme test suite through it.
-# s7 is downloaded at build time (not vendored); see scripts/fetch-s7.sh.
+# Done Rite Detailing — a Godot 4 game.
+#
+# The Godot editor and export templates are downloaded on demand and pinned by
+# sha256 (see scripts/fetch-godot.sh), so `make` here and CI over there run the
+# byte-identical toolchain. Nothing is installed system-wide: everything lives
+# under .godot-sdk/ and is thrown away by `make distclean`.
+#
+#   make check     type-check every script (the CI gate)
+#   make smoke     boot the game headless and require a clean exit
+#   make build     export the Linux release binary -> build/linux/
+#   make editor    open the project in the Godot editor
 
-CC      ?= cc
-S7_DIR  := .s7
-BIN_DIR := bin
-S7      := $(BIN_DIR)/s7
+SDK        := .godot-sdk
+GODOT      := $(SDK)/bin/godot
+BUILD_DIR  := build/linux
+TARGET     := $(BUILD_DIR)/done-rite-detailing.x86_64
+PRESET     := Linux
+LOG_DIR    := build/logs
 
-# Canonical s7 standalone build (Linux). WITH_MAIN gives s7.c a REPL/main;
-# -export-dynamic is required so the FFI can resolve symbols at runtime.
-CFLAGS  ?= -O2
-S7_CFLAGS := -DWITH_MAIN -I$(S7_DIR) $(CFLAGS)
-S7_LDFLAGS := -ldl -lm -Wl,-export-dynamic
+# Godot resolves export templates under $XDG_DATA_HOME/godot; pointing it at the
+# SDK keeps the pinned templates out of the developer's real ~/.local/share.
+export XDG_DATA_HOME := $(abspath $(SDK)/data)
 
-# Every *.scm under tests/ is a test; each must exit non-zero on failure.
-TESTS := $(wildcard tests/*.scm)
+# Headless boot length for `make smoke`. Enough frames for _ready() across the
+# whole scene tree plus a few idle frames.
+SMOKE_FRAMES ?= 60
 
-.PHONY: all build test repl fetch clean distclean
+# Every .gd in the working tree is type-checked. Deliberately `find` and not
+# `git ls-files`: a script you haven't staged yet is exactly the one most likely
+# to be broken, and listing tracked files only would skip it silently.
+# addons/ is third-party and exempt (see gdscript/warnings/exclude_addons).
+SOURCES := $(shell find . -name '*.gd' \
+             -not -path './.godot/*' -not -path './.godot-sdk/*' \
+             -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-all: build
+.PHONY: all sdk editor-sdk import check smoke test build stamp run editor clean distclean
 
-# Download + checksum-verify the pinned s7 source. Idempotent: the recipe only
-# runs when .s7/s7.c is missing.
-$(S7_DIR)/s7.c:
-	scripts/fetch-s7.sh $(S7_DIR)
-fetch: $(S7_DIR)/s7.c
+all: check build
 
-build: $(S7)
+# ---- toolchain -------------------------------------------------------------
 
-$(S7): $(S7_DIR)/s7.c
-	@mkdir -p $(BIN_DIR)
-	$(CC) $(S7_DIR)/s7.c -o $@ $(S7_CFLAGS) $(S7_LDFLAGS)
+# Editor + export templates (~1.2 GB on first run, then cached in .godot-sdk/).
+# Phony on purpose: the templates directory is created (empty) by the editor on
+# every launch, so a directory target would look up to date and skip the fetch.
+# fetch-godot.sh does its own idempotency check and is a no-op once populated.
+sdk:
+	@scripts/fetch-godot.sh $(SDK)
 
-# Run each test script; s7 exits non-zero if the script calls (exit N>0) or errors.
-test: build
-	@if [ -z "$(TESTS)" ]; then \
-	  echo "No tests/*.scm yet — nothing to run."; \
-	else \
-	  fail=0; \
-	  for t in $(TESTS); do \
-	    printf '  s7 %s ... ' "$$t"; \
-	    if ./$(S7) "$$t" >/dev/null; then echo ok; else echo FAIL; fail=1; fi; \
-	  done; \
-	  [ $$fail -eq 0 ] || { echo "Some tests failed."; exit 1; }; \
-	  echo "All tests passed."; \
+# Editor only (~76 MB) — all that `import`, `check` and `smoke` need.
+editor-sdk: $(GODOT)
+
+$(GODOT):
+	@scripts/fetch-godot.sh --editor-only $(SDK)
+
+# ---- develop ---------------------------------------------------------------
+
+# Populate .godot/ (import icon.svg -> .ctex, build the UID cache, register
+# global classes). Required once before anything can load the project.
+import: $(GODOT)
+	$(GODOT) --headless --path . --import
+
+# The quality gate. `--check-only` parses and type-checks a script and exits
+# non-zero on any error, and project.godot promotes the typing warnings to
+# errors — so untyped or unsafe GDScript fails here instead of at runtime.
+check: import
+	@mkdir -p $(LOG_DIR); fail=0; \
+	for f in $(SOURCES); do \
+	  printf '  check %s ... ' "$$f"; \
+	  if $(GODOT) --headless --path . --check-only --script "res://$$f" \
+	       >/dev/null 2>$(LOG_DIR)/check.log; then \
+	    echo ok; \
+	  else \
+	    echo FAIL; cat $(LOG_DIR)/check.log; fail=1; \
+	  fi; \
+	done; \
+	[ $$fail -eq 0 ] || { echo "Type check failed."; exit 1; }; \
+	echo "All scripts type-check."
+
+# Proof of life: boot the real project headless. Catches what `check` cannot —
+# broken scenes, missing autoloads, node paths that don't resolve.
+#
+# Godot exits 0 even when a script errors at runtime, so the exit code alone
+# proves nothing; the run has to be clean as well. Warnings (push_warning) are
+# deliberately allowed through — only errors fail the build.
+smoke: import
+	@mkdir -p $(LOG_DIR)
+	@echo "  booting headless for $(SMOKE_FRAMES) frames ..."
+	@$(GODOT) --headless --path . --quit-after $(SMOKE_FRAMES) 2>&1 | tee $(LOG_DIR)/smoke.log
+	@if grep -qE '(^|[[:space:]])(SCRIPT |USER )?ERROR:' $(LOG_DIR)/smoke.log; then \
+	  echo "Smoke test FAILED — the headless run logged errors (above)."; exit 1; \
 	fi
+	@echo "Smoke test passed."
 
-# Start an interactive s7 REPL.
-repl: build
-	./$(S7)
+# The one command CI and humans run. Unit tests (GUT) join it next; until then
+# it is the type check plus the headless boot.
+test: check smoke
+
+# ---- build -----------------------------------------------------------------
+
+stamp:
+	scripts/stamp-build.sh .
+
+build: check stamp sdk
+	@mkdir -p $(BUILD_DIR)
+	$(GODOT) --headless --path . --export-release "$(PRESET)" $(abspath $(TARGET))
+	@echo ">> $(TARGET) ($$(du -h $(TARGET) | cut -f1))"
+
+# ---- interactive -----------------------------------------------------------
+
+run: import
+	$(GODOT) --path .
+
+editor: import
+	$(GODOT) --editor --path .
+
+# ---- housekeeping ----------------------------------------------------------
 
 clean:
-	rm -rf $(BIN_DIR)
+	rm -rf build build_stamp.json .godot
 
-# Also drop the fetched source (forces a re-download on the next build).
+# Also drops the downloaded toolchain (forces a re-fetch on the next build).
 distclean: clean
-	rm -rf $(S7_DIR)
+	rm -rf $(SDK)

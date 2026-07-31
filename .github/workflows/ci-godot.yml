@@ -1,0 +1,95 @@
+name: CI (Godot)
+
+# Two stages, fastest feedback first:
+#   check  — type-check every script + boot the game headless (editor only, ~76 MB)
+#   build  — export the Linux release binary, run it, upload it as an artifact
+#
+# Both use the sha256-pinned toolchain from scripts/fetch-godot.sh, so CI and a
+# developer's `make` run the identical Godot. The SDK is cached on that script's
+# hash: bumping the pin invalidates the cache automatically.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-godot-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARTIFACT: build/linux/done-rite-detailing.x86_64
+
+jobs:
+  check:
+    name: Type check & smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Editor only — `check` and `smoke` never touch the export templates.
+      - name: Cache Godot editor
+        uses: actions/cache@v4
+        with:
+          path: .godot-sdk/bin
+          key: godot-editor-${{ hashFiles('scripts/fetch-godot.sh') }}
+
+      # Fails on any untyped/unsafe GDScript (project.godot promotes those
+      # warnings to errors) and on any error logged during a headless boot.
+      - name: Type check & headless smoke test
+        run: make test
+
+  build:
+    name: Export Linux build
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Editor + the pruned export templates (~280 MB).
+      - name: Cache Godot SDK
+        uses: actions/cache@v4
+        with:
+          path: .godot-sdk
+          key: godot-sdk-${{ hashFiles('scripts/fetch-godot.sh') }}
+
+      - name: Export
+        run: make build
+
+      # The export succeeding is not the same as the game working. Boot the
+      # actual artifact — this is the "I can see the build run" gate.
+      - name: Run the exported game
+        run: |
+          "$ARTIFACT" --headless --quit-after 120 2>&1 | tee run.log
+          if grep -qE '(^|[[:space:]])(SCRIPT |USER )?ERROR:' run.log; then
+            echo "::error::the exported binary logged errors on startup"
+            exit 1
+          fi
+
+      - name: Summarise
+        run: |
+          {
+            echo "### Linux build"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Size | $(du -h "$ARTIFACT" | cut -f1) |"
+            echo "| Commit | \`$(jq -r .commit build_stamp.json)\` |"
+            echo "| Built | $(jq -r .built_at build_stamp.json) |"
+            echo
+            echo '```'
+            grep -a 'Done Rite Detailing' run.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Downloadable from the run page / the PR's checks tab.
+      - name: Upload the game
+        uses: actions/upload-artifact@v7
+        with:
+          name: done-rite-detailing-linux-x86_64
+          path: ${{ env.ARTIFACT }}
+          if-no-files-found: error

@@ -15,8 +15,14 @@ trim_trailing_whitespace = false
 [Makefile]
 indent_style = tab
 
-[*.{go}]
+# GDScript is tab-indented — the engine's own style, what the editor emits, and
+# what gdformat enforces. Do not "fix" this to spaces.
+[*.gd]
 indent_style = tab
-
-[*.py]
 indent_size = 4
+
+# Godot owns these files and rewrites them wholesale; don't let editors reformat.
+[*.{tscn,tres,godot,import}]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = false
