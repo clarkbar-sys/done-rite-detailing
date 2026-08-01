@@ -21,9 +21,20 @@ crosshair snaps to the nearest bodywork instead. Holding is aiming, letting go
 is not. On a touchscreen the aim is taken a thumb's width above your finger
 rather than under it — the one part of a phone you cannot see is the part you
 are touching — so the mark stays in view while you drag it around the paint. A
-mouse aims at the pointer, because a cursor hides nothing. There is nothing to clean yet: the room is boxes and the car is a green
-one, and the crosshair is as far as the trigger goes. Gameplay comes next; see
-the [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
+mouse aims at the pointer, because a cursor hides nothing.
+
+And the trigger now spends something. The car starts under mud, and holding the
+power wash on a panel takes it off where the water lands — a patch at a time,
+each one announced as it comes clean. Every panel carries its own dirt mask,
+addressed by a six-plane projection worked out from the point you hit rather
+than from a UV map anybody unwrapped, so washing the driver's door leaves the
+passenger's door filthy; the mud *pattern* over it is sampled triplanar, which
+is the half of that job blending is safe for. Press **G** for the twelve masks
+themselves, which is how you tell a projection bug from a raycast one. Only the
+power wash does anything so far — the sponge, the cloth and the two sprays have
+their channels allocated and nothing to write to them yet. The room is still
+boxes and the car is still a green one under all that; see the
+[day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.
 
 The Godot editor and export templates are **not vendored**. They're downloaded

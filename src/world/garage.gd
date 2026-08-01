@@ -150,6 +150,14 @@ extends SubViewportContainer
 ## something. The room is the only thing that owns the geometry.
 signal aimed(panel: String)
 
+## The car has mud on it and [method grime] is worth asking. Emitted once, a
+## frame after [method _ready], and never on a screen that is not first person.
+##
+## A signal rather than something a caller can poll for, because the wait is not
+## optional and it is not obvious — see [method _lay_on_the_grime]. Anything that
+## wants to draw the masks has to be told when there are masks.
+signal grimed
+
 ## How far past the nearest-point post [method _nearest_on_the_car] casts its
 ## second ray, as a fraction of the distance to it. A tenth over, because the
 ## post sits on a box that is slightly larger than the panel inside it — a ray
@@ -305,10 +313,33 @@ const PAST_THE_POST: float = 1.1
 ## because there is nothing there rather than because the ray ran out.
 @export var aim_reach: float = 40.0
 
+## How wide the power wash's jet is where it lands, as a radius in metres.
+##
+## A hand's width. Narrow enough that washing a car is a job you have to do
+## rather than one press, wide enough that the mask's texels are never the thing
+## you are fighting — at [member Grime.tile_pixels] this is several texels across
+## on every panel, so the edge of the jet is a shape rather than a staircase.
+##
+## Not distance-dependent, and that is a simplification rather than a decision:
+## real water spreads and loses pressure with range, which is a reason to stand
+## close, which is a mechanic. It wants the standoff and the reach to mean
+## something first.
+@export var wash_radius_metres: float = 0.16
+
+## How much mud a held jet takes off a spot per second, where [code]1.0[/code] is
+## all of it.
+##
+## About a second and a half from filthy to clean at the middle of the jet, and
+## longer at its edge. Tuned to feel like work without feeling like a chore, on
+## the understanding that the number that actually decides this is how big
+## [member wash_radius_metres] is against how big the car is.
+@export var wash_per_second: float = 0.7
+
 var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
 var _standoff: Standoff = null
 var _marker: AimMarker = null
+var _grime: Grime = null
 var _aiming: bool = false
 var _aim_at: Vector2 = Vector2.ZERO
 var _marked: String = ""
@@ -382,7 +413,7 @@ func _process(delta: float) -> void:
 ## one you can walk around, and a screen that set [member first_person] without
 ## [member walkaround] would otherwise have a tool that never moves.
 func _physics_process(delta: float) -> void:
-	_resolve_aim()
+	_resolve_aim(delta)
 	if _drive == null:
 		return
 	_drive.drive(_orbit, delta)
@@ -457,6 +488,16 @@ func aim_marker() -> AimMarker:
 	return _marker
 
 
+## The mud on the car, or [code]null[/code] on a screen that never took up
+## aiming. Not laid on the panels until [signal grimed] has been emitted.
+##
+## Public for the same reason [method view_model] is: the play screen has a debug
+## view that draws these masks, and it must draw [i]these[/i] rather than build a
+## set of its own.
+func grime() -> Grime:
+	return _grime
+
+
 ## Puts the camera where the orbit says it should be, looking at the car.
 ##
 ## Named for the eye and not for aiming, because aiming is now something the
@@ -493,6 +534,29 @@ func _take_up_aiming() -> void:
 	_marker = AimMarker.new()
 	_marker.name = "AimMarker"
 	_car.get_parent().add_child(_marker)
+	_grime = Grime.new()
+	_grime.name = "Grime"
+	_car.get_parent().add_child(_grime)
+	_lay_on_the_grime()
+
+
+## Puts mud on the car, a frame after there is a car to put it on.
+##
+## [b]The wait is the whole function.[/b] Every mask is sized from its panel's
+## [method CSGShape3D.get_aabb] and CSG meshes are built deferred, so a car asked
+## during [method Node._ready] reports panels with no size — and a mask built
+## against a zero box is a projection with nothing to divide by. [Car] documents
+## the same trap for [method Car.bounds], which is where it was first paid for.
+##
+## Started and not awaited by the caller: [method _ready] has nothing further to
+## do about grime, and making it wait would push every screen's first frame
+## behind this.
+func _lay_on_the_grime() -> void:
+	await get_tree().process_frame
+	if not is_instance_valid(_grime) or not is_instance_valid(_car):
+		return
+	_grime.lay_on(_car)
+	grimed.emit()
 
 
 ## Turns a press on the glass into a mark on the paint and a tool pointed at it.
@@ -507,7 +571,14 @@ func _take_up_aiming() -> void:
 ## Nothing is emitted while the answer stays the same. A finger held on one door
 ## is one [signal aimed] rather than sixty a second, which matters because the
 ## thing on the other end of it draws text.
-func _resolve_aim() -> void:
+##
+## [b]And the press is now worth something.[/b] A held trigger with the power wash
+## in hand takes [member wash_per_second] of mud a second off wherever it landed
+## — [method _spend_the_trigger] below is that, and it is deliberately the last
+## thing this does. The mark goes on the paint whether or not any tool would do
+## anything there, because the crosshair is a statement about where you are
+## pointing rather than about what you are achieving.
+func _resolve_aim(delta: float) -> void:
 	if _marker == null:
 		return
 	if not _aiming:
@@ -532,11 +603,38 @@ func _resolve_aim() -> void:
 	var outward: Vector3 = found["normal"]
 	var panel: Node = found["collider"]
 	_marker.mark(surface, outward)
+	_spend_the_trigger(found, delta)
 	var named: String = "" if panel == null else String(panel.name)
 	if named == _marked:
 		return
 	_marked = named
 	aimed.emit(_marked)
+
+
+## What the tool in the player's hand does to the paint the press landed on.
+##
+## [b]Only a ray that actually hit.[/b] A press past the car still marks the
+## nearest bodywork, because "nothing" is not a useful thing to mark — but the
+## post that mark sits on is a guess assembled out of bounding boxes, not a place
+## water went. Washing there would let a player clean the car by pointing at the
+## sky beside it, so the [code]direct[/code] flag from [method _under_the_finger]
+## is what this reads and the crosshair is not.
+##
+## One tool of five so far. What the other four do is a rule about the game and
+## it goes here, next to this one, when they have somewhere to write to —
+## [GrimeMap] already carries the channels they will use.
+func _spend_the_trigger(found: Dictionary, delta: float) -> void:
+	if _grime == null or not _grime.is_laid() or not found.get("direct", false):
+		return
+	if _view_model.belt().equipped().id != DetailingTool.Id.POWER_WASH:
+		return
+	# Read out into typed locals rather than passed straight through: a
+	# [Dictionary] hands back [Variant], and this project's warning levels treat
+	# handing one to a typed parameter as an error rather than as a cast.
+	var panel: Node = found["collider"]
+	var surface: Vector3 = found["position"]
+	var outward: Vector3 = found["normal"]
+	_grime.wash(panel, surface, outward, wash_radius_metres, wash_per_second * delta)
 
 
 ## What the press landed on: the panel the ray hit, or failing that the nearest
@@ -546,12 +644,19 @@ func _resolve_aim() -> void:
 ## result — [code]position[/code], [code]normal[/code], [code]collider[/code] —
 ## including when it is assembled by hand below, so the caller has one shape to
 ## read rather than two and cannot forget which case it is in.
+##
+## Plus one key the engine does not set: [code]direct[/code], true when the ray
+## really hit that panel and false when the answer was reconstructed from the
+## boxes. Everything that draws is happy either way and says so by ignoring it;
+## anything that [i]changes[/i] the car has to know the difference, which is the
+## whole reason the flag exists rather than a second return shape.
 func _under_the_finger(from: Vector3, facing: Vector3) -> Dictionary:
 	var space: PhysicsDirectSpaceState3D = _camera.get_world_3d().direct_space_state
 	var hit: Dictionary = space.intersect_ray(
 		PhysicsRayQueryParameters3D.create(from, from + facing * aim_reach)
 	)
 	if not hit.is_empty():
+		hit["direct"] = true
 		return hit
 	return _nearest_on_the_car(space, from, facing)
 
@@ -586,9 +691,18 @@ func _nearest_on_the_car(
 	var probe: Dictionary = space.intersect_ray(
 		PhysicsRayQueryParameters3D.create(from, from + reach * PAST_THE_POST)
 	)
+	# Both answers are marked as not direct, including the probe's — which really
+	# did hit that surface, but only because a post was put in front of it. The
+	# player pointed past the car; water goes where you point.
 	if not probe.is_empty():
+		probe["direct"] = false
 		return probe
-	return {"position": post, "normal": (from - post).normalized(), "collider": panels[nearest]}
+	return {
+		"position": post,
+		"normal": (from - post).normalized(),
+		"collider": panels[nearest],
+		"direct": false,
+	}
 
 
 ## How much bigger the picture on the glass is than the viewport the world is

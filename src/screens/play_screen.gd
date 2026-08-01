@@ -132,6 +132,11 @@ const LIFT_UP_ACTION: String = "camera_up"
 ## Lowers it.
 const LIFT_DOWN_ACTION: String = "camera_down"
 
+## Shows or hides the grime masks. Keyboard only and deliberately so: it is a
+## developer's view of a texture, and a phone has no spare key to press by
+## accident.
+const GRIME_DEBUG_ACTION: String = "grime_debug"
+
 ## No finger is on the glass. Not a touch index the engine can ever hand out, so
 ## it cannot collide with a real one.
 const NO_FINGER: int = -1
@@ -149,6 +154,7 @@ var _finger: int = NO_FINGER
 @onready var _hud: ToolBeltHud = $ToolBelt
 @onready var _pad: MotionPad = $MotionPad
 @onready var _readout: Label = $PanelReadout
+@onready var _masks: GrimeDebug = $GrimeDebug
 
 
 func _ready() -> void:
@@ -159,6 +165,7 @@ func _ready() -> void:
 	_hud.bind(_belt)
 	_hud.tool_selected.connect(_on_tool_selected)
 	_garage.aimed.connect(_on_aimed)
+	_garage.grimed.connect(_on_grimed)
 	_readout.text = ""
 
 
@@ -176,6 +183,12 @@ func _process(_delta: float) -> void:
 	var turn: float = _pad.turn() + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
 	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
 	_garage.steer(turn, lift)
+	# Only while the masks are up. The number costs a walk over twelve panels and
+	# nothing is reading it otherwise, so a game nobody has pressed the key in
+	# does not pay for the readout.
+	var grime: Grime = _garage.grime()
+	if _masks.is_shown() and grime != null:
+		_masks.report(grime.remaining())
 
 
 ## Keys, for the half of the players who will never tap the [b]T[/b].
@@ -191,6 +204,10 @@ func _process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(TOGGLE_ACTION):
 		_hud.toggle()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed(GRIME_DEBUG_ACTION):
+		_masks.toggle()
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed(CLOSE_ACTION):
@@ -331,6 +348,15 @@ func _on_the_glass(where: Vector2) -> Vector2:
 ## something real consumes this.
 func _on_aimed(panel: String) -> void:
 	_readout.text = panel
+
+
+## The car has mud on it, so the debug view has something to draw.
+##
+## Bound on the signal rather than in [method _ready] because the masks do not
+## exist for a frame after the room does — [method Garage._lay_on_the_grime] has
+## why — and a view that bound early would draw an empty grid for the whole game.
+func _on_grimed() -> void:
+	_masks.bind(_garage.grime())
 
 
 ## A tool picked out of the roll-up.
