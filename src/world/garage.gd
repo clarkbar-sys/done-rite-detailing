@@ -149,6 +149,20 @@
 ## its own collider, so the hit comes back as [code]"Hood"[/code] or
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
 ## grime work needs and the reason [signal aimed] carries a name at all.
+##
+## [b]And the tool that sprays now draws its own sight.[/b] With the power wash
+## in hand the crosshair is replaced by a [WashJet]: a narrow cone from the
+## wand's nozzle to the mark, blue at the tip and red where it lands, as wide at
+## its base as [member wash_radius_metres] — which is to say, the patch
+## [method _spend_the_trigger] is about to clean, drawn at the size and angle it
+## is actually cleaned at. The other four tools are put on the car at a point and
+## keep the crosshair, which is the right shape for them. [method _sight_the_aim]
+## is the whole of the choice, made every tick from the belt, so swapping tools
+## mid-press swaps the sight with them.
+##
+## [i]The mark is still made either way[/i] — see [AimMarker] — so the panel
+## readout, the wand's alignment and the water all read exactly what they read
+## before. What changes is what is drawn on top of it.
 class_name Garage
 extends SubViewportContainer
 
@@ -364,6 +378,7 @@ var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
 var _standoff: Standoff = null
 var _marker: AimMarker = null
+var _jet: WashJet = null
 var _grime: Grime = null
 var _aiming: bool = false
 var _aim_at: Vector2 = Vector2.ZERO
@@ -513,6 +528,14 @@ func aim_marker() -> AimMarker:
 	return _marker
 
 
+## The power wash's cone of water, or [code]null[/code] on a screen that never
+## took up aiming. Public for the same reason [method aim_marker] is: a test
+## should be able to ask where the water actually went rather than trust that
+## something drew it.
+func wash_jet() -> WashJet:
+	return _jet
+
+
 ## The mud on the car, or [code]null[/code] on a screen that never took up
 ## aiming. Not laid on the panels until [signal grimed] has been emitted.
 ##
@@ -559,6 +582,11 @@ func _take_up_aiming() -> void:
 	_marker = AimMarker.new()
 	_marker.name = "AimMarker"
 	_car.get_parent().add_child(_marker)
+	# A sibling of the car for the same reason the marker is: it is world-space UI
+	# and nothing walking the car's children looking for panels should find it.
+	_jet = WashJet.new()
+	_jet.name = "WashJet"
+	_car.get_parent().add_child(_jet)
 	_grime = Grime.new()
 	_grime.name = "Grime"
 	_car.get_parent().add_child(_grime)
@@ -608,6 +636,9 @@ func _resolve_aim(delta: float) -> void:
 		return
 	if not _aiming:
 		_view_model.lower()
+		# Unconditionally, and before the early return below: the water stops when
+		# the finger comes off the glass, whether or not the panel under it changed.
+		_jet.stow()
 		if _marked.is_empty():
 			return
 		_marked = ""
@@ -627,7 +658,7 @@ func _resolve_aim(delta: float) -> void:
 	var surface: Vector3 = found["position"]
 	var outward: Vector3 = found["normal"]
 	var panel: Node = found["collider"]
-	_marker.mark(surface, outward)
+	_sight_the_aim(surface, outward)
 	# Where it landed, which the hand needs and the direction above cannot carry: a
 	# tool held below and to one side of the lens has to be pointed at the mark
 	# rather than along the ray to reach it. See [method ViewModel.mark_at], which
@@ -639,6 +670,34 @@ func _resolve_aim(delta: float) -> void:
 		return
 	_marked = named
 	aimed.emit(_marked)
+
+
+## Draws the aim the way the tool in hand wants it drawn: a cone of water for the
+## power wash, the crosshair for the other four.
+##
+## [b]The mark is made first and always[/b], whichever sight is showing. It is
+## what the panel readout names, what the wand lines itself up with, and what the
+## trigger spends water on — see [AimMarker] — so this function only ever decides
+## what is drawn on top of it.
+##
+## [b]The cone is hung off the nozzle and not off the eye.[/b] The wand is
+## already aligned to the mark by [WandCarry], so the two agree once it has
+## finished coming up; drawing from the nozzle rather than from the aim's own ray
+## means the cone is anchored to the thing the player can see spraying it, and
+## converges onto the wand while the wand is still swinging.
+##
+## Asked of the belt every tick rather than wired up on a swap: a tool changed
+## while the finger is down changes the sight on the same tick, and there is no
+## second copy of "which tool is this" to fall out of step with the first.
+func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
+	_marker.mark(surface, outward)
+	var washing: bool = _view_model.belt().equipped().id == DetailingTool.Id.POWER_WASH
+	_marker.draw_crosshair(not washing)
+	var nozzle: Marker3D = _view_model.muzzle()
+	if not washing or nozzle == null:
+		_jet.stow()
+		return
+	_jet.spray(nozzle.global_position, surface, wash_radius_metres)
 
 
 ## What the tool in the player's hand does to the paint the press landed on.
