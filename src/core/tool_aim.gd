@@ -31,6 +31,15 @@
 ## [constant REST] and the same servo carries it home. One code path for "aim
 ## there" and "stop aiming", so a release can never leave the hand somewhere
 ## [method advance] will not take it out of.
+##
+## [b]And one thing the two angles could not say: whether anybody is aiming at
+## all.[/b] "Pointed straight ahead" and "not pointed at anything" are the same
+## pair of zeroes, which is why [method is_raised] has always had to hedge. A
+## tool that changes shape while it is aimed — [WandCarry], today the power wash
+## alone — needs those two told apart, and needs the change between them to take
+## time rather than to happen between two frames. So a press raises, a release
+## lowers, and [method raise_amount] eases between them on the same
+## target-and-servo shape as everything else in this class.
 class_name ToolAim
 extends RefCounted
 
@@ -43,6 +52,13 @@ const PER_DEGREE: float = PI / 180.0
 ## own [code]-Z[/code], which is the pose [code]garage.tscn[/code] parks the
 ## anchor in.
 const REST: Vector3 = Vector3(0.0, 0.0, -1.0)
+
+## How fast a tool comes up to aim and goes back down, as a fraction of the way
+## per second. A sixth of a second either way, which is about the width of the
+## swing it happens alongside — the two are separate numbers because they are
+## answers to different questions, but a raise that outlasted the swing would
+## read as the tool arriving after the hand did.
+const RAISE_PER_SECOND: float = 6.0
 
 ## How far the hand may swing left or right of [constant REST], in degrees.
 var yaw_limit_degrees: float
@@ -57,6 +73,8 @@ var swing_degrees_per_second: float
 
 var _held: Vector2 = Vector2.ZERO
 var _wanted: Vector2 = Vector2.ZERO
+var _raise: float = 0.0
+var _raising: bool = false
 
 
 func _init(yaw_limit: float, pitch_limit: float, swing_speed: float) -> void:
@@ -93,15 +111,18 @@ static func angles_for(direction: Vector3) -> Vector2:
 ## swing chases it, which is exactly the behaviour a drag should have.
 func aim_toward(direction: Vector3) -> void:
 	_wanted = fenced(angles_for(direction))
+	_raising = true
 
 
 ## Lets go: the hand is asked for [constant REST] and gets there at the same
 ## speed it left.
 func lower() -> void:
 	_wanted = Vector2.ZERO
+	_raising = false
 
 
-## Moves the held angles [param delta] seconds' worth toward what was asked for.
+## Moves the held angles [param delta] seconds' worth toward what was asked for,
+## and the raise the same fraction of its own way up or down.
 ##
 ## [method Vector2.move_toward] rather than a per-axis step, so the pair travels
 ## in a straight line through angle-space and the hand takes one path to the
@@ -109,6 +130,7 @@ func lower() -> void:
 ## as a hand that shrugs and then nods.
 func advance(delta: float) -> void:
 	_held = _held.move_toward(_wanted, swing_degrees_per_second * delta)
+	_raise = move_toward(_raise, _wanted_raise(), RAISE_PER_SECOND * delta)
 
 
 ## The angles the hand is actually at, as [code](yaw, pitch)[/code] in degrees.
@@ -122,9 +144,22 @@ func wanted_angles() -> Vector2:
 	return _wanted
 
 
-## Whether the swing has arrived, so a caller can stop paying for it.
+## How far up the tool is brought, 0 with the finger off the glass and 1 with it
+## fully aimed. What [WandCarry] blends its two poses through.
+##
+## The honest version of [method is_raised] for anything that has to change shape
+## while aiming: it says the finger is down rather than that the angles are
+## non-zero, so a press dead ahead — where the two angles never leave zero —
+## still brings the tool up.
+func raise_amount() -> float:
+	return _raise
+
+
+## Whether the swing has arrived, so a caller can stop paying for it. The raise
+## counts: a tool coming up while the hand is already pointed the right way is
+## still something moving on screen.
 func is_settled() -> bool:
-	return _held.is_equal_approx(_wanted)
+	return _held.is_equal_approx(_wanted) and is_equal_approx(_raise, _wanted_raise())
 
 
 ## Whether the hand is pointed anywhere other than straight ahead — which is the
@@ -168,3 +203,11 @@ func fenced(angles: Vector2) -> Vector2:
 		clampf(angles.x, -yaw_limit_degrees, yaw_limit_degrees),
 		clampf(angles.y, -pitch_limit_degrees, pitch_limit_degrees)
 	)
+
+
+## Where [member _raise] is headed: all the way up while a finger is on the
+## glass, all the way down once it comes off. A target and a servo, exactly like
+## the angles above, so a release mid-raise turns around where it is rather than
+## restarting from the top.
+func _wanted_raise() -> float:
+	return 1.0 if _raising else 0.0

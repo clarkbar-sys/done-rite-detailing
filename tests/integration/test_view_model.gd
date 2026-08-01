@@ -11,6 +11,14 @@
 ## The garage is instantiated with [member Garage.first_person] set rather than
 ## through the play screen, so a failure points at the room and the viewmodel
 ## instead of at whatever else a screen is doing.
+##
+## [b]Nothing here presses anything[/b], so every tool is at rest and every
+## measurement below is of the resting pose. That is deliberate now that the
+## power wash moves in the hand: what a wand does while it is being aimed needs a
+## finger on real glass and lives in
+## [code]tests/integration/test_play_screen_aim.gd[/code], and what it does to
+## the resting frame — which is nothing at all — is exactly what this suite is
+## for.
 extends GutTest
 
 const GARAGE: String = "res://src/world/garage.tscn"
@@ -260,6 +268,57 @@ func test_no_tool_is_pointed_straight_down_the_barrel() -> void:
 		var view: Vector3 = -_camera().global_transform.basis.z
 		var aim: float = absf(axis.dot(view))
 		assert_lt(aim, NOT_AIMED_AT_THE_LENS, "%s points at the lens" % tool.display_name)
+
+
+# ---- the two ends of the wand ------------------------------------------------
+
+
+func test_the_power_wash_carries_a_marker_at_each_of_its_ends() -> void:
+	# What the jet will hang off, and what the alignment is measured between. Found
+	# through the viewmodel's own accessors rather than by node path, so a test is
+	# not the thing that decides what they are called.
+	var view_model: ViewModel = _view_model()
+	assert_not_null(view_model.muzzle(), "the wand has an end the water comes out of")
+	assert_not_null(view_model.butt(), "and one the hose goes into")
+
+
+func test_the_markers_sit_at_the_two_ends_of_the_wand_and_nowhere_else() -> void:
+	# Half a wand either side of its middle, measured off the mesh's own box rather
+	# than off the catalogue — a marker parked at the centre would satisfy "there
+	# are two nodes" and quietly emit the water out of the middle of the barrel.
+	var wand: MeshInstance3D = _view_model().proxy_for(DetailingTool.Id.POWER_WASH)
+	var half: float = wand.get_aabb().size.y * 0.5
+	assert_almost_eq(_view_model().muzzle().position.distance_to(Vector3.ZERO), half, TOLERANCE)
+	assert_almost_eq(_view_model().butt().position.distance_to(Vector3.ZERO), half, TOLERANCE)
+	assert_almost_eq(
+		_view_model().muzzle().position.distance_to(_view_model().butt().position),
+		half * 2.0,
+		TOLERANCE,
+		"and at opposite ends rather than both at the same one"
+	)
+
+
+func test_the_muzzle_faces_out_of_the_nozzle() -> void:
+	# A [GPUParticles3D] emits down its own -Z, and a [CylinderMesh] is built along
+	# +Y — so a marker that inherited the mesh's rotation unturned would spray the
+	# water out of the side of the wand. Asserted as the direction from one end to
+	# the other, which is the wand itself and not a basis this test could get wrong
+	# in the same way the code did.
+	var muzzle: Marker3D = _view_model().muzzle()
+	var along: Vector3 = _view_model().butt().global_position.direction_to(muzzle.global_position)
+	assert_almost_eq(-muzzle.global_basis.z.normalized().dot(along), 1.0, TOLERANCE)
+
+
+func test_nothing_else_on_the_belt_has_grown_ends() -> void:
+	# The instruction this refactor was given: the power wash gets the new
+	# behaviour and the other four are left exactly as they were. A sponge with a
+	# muzzle would be the first sign that "just the wand" had quietly become "all
+	# of them".
+	for tool: DetailingTool in DetailingTool.catalogue():
+		if tool.id == DetailingTool.Id.POWER_WASH:
+			continue
+		var proxy: MeshInstance3D = _view_model().proxy_for(tool.id)
+		assert_eq(proxy.get_child_count(), 0, "%s has ends it should not" % tool.display_name)
 
 
 # ---- the clipping decision, per proxy ----------------------------------------
