@@ -128,6 +128,17 @@
 ## and the player is plainly asking about the roof. On the car, which is nearly
 ## every press, the two coincide and the distinction never comes up.
 ##
+## [i]And the room hands the mark to the hand as well as to the crosshair[/i],
+## which is the one thing the paragraph above has an exception for. The hand
+## hangs half a metre in front of the lens and off to one side of it, so a tool
+## turned merely parallel to the aim points past the crosshair by that offset —
+## near enough to look right, far enough that a jet would visibly miss. So
+## [ViewModel] is told where the mark actually is, and the power wash lays itself
+## along the line to it ([WandCarry]); the other four are held at their fixed
+## angles and never ask. [method ViewModel.mark_at] carries the argument for why
+## the tool that sprays follows the crosshair rather than the finger even where
+## the two disagree.
+##
 ## [i]It resolves on the physics clock[/i], for the same reason the walk does:
 ## it casts a ray, and a space state may only be queried while physics is
 ## stepping. So [method aim_at] records where the finger is and
@@ -617,6 +628,11 @@ func _resolve_aim(delta: float) -> void:
 	var outward: Vector3 = found["normal"]
 	var panel: Node = found["collider"]
 	_marker.mark(surface, outward)
+	# Where it landed, which the hand needs and the direction above cannot carry: a
+	# tool held below and to one side of the lens has to be pointed at the mark
+	# rather than along the ray to reach it. See [method ViewModel.mark_at], which
+	# is also where the one case these two deliberately disagree in is written down.
+	_view_model.mark_at(surface)
 	_spend_the_trigger(found, delta)
 	var named: String = "" if panel == null else String(panel.name)
 	if named == _marked:
