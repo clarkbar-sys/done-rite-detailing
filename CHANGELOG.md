@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.2.0...v1.3.0) (2026-08-01)
+
+
+### Features
+
+* put mud on the car and let the power wash take it off ([#53](https://github.com/clarkbar-sys/done-rite-detailing/issues/53)) ([2c2fb8e](https://github.com/clarkbar-sys/done-rite-detailing/commit/2c2fb8e6073fcfa37ad4ee274e2e159989973be0))
+
 ## [1.2.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.1.0...v1.2.0) (2026-08-01)
 
 
