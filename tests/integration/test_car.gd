@@ -159,6 +159,41 @@ func test_the_glass_is_not_the_same_material_as_the_paint() -> void:
 	assert_ne(windshield.material, hood.material, "glass is not paint")
 
 
+func test_the_car_starts_painted_one_of_the_sixteen_colors() -> void:
+	assert_has(
+		Car.PAINT_COLORS,
+		_car.paint.albedo_color,
+		"the car must start in one of the sixteen colours"
+	)
+
+
+func test_every_body_panel_shares_the_cars_paint() -> void:
+	# Body, Hood, Deck, Roof and Cabin are five separate CSG roots that all read
+	# as "the car's colour" to a detailer. Forcing the colour here and checking
+	# every panel that carries it is what catches one of the six being missed,
+	# rather than trusting that they all point at the same sub-resource.
+	_car.paint.albedo_color = Color(0.5, 0.5, 0.5)
+	for path: String in ["Body/Profile", "Body/Plan"]:
+		var panel: CSGPolygon3D = _car.get_node(path) as CSGPolygon3D
+		assert_eq(panel.material, _car.paint, "%s must be painted the car's colour" % path)
+	for path: String in ["Hood/Panel", "Deck/Panel", "Roof/Panel", "Cabin/Shell"]:
+		var panel: CSGBox3D = _car.get_node(path) as CSGBox3D
+		assert_eq(panel.material, _car.paint, "%s must be painted the car's colour" % path)
+
+
+func test_each_car_gets_its_own_paint() -> void:
+	# The paint material is marked local-to-scene precisely so two cars never
+	# share one StandardMaterial3D — without that, repainting one car in the
+	# garage would repaint every car ever instantiated, including this test's.
+	var other: Car = (load(CAR) as PackedScene).instantiate() as Car
+	add_child_autofree(other)
+	await wait_process_frames(1)
+	other.paint.albedo_color = Color(0.5, 0.5, 0.5)
+	assert_ne(
+		_car.paint.albedo_color, other.paint.albedo_color, "two cars must not share one paint job"
+	)
+
+
 func test_a_panel_can_be_baked_to_a_real_mesh() -> void:
 	# The exit ramp, asserted so it stays one. CSG is the blockout's whole reason
 	# for existing and none of it is meant to survive to the finished game; this is

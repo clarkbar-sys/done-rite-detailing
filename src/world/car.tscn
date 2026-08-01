@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://src/world/car.gd" id="1_1nwee"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i0fu5"]
+resource_local_to_scene = true
 albedo_color = Color(0.13, 0.66, 0.27, 1)
 roughness = 0.55
 
@@ -26,6 +27,7 @@ roughness = 0.35
 
 [node name="Car" type="Node3D" unique_id=637623716]
 script = ExtResource("1_1nwee")
+paint = SubResource("StandardMaterial3D_i0fu5")
 
 [node name="Body" type="CSGCombiner3D" parent="." unique_id=1513077034]
 use_collision = true
