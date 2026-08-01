@@ -48,6 +48,17 @@
 ## [method Garage.release_aim] when it lifts. Nothing sprays yet. When something
 ## does, it goes on the far end of those two and nothing here changes.
 ##
+## [b]The [Vector2] that crosses is not quite where the finger is[/b], and that
+## is this file's one piece of judgement about the trigger rather than an
+## accident. A thumb covers the part of the screen it is touching, so an aim
+## taken at the contact point puts the crosshair — and later the spray, and later
+## still the patch of grime the player is trying to watch disappear — underneath
+## the hand asking for it. [ThumbLift] moves the aim a thumb's width up the glass
+## before it is handed over; [method _aim_point] is where that happens, and it
+## happens to touches only, because a mouse cursor hides nothing. The room is
+## never told: it is still a point on the glass, and which point is a question
+## about hands, which is this file's half of the split and not the room's.
+##
 ## [b]Pointer input arrives in [method Control._gui_input] and not in
 ## [method Node._unhandled_input], where the keys are, and the difference is
 ## worth knowing before moving any of it.[/b] A [Control] at the default
@@ -249,7 +260,7 @@ func _finger_moved(index: int, at: Vector2, pressed: bool) -> void:
 		if _finger != NO_FINGER:
 			return
 		_finger = index
-		_garage.aim_at(_on_the_glass(at))
+		_garage.aim_at(_on_the_glass(_aim_point(index, at)))
 		return
 	if index != _finger:
 		return
@@ -262,7 +273,40 @@ func _finger_moved(index: int, at: Vector2, pressed: bool) -> void:
 func _finger_dragged(index: int, at: Vector2) -> void:
 	if index != _finger:
 		return
-	_garage.aim_at(_on_the_glass(at))
+	_garage.aim_at(_on_the_glass(_aim_point(index, at)))
+
+
+## Where a pointer [param index] touching down at [param at] is actually aiming.
+##
+## [b]A thumb aims above itself and a mouse aims at itself.[/b] [ThumbLift] has
+## the whole argument; the part that belongs here is why the two cases are told
+## apart at all, and it is that the screen already knows which is which.
+## [constant MOUSE_FINGER] is a real distinction the trigger has been making since
+## the day both hands had to work, so asking it one more question costs nothing
+## and no heuristic is being invented to answer it.
+##
+## In this screen's coordinates and before [method _on_the_glass], because that
+## is the order the two facts are true in: the thumb is on this screen's glass,
+## and where this screen's glass lands in the room is the next question.
+func _aim_point(index: int, at: Vector2) -> Vector2:
+	if index == MOUSE_FINGER:
+		return at
+	return ThumbLift.aim_from(at, _thumb_lift())
+
+
+## [constant ThumbLift.REFERENCE_PX], in this screen's design pixels.
+##
+## Read every press rather than cached in [method Node._ready], and that is not
+## caution: the web build is resized by the browser and rotated by the player,
+## and [code]window/stretch/aspect[/code] is [code]expand[/code], so the scale
+## below really does change under a running game. A lift measured once at startup
+## would be a thumb's width in portrait and something else entirely after the
+## first turn of the phone. It is two engine reads and a division, once per press
+## or drag event, against a raycast on every physics tick.
+func _thumb_lift() -> float:
+	return ThumbLift.design_lift(
+		get_viewport().get_final_transform().get_scale().y, DisplayServer.screen_get_scale()
+	)
 
 
 ## [param where], moved out of this screen's coordinates and into the room's.
