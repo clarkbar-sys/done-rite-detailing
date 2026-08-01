@@ -15,8 +15,11 @@ straight into that same room, standing beside the car with a tool in your
 hand. Four arrows down the right-hand edge walk you around it and raise and
 lower your eye — hold one to move, let go to stop, or use the arrow keys or
 WASD — and a **T** in the opposite corner rolls out the five tools you carry.
-There is nothing to clean yet: the room is boxes and the car is a green one.
-Gameplay comes next; see
+Press anywhere on the car and the tool in your hand swings to point at it,
+with a red crosshair on the paint where it lands; press past the car and the
+crosshair snaps to the nearest bodywork instead. Holding is aiming, letting go
+is not. There is nothing to clean yet: the room is boxes and the car is a green
+one, and the crosshair is as far as the trigger goes. Gameplay comes next; see
 the [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.
 
