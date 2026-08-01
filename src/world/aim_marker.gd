@@ -29,6 +29,16 @@
 ## coplanar mesh and a car panel fight for the same pixel and the fight looks
 ## like a crosshair with holes in it. A centimetre is far enough to win and near
 ## enough that no viewing angle in this game shows it floating.
+##
+## [b]One tool draws its own instead.[/b] The power wash puts a [WashJet] between
+## its nozzle and the paint, and a ring under the wide end of that cone is a
+## second answer to a question the cone has already answered better — so the room
+## turns the ring off with [method draw_crosshair] while the washer is in hand.
+## What it does not turn off is the mark itself: [method mark] still records
+## where the aim landed and [method marked_point] still answers, because where
+## the tool is pointed is a fact about the aim rather than about which tool
+## happens to be drawing it. Everything that reads this — the panel readout, the
+## jet, the wand that lines up with it — goes on working unchanged.
 class_name AimMarker
 extends Node3D
 
@@ -87,6 +97,7 @@ const LIFT: float = 0.02
 const TOO_PARALLEL: float = 0.0001
 
 var _point: Vector3 = Vector3.ZERO
+var _pieces: Array[MeshInstance3D] = []
 
 
 func _ready() -> void:
@@ -126,6 +137,26 @@ func unmark() -> void:
 ## Whether the crosshair is on the car right now.
 func is_marking() -> bool:
 	return visible
+
+
+## Whether the ring and bars are drawn at all.
+##
+## Separate from marking on purpose — see the class docs. A tool that shows the
+## player where it is pointed by some better means says so here, and the mark
+## goes on being made either way; a caller that never asks gets the crosshair,
+## which is what four of the five tools want.
+##
+## Set on the pieces rather than on this node, because hiding the node itself is
+## what [method unmark] means and one flag cannot be two states.
+func draw_crosshair(drawn: bool) -> void:
+	for piece: MeshInstance3D in _pieces:
+		piece.visible = drawn
+
+
+## Whether the crosshair itself would be seen if something were marked. What a
+## test asks instead of reaching into the children by name.
+func is_crosshair_drawn() -> bool:
+	return not _pieces.is_empty() and _pieces[0].visible
 
 
 ## The point last marked, without the [constant LIFT] — the place on the
@@ -172,3 +203,4 @@ func _add(named: String, mesh: Mesh, paint: StandardMaterial3D, turned: Basis) -
 	piece.basis = turned
 	piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(piece)
+	_pieces.append(piece)
