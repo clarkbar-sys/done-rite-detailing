@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.1.0...v1.2.0) (2026-08-01)
+
+
+### Features
+
+* point the held tool at the car and mark where it lands ([#51](https://github.com/clarkbar-sys/done-rite-detailing/issues/51)) ([d33d5b4](https://github.com/clarkbar-sys/done-rite-detailing/commit/d33d5b4e969da224ae4839891dce638228ffeadf))
+* replace the green box with a CSG car blockout ([#50](https://github.com/clarkbar-sys/done-rite-detailing/issues/50)) ([e59bce5](https://github.com/clarkbar-sys/done-rite-detailing/commit/e59bce5aa2fb0174fc40d1db7d3d3c50cce13817))
+* swap the garage's walls and toolboxes for a driveway blockout ([#48](https://github.com/clarkbar-sys/done-rite-detailing/issues/48)) ([c8c9bca](https://github.com/clarkbar-sys/done-rite-detailing/commit/c8c9bca774397a08f4a0e4f2a0aa76b0175dafb8))
+* take the aim a thumb's width above the finger ([#52](https://github.com/clarkbar-sys/done-rite-detailing/issues/52)) ([bc50021](https://github.com/clarkbar-sys/done-rite-detailing/commit/bc500210f47ea0e2768b1a0387d89dfe1ab2120b))
+
 ## [1.1.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.0.0...v1.1.0) (2026-08-01)
 
 
