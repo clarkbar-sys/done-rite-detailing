@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.0.0...v1.1.0) (2026-08-01)
+
+
+### Features
+
+* add the detailing bay, an orbiting menu camera, and Start Game ([#35](https://github.com/clarkbar-sys/done-rite-detailing/issues/35)) ([f0b422d](https://github.com/clarkbar-sys/done-rite-detailing/commit/f0b422d9472ec4a1c1b912469ca654099df07cf9))
+* show the garage behind the title screen ([#36](https://github.com/clarkbar-sys/done-rite-detailing/issues/36)) ([f20c992](https://github.com/clarkbar-sys/done-rite-detailing/commit/f20c9922b393a38331136af49a2bea664711040e))
+* split the screen into game states, and add Start ([#32](https://github.com/clarkbar-sys/done-rite-detailing/issues/32)) ([e55e399](https://github.com/clarkbar-sys/done-rite-detailing/commit/e55e3990dba5c7aedaaa8e5e806c0db7f0463710))
+* walk the camera around the car with a four-arrow motion pad ([#47](https://github.com/clarkbar-sys/done-rite-detailing/issues/47)) ([bc9f698](https://github.com/clarkbar-sys/done-rite-detailing/commit/bc9f698a0537834eedf2b7bd290590976d7bc160))
+
 ## 1.0.0 (2026-07-31)
 
 
