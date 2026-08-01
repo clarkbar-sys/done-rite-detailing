@@ -24,3 +24,19 @@ layout_mode = 1
 
 [node name="MotionPad" parent="." instance=ExtResource("4_pad")]
 layout_mode = 1
+
+; Which panel the crosshair is on, in the one corner of the screen neither the
+; belt nor the pad reaches. Debug scaffolding — see `_on_aimed` in
+; play_screen.gd — so it is a plain Label with a font big enough to read at the
+; third-scale a phone renders this design at, and an outline because the thing
+; behind it is sometimes sky and sometimes tarmac.
+[node name="PanelReadout" type="Label" parent="."]
+layout_mode = 1
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 360.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(0.95, 0.13, 0.16, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 32

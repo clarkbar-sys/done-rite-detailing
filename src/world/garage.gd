@@ -110,8 +110,52 @@
 ## needs the eye nearer the paint than a held tool is long, those go red and the
 ## second viewport gets built then — with something real to look at rather than
 ## as insurance against a camera that cannot move.
+##
+## [b]And the hand can now be pointed at the car.[/b] A finger on the glass is an
+## aim: the tool swings toward wherever it landed ([ToolAim], applied by
+## [ViewModel]) and a red crosshair goes on the nearest bodywork to it
+## ([AimMarker]). Holding is aiming and letting go is not, so
+## [method release_aim] puts the mark away and lets the hand fall back to rest —
+## which is the shape the trigger will keep when there is something for it to
+## spray.
+##
+## Three things about it are worth knowing before changing any of it.
+##
+## [i]The tool follows the finger; the mark follows the car.[/i] They are
+## deliberately not the same point. Press the sky above the roof and the hand
+## swings at the sky, because that is where you pointed, while the crosshair
+## snaps to the nearest paint — because "nothing" is not a useful thing to mark
+## and the player is plainly asking about the roof. On the car, which is nearly
+## every press, the two coincide and the distinction never comes up.
+##
+## [i]It resolves on the physics clock[/i], for the same reason the walk does:
+## it casts a ray, and a space state may only be queried while physics is
+## stepping. So [method aim_at] records where the finger is and
+## [method _resolve_aim] answers it on the next tick — which also means a finger
+## dragged across the glass costs one raycast per tick rather than one per event.
+##
+## [i]The panel it names is real.[/i] Every piece of the [Car] is a CSG root with
+## its own collider, so the hit comes back as [code]"Hood"[/code] or
+## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
+## grime work needs and the reason [signal aimed] carries a name at all.
 class_name Garage
 extends SubViewportContainer
+
+## The panel the crosshair is on, or [code]""[/code] when nothing is marked —
+## emitted only when the answer changes, so a finger held still on one door is
+## one signal rather than sixty a second.
+##
+## A name and not a node: what is on the other end of this is a readout today and
+## a job sheet later, and neither should be able to reach into the car and move
+## something. The room is the only thing that owns the geometry.
+signal aimed(panel: String)
+
+## How far past the nearest-point post [method _nearest_on_the_car] casts its
+## second ray, as a fraction of the distance to it. A tenth over, because the
+## post sits on a box that is slightly larger than the panel inside it — a ray
+## stopped exactly at the post would land just short of the paint on every panel
+## whose box is loose, which is all of them.
+const PAST_THE_POST: float = 1.1
 
 ## Whether the camera circles the car. The title screen leaves it on to show
 ## the car off; the play screen turns it off and stands still instead.
@@ -240,9 +284,34 @@ extends SubViewportContainer
 ## mechanism exists for.
 @export var standoff_radius_min: float = 1.6
 
+## How far left or right of straight ahead the held tool may be swung, in
+## degrees. Inside the 75° lens's own half-angle, so a tool aimed at the very
+## edge of the frame is still a tool in the frame rather than one that has left
+## it.
+@export var aim_yaw_degrees: float = 32.0
+
+## How far up or down. Tighter than the yaw because a car is wide and low: see
+## [member ToolAim.pitch_limit_degrees].
+@export var aim_pitch_degrees: float = 24.0
+
+## How fast the hand swings toward a new aim, in degrees per second. The full
+## width of the cone in about a fifth of a second — fast enough to feel like a
+## response to the press rather than a decision about it, slow enough that the
+## eye follows the tool across instead of finding it already there.
+@export var aim_swing_degrees_per_second: float = 320.0
+
+## How far the aiming ray is cast, in metres. Comfortably past the far edge of
+## the modeled ground, so a press at the horizon is answered by "hit nothing"
+## because there is nothing there rather than because the ray ran out.
+@export var aim_reach: float = 40.0
+
 var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
 var _standoff: Standoff = null
+var _marker: AimMarker = null
+var _aiming: bool = false
+var _aim_at: Vector2 = Vector2.ZERO
+var _marked: String = ""
 
 @onready var _camera: Camera3D = %Camera
 @onready var _car: Car = %Car
@@ -272,6 +341,7 @@ func _ready() -> void:
 	_view_model.visible = first_person
 	if first_person:
 		_stand()
+		_take_up_aiming()
 		if walkaround:
 			_take_up_the_walk()
 		return
@@ -280,7 +350,7 @@ func _ready() -> void:
 	# Aimed once here rather than waiting for the first `_process`: a screen that
 	# never orbits would otherwise keep whatever transform the scene file
 	# happened to save, and the first frame of one that does would be a jump.
-	_aim()
+	_place_the_eye()
 
 
 func _process(delta: float) -> void:
@@ -294,7 +364,7 @@ func _process(delta: float) -> void:
 	if _orbit == null or _drive != null or not orbiting:
 		return
 	_orbit.advance(delta)
-	_aim()
+	_place_the_eye()
 
 
 ## The walk, on the physics clock rather than the frame clock.
@@ -303,12 +373,21 @@ func _process(delta: float) -> void:
 ## may only be queried while physics is stepping. Doing the movement here as well
 ## keeps the whole camera in one place per tick — a camera moved on one clock and
 ## measured on the other is a camera that measures where it used to be.
+## Aiming rides the same clock, and for the same reason — it casts a ray too. It
+## is settled before the walk moves the eye rather than after, so a press is
+## answered against the frame the player was actually looking at when their
+## finger landed on it.
+##
+## Ahead of the `_drive` test on purpose: a room can be aimed in without being
+## one you can walk around, and a screen that set [member first_person] without
+## [member walkaround] would otherwise have a tool that never moves.
 func _physics_process(delta: float) -> void:
+	_resolve_aim()
 	if _drive == null:
 		return
 	_drive.drive(_orbit, delta)
 	_hold_the_standoff(delta)
-	_aim()
+	_place_the_eye()
 
 
 ## Takes the player's intent — [param turn] to walk around the car,
@@ -340,8 +419,49 @@ func view_model() -> ViewModel:
 	return _view_model
 
 
+## Points the held tool at [param where], a point in this container's own local
+## coordinates — which is to say, where the player is touching the picture of the
+## room.
+##
+## [b]A point on the glass and not a direction in the world[/b], for exactly the
+## reason [method steer] takes two numbers instead of two buttons: what is on
+## screen is the play screen's business and where the camera is looking is this
+## one's, and the only thing that has to cross between them is where the finger
+## landed. A caller that had to turn a touch into a world ray would need the
+## camera, the sub-viewport and its scaling — which is three pieces of this room
+## in a file that should not have any.
+##
+## Recorded rather than answered: see [method _resolve_aim] for why the ray waits
+## for the physics tick. Ignored outside first person — the title screen's
+## showcase circuit has nobody standing behind it.
+func aim_at(where: Vector2) -> void:
+	if not first_person:
+		return
+	_aim_at = where
+	_aiming = true
+
+
+## The player has lifted their finger. The crosshair comes off the car and the
+## hand falls back to rest.
+##
+## Holding the glass is firing and letting go is not — so this is the release
+## half of the trigger, and the thing that will one day also stop the water.
+func release_aim() -> void:
+	_aiming = false
+
+
+## The crosshair on the paint, or [code]null[/code] on a screen that never took
+## up aiming. Public so a test can ask where the mark actually landed rather than
+## trusting a signal to have meant it.
+func aim_marker() -> AimMarker:
+	return _marker
+
+
 ## Puts the camera where the orbit says it should be, looking at the car.
-func _aim() -> void:
+##
+## Named for the eye and not for aiming, because aiming is now something the
+## player does with a tool a few functions below and one word cannot mean both.
+func _place_the_eye() -> void:
 	_camera.global_position = _orbit.eye(_car.global_position)
 	_face_car()
 
@@ -355,6 +475,136 @@ func _aim() -> void:
 func _stand() -> void:
 	_camera.global_position = eye_position
 	_face_car()
+
+
+## Gives the hand something to swing on and the room something to draw a
+## crosshair with. Both only exist in first person, which is the only mode with
+## a player in it.
+##
+## [b]The marker is a sibling of the car, not a child of it.[/b] It is a piece of
+## UI that happens to be drawn in world space, and hanging it inside the car
+## would put it in the way of everything that walks the car's children looking
+## for panels ([method Car.panels]) — for a mark that is already positioned in
+## world coordinates and gains nothing from the parenting.
+func _take_up_aiming() -> void:
+	_view_model.take_up_aiming(
+		ToolAim.new(aim_yaw_degrees, aim_pitch_degrees, aim_swing_degrees_per_second)
+	)
+	_marker = AimMarker.new()
+	_marker.name = "AimMarker"
+	_car.get_parent().add_child(_marker)
+
+
+## Turns a press on the glass into a mark on the paint and a tool pointed at it.
+##
+## [b]Why this is a physics tick and not a handler.[/b] It casts a ray, and a
+## space state may only be queried while physics is stepping — the same
+## constraint that put the walk on this clock. It also makes a drag cheap: a
+## finger sliding across the screen fires an event per pixel of movement and this
+## answers the latest one once per tick, so the cost of aiming does not depend on
+## how fast somebody's thumb is moving.
+##
+## Nothing is emitted while the answer stays the same. A finger held on one door
+## is one [signal aimed] rather than sixty a second, which matters because the
+## thing on the other end of it draws text.
+func _resolve_aim() -> void:
+	if _marker == null:
+		return
+	if not _aiming:
+		_view_model.lower()
+		if _marked.is_empty():
+			return
+		_marked = ""
+		_marker.unmark()
+		aimed.emit(_marked)
+		return
+	var at: Vector2 = _aim_at * _picture_scale()
+	var from: Vector3 = _camera.project_ray_origin(at)
+	var facing: Vector3 = _camera.project_ray_normal(at)
+	# The tool follows the finger and the mark follows the car — see the class
+	# docs. This is that split, and it is one line: the hand is pointed at the
+	# press, whatever the press turns out to have landed on.
+	_view_model.aim_toward(_camera.global_basis.inverse() * facing)
+	var found: Dictionary = _under_the_finger(from, facing)
+	if found.is_empty():
+		return
+	var surface: Vector3 = found["position"]
+	var outward: Vector3 = found["normal"]
+	var panel: Node = found["collider"]
+	_marker.mark(surface, outward)
+	var named: String = "" if panel == null else String(panel.name)
+	if named == _marked:
+		return
+	_marked = named
+	aimed.emit(_marked)
+
+
+## What the press landed on: the panel the ray hit, or failing that the nearest
+## bit of car to it.
+##
+## Shaped like the engine's own [method PhysicsDirectSpaceState3D.intersect_ray]
+## result — [code]position[/code], [code]normal[/code], [code]collider[/code] —
+## including when it is assembled by hand below, so the caller has one shape to
+## read rather than two and cannot forget which case it is in.
+func _under_the_finger(from: Vector3, facing: Vector3) -> Dictionary:
+	var space: PhysicsDirectSpaceState3D = _camera.get_world_3d().direct_space_state
+	var hit: Dictionary = space.intersect_ray(
+		PhysicsRayQueryParameters3D.create(from, from + facing * aim_reach)
+	)
+	if not hit.is_empty():
+		return hit
+	return _nearest_on_the_car(space, from, facing)
+
+
+## The nearest bit of car to a ray that hit nothing.
+##
+## [b]Two passes, because a box is not a car.[/b] [NearestPoint] works on one
+## [AABB] per panel, which is cheap and is enough to answer "which panel, and
+## roughly where on it" — but a box around a wing mirror is much bigger than the
+## mirror, so the point it returns is beside the bodywork rather than on it, and
+## it has no surface normal at all. So the answer is used as an aiming post: a
+## second ray goes from the eye to just past that point, and if it hits, the mark
+## goes on the real surface with the real panel's real normal.
+##
+## [b]When even that misses[/b] — a press level with the gap between a wheel and
+## its arch can thread the whole car — the box point is used as-is, faced at the
+## player. It is the honest answer to "nearest bit of car" and it is visibly
+## approximate, which beats showing nothing at all in the one case the player is
+## most likely to be probing at the edges of.
+func _nearest_on_the_car(
+	space: PhysicsDirectSpaceState3D, from: Vector3, facing: Vector3
+) -> Dictionary:
+	var panels: Array[CSGShape3D] = _car.panels()
+	var boxes: Array[AABB] = []
+	for panel: CSGShape3D in panels:
+		boxes.append(panel.global_transform * panel.get_aabb())
+	var nearest: int = NearestPoint.nearest_box(boxes, from, facing)
+	if nearest < 0:
+		return {}
+	var post: Vector3 = NearestPoint.in_box_from_ray(boxes[nearest], from, facing)
+	var reach: Vector3 = post - from
+	var probe: Dictionary = space.intersect_ray(
+		PhysicsRayQueryParameters3D.create(from, from + reach * PAST_THE_POST)
+	)
+	if not probe.is_empty():
+		return probe
+	return {"position": post, "normal": (from - post).normalized(), "collider": panels[nearest]}
+
+
+## How much bigger the picture on the glass is than the viewport the world is
+## rendered into, so a press can be turned into a point the camera understands.
+##
+## [code]stretch[/code] is on in [code]garage.tscn[/code], which keeps the
+## [SubViewport] the same size as this container and makes this [code](1, 1)[/code]
+## today. It is computed rather than assumed because
+## [member SubViewportContainer.stretch_shrink] exists, is exactly the setting
+## somebody reaches for when the web build needs to render at half resolution on
+## a phone, and would otherwise silently halve every aim in the game.
+func _picture_scale() -> Vector2:
+	var view: SubViewport = _camera.get_viewport() as SubViewport
+	if view == null or size.x <= 0.0 or size.y <= 0.0:
+		return Vector2.ONE
+	return Vector2(view.size) / size
 
 
 ## Turns where the player is standing into a circle they can walk around.

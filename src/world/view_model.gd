@@ -25,6 +25,19 @@
 ## distance along the tool's own long axis so a 0.72 m wand is held near its butt
 ## like a wand instead of balanced at its middle like a baton.
 ##
+## [b]The hand can now be pointed, and it still does not move.[/b] Press the
+## glass and the anchor swings to face where you pressed — [ToolAim] owns how far
+## and how fast, this owns applying it. A rotation of the anchor about its own
+## origin and emphatically not a new position for it: the hand stays 0.45 m off
+## the lens in the corner of the frame, exactly where the scene file put it, and
+## the tool sweeps around that point the way a wrist turns. Sliding the anchor
+## toward the touch instead would have been a hand that drifts across the screen
+## and out of the corner it is framed in, and it would have spent the clearance
+## budget the room's standoff exists to protect. The five poses below are
+## untouched by it: they are how a hand holds a thing, the swing is where the
+## hand is pointed, and the two compose because the swing is applied to the
+## anchor and the poses hang off it.
+##
 ## [b]The drying rag is a plane, and a plane has one side.[/b] Two ways to lose
 ## it entirely, and it needs both fixed. Edge-on it is zero pixels, so the angle
 ## in [method _held_pose] keeps its normal 47° off face-on and never anywhere
@@ -67,9 +80,18 @@ const PER_DEGREE: float = PI / 180.0
 
 var _belt: ToolBelt = null
 var _proxies: Array[MeshInstance3D] = []
+var _aim: ToolAim = null
+var _rest: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
+	# Where the scene file parked the hand, kept because every swing below
+	# rebuilds the anchor's transform and has to put it back exactly. Read rather
+	# than written down again here: the number that frames the hand lives in
+	# `garage.tscn` (see [member Garage._view_model]) and a second copy of it here
+	# would be a hand that jumps to a stale corner the first time somebody
+	# retunes the shot.
+	_rest = position
 	_belt = ToolBelt.new()
 	for tool: DetailingTool in _belt.tools():
 		var proxy: MeshInstance3D = _build(tool)
@@ -82,10 +104,64 @@ func _ready() -> void:
 	_show_only(_belt.equipped_index())
 
 
+## Swings the hand [param delta] seconds' worth toward wherever it was last
+## pointed, and does nothing at all until somebody has handed it a [ToolAim].
+##
+## On the frame clock and not the physics one, unlike everything else about
+## where the hand ends up. Deliberate, and the split is the usual one: the room
+## decides what the hand is pointed at while physics is stepping, because that is
+## the only time it is allowed to cast the ray that answers the question, and
+## this is the visible motion between those decisions. A swing stepped at 60 Hz
+## while the screen runs faster is a swing that judders.
+##
+## Skipped entirely once the swing has arrived, which is most frames — including
+## every frame of the title screen, where nothing ever hands this an aim.
+func _process(delta: float) -> void:
+	if _aim == null or _aim.is_settled():
+		return
+	_aim.advance(delta)
+	transform = Transform3D(_aim.orientation(), _rest)
+
+
 ## The belt driving this viewmodel. See the class docs — the roll-up will want
 ## this one and not a second one.
 func belt() -> ToolBelt:
 	return _belt
+
+
+## Hands this viewmodel the aim it swings on, and with it the whole ability to be
+## pointed at anything.
+##
+## Given rather than built, because the limits and the speed are the room's
+## numbers — they are about how far a tool may swing before it is in the paint,
+## which is a fact about a car and a standing distance, not about a mesh. Handed
+## over once, from [method Garage._ready], and only in first person: the title
+## screen's camera has no player behind it to press anything.
+func take_up_aiming(swing: ToolAim) -> void:
+	_aim = swing
+
+
+## The aim this viewmodel swings on, or [code]null[/code] on a screen that never
+## took one up. What a test asserts the swing against, and what tells the room
+## whether there is anything to point.
+func aim() -> ToolAim:
+	return _aim
+
+
+## Points the hand along [param direction], read in the camera's own space.
+func aim_toward(direction: Vector3) -> void:
+	if _aim == null:
+		return
+	_aim.aim_toward(direction)
+
+
+## Lets the hand fall back to rest. The player has lifted their finger, and a
+## hand still pointed at the last thing they touched would say the tool is aimed
+## at something when nothing is aimed at all.
+func lower() -> void:
+	if _aim == null:
+		return
+	_aim.lower()
 
 
 ## The mesh standing in for [param id], or `null` if the belt doesn't carry it.
