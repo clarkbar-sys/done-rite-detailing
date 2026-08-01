@@ -1,11 +1,17 @@
 ## The driveway: a grey plane for the car to sit on, green planes either side
-## for the grass, a green box for the car, and a camera that either circles the
-## car or stands beside it looking at it.
+## for the grass, a [Car] parked on it, and a camera that either circles the car
+## or stands beside it looking at it.
 ##
-## It is boxes on purpose. Everything here is one unit [BoxMesh] scaled into
-## place, so the whole level is readable in the scene file and none of it is
-## waiting on an artist; the shapes and their sizes are the design decision, and
-## a real mesh drops in later without moving anything else.
+## The ground is boxes on purpose. Every plane of it is one unit [BoxMesh]
+## scaled into place, so the whole level is readable in the scene file and none
+## of it is waiting on an artist; the shapes and their sizes are the design
+## decision, and a real mesh drops in later without moving anything else.
+##
+## The car used to be one of those boxes. It is now a CSG blockout in the same
+## 4.3 × 1.9 × 1.4 m envelope and the same place, for the same reason — a shape
+## nobody has to open Blender to change. What it is made of, and why it is made
+## of twelve separate pieces, is [code]src/world/car.gd[/code]'s business; this
+## scene only cares that it is a thing with a position and an outline.
 ##
 ## [b]Why the [SubViewport][/b]. In the root viewport, 2D always composites over
 ## 3D — and [code]src/main/main.tscn[/code] has a full-screen [ColorRect]
@@ -50,18 +56,20 @@
 ## the gap between the eye and the bodywork: every physics frame a ray goes out
 ## level toward the middle of the car, and [Standoff] eases the radius until the
 ## paint is [member standoff_metres] away square on. The camera hugs the
-## car's outline rather than a circle drawn around it, and the day the green box
-## becomes a real car with wing mirrors, the ray finds those too — nothing here
-## says "box" anywhere.
+## car's outline rather than a circle drawn around it, and now that the green box
+## has become a car with a tapered nose and wing mirrors, the ray finds those too
+## — exactly as the previous version of this paragraph said it would. Nothing
+## here says "box" anywhere.
 ##
-## [b]Which is why the car grew a [StaticBody3D].[/b] It is the only thing in the
-## room a ray can hit, and it is a sibling of the mesh with its own unscaled
-## transform rather than a child of it: everything in this room is a unit
-## [BoxMesh] scaled into place, a [CollisionShape3D] inherits that scale, and a
-## non-uniformly scaled shape is the one thing the physics server asks not to be
-## handed. The cost is the car's size written down twice, and
-## [code]tests/integration/test_garage.gd[/code] asserts the two still agree
-## rather than trusting whoever resizes the car next to remember.
+## [b]Which is why the car has to be something a ray can hit.[/b] It is the only
+## thing out here that is — the ground has no collider and nothing else is
+## modelled. It no longer needs a hand-built collider to be it:
+## every panel of the [Car] is a CSG root with [member CSGShape3D.use_collision]
+## set, so the body is generated from the same brushes that make the mesh and
+## cannot drift from it. That deleted a [BoxShape3D] that used to sit beside the
+## mesh carrying the car's size a second time, along with the test whose whole
+## job was catching the two disagreeing — and it means the ray now measures to
+## the panel it actually hit rather than to a box drawn around everything.
 ##
 ## [b]The viewmodel hangs off this camera, and is kept inside the near plane
 ## rather than given a camera of its own.[/b] A mesh parented to a camera punches
@@ -237,7 +245,7 @@ var _drive: OrbitDrive = null
 var _standoff: Standoff = null
 
 @onready var _camera: Camera3D = %Camera
-@onready var _car: Node3D = %Car
+@onready var _car: Car = %Car
 
 ## Where held things render: a [ViewModel] parented to the camera, so it travels
 ## with the eye and never has to be re-aimed. What hangs in it is that class's

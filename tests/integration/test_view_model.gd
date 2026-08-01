@@ -54,9 +54,13 @@ func _camera() -> Camera3D:
 	return _garage.get_node("%Camera") as Camera3D
 
 
+## The car's bounding box in world space. [Car.bounds] rather than an [AABB] off
+## a mesh: the car is twelve CSG panels now, and it is wider than the bodywork
+## by the reach of the wing mirrors — which only makes the clearances below more
+## conservative.
 func _car_box() -> AABB:
-	var car: MeshInstance3D = _garage.get_node("%Car") as MeshInstance3D
-	return car.global_transform * car.get_aabb()
+	var car: Car = _garage.get_node("%Car") as Car
+	return car.bounds()
 
 
 func _material(proxy: MeshInstance3D) -> StandardMaterial3D:

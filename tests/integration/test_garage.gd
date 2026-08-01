@@ -33,12 +33,8 @@ func _camera() -> Camera3D:
 	return _garage.get_node("%Camera") as Camera3D
 
 
-func _car() -> MeshInstance3D:
-	return _garage.get_node("%Car") as MeshInstance3D
-
-
-func _car_body() -> StaticBody3D:
-	return _garage.get_node("%CarBody") as StaticBody3D
+func _car() -> Car:
+	return _garage.get_node("%Car") as Car
 
 
 ## How far the car is from the outer edge of the modeled ground, read off the
@@ -156,44 +152,54 @@ func test_steering_a_room_nobody_is_standing_in_is_ignored() -> void:
 # ---- the car's collider: what the walkaround camera measures against ---------
 
 
-func test_the_car_has_a_body_a_ray_can_find() -> void:
-	# The green box is a MeshInstance3D and a mesh is invisible to a raycast, so
-	# without this the standoff would measure nothing, find no hit, and hold
-	# whatever radius it started with — a bug that looks exactly like the feature
-	# not being wired up.
-	var body: StaticBody3D = _car_body()
-	assert_not_null(body, "the car needs something a ray can hit")
-	if body == null:
+func test_every_panel_of_the_car_is_something_a_ray_can_find() -> void:
+	# A CSG mesh is invisible to a raycast unless the panel asks for collision,
+	# and the standoff would then measure nothing, find no hit, and hold whatever
+	# radius it started with — a bug that looks exactly like the feature not being
+	# wired up. It used to be one hand-built box shape that could go stale; it is
+	# now a property on each panel that can be forgotten one panel at a time.
+	var panels: Array[CSGShape3D] = _car().panels()
+	assert_gt(panels.size(), 0, "the car needs panels")
+	for panel: CSGShape3D in panels:
+		assert_true(panel.use_collision, "%s must be something a ray can hit" % panel.name)
+
+
+func test_the_standoff_ray_finds_the_car_and_can_name_what_it_hit() -> void:
+	# The whole reason the car is panels rather than one solid. `intersect_ray`
+	# hands back the CSG root itself, so what comes out of a hit is the panel's
+	# own node — which is what the grime this game is about will need in order to
+	# dirty a bonnet without dirtying the wheels.
+	#
+	# Cast the way `_hold_the_standoff` casts it: level, at the car's own
+	# mid-height, in at the middle of the car.
+	# A frame for CSG to build its meshes, then a physics step for the bodies it
+	# generated to be in the space a query can see.
+	await wait_physics_frames(1)
+	var focus: Vector3 = _car().global_position
+	var probe: Vector3 = focus + Vector3(4.0, 0.0, 0.0)
+	var space: PhysicsDirectSpaceState3D = _camera().get_world_3d().direct_space_state
+	var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(probe, focus))
+	assert_false(hit.is_empty(), "a ray at the car's mid-height must find the car")
+	if hit.is_empty():
 		return
-	var shape: CollisionShape3D = body.get_node("Shape") as CollisionShape3D
-	assert_not_null(shape, "the body needs a shape")
-	assert_not_null(shape.shape as BoxShape3D, "and the shape should be the box the car is")
+	var struck: Object = hit["collider"]
+	var panel: CSGShape3D = struck as CSGShape3D
+	assert_not_null(panel, "what a ray hits must be a panel, not an anonymous body")
+	if panel != null:
+		assert_eq(panel.name, &"Body", "level at mid-height, side on, the ray meets the tub")
 
 
-func test_the_collider_is_the_same_size_and_place_as_the_car() -> void:
-	# The cost of keeping the collider out of the mesh's scale (see the class
-	# docs): the car's size is written down twice. This is what stops the second
-	# copy from quietly going stale the first time somebody resizes the first.
-	var car: MeshInstance3D = _car()
-	var painted: AABB = car.global_transform * car.get_aabb()
-	var box: BoxShape3D = (_car_body().get_node("Shape") as CollisionShape3D).shape as BoxShape3D
-	var solid: AABB = AABB(_car_body().global_position - box.size * 0.5, box.size)
-	assert_almost_eq(solid.size.distance_to(painted.size), 0.0, TOLERANCE, "same size as the car")
-	assert_almost_eq(
-		solid.get_center().distance_to(painted.get_center()),
-		0.0,
-		TOLERANCE,
-		"and in the same place"
-	)
-
-
-func test_the_collider_is_not_scaled() -> void:
-	# Why it is a sibling of the mesh rather than a child: everything in this room
-	# is a unit box scaled into place, a CollisionShape3D inherits that scale, and
-	# a non-uniformly scaled shape is the one thing the physics server asks not to
-	# be handed.
-	var scaling: Vector3 = _car_body().global_transform.basis.get_scale()
-	assert_almost_eq(scaling.distance_to(Vector3.ONE), 0.0, TOLERANCE, "shapes are not scaled")
+func test_no_panel_is_scaled() -> void:
+	# The rule the old hand-built collider existed to satisfy, now enforced across
+	# every panel instead: a non-uniformly scaled shape is the one thing the
+	# physics server asks not to be handed, and CSG generates its body from the
+	# panel's own transform. The room's walls are unit boxes scaled into place;
+	# the car is authored at its real size precisely so this never comes up.
+	for panel: CSGShape3D in _car().panels():
+		var scaling: Vector3 = panel.global_transform.basis.get_scale()
+		assert_almost_eq(
+			scaling.distance_to(Vector3.ONE), 0.0, TOLERANCE, "%s is scaled" % panel.name
+		)
 
 
 func test_the_view_model_anchor_is_hidden_while_the_camera_circles() -> void:
