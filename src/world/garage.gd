@@ -315,25 +315,39 @@ const PAST_THE_POST: float = 1.1
 
 ## How wide the power wash's jet is where it lands, as a radius in metres.
 ##
-## A hand's width. Narrow enough that washing a car is a job you have to do
-## rather than one press, wide enough that the mask's texels are never the thing
-## you are fighting — at [member Grime.tile_pixels] this is several texels across
-## on every panel, so the edge of the jet is a shape rather than a staircase.
+## This and [member wash_per_second] were both about four times too small when
+## they shipped, and the way they were wrong is worth writing down because it is
+## not a bug and it fails like one.
+##
+## The first pair — a 0.16 m jet at 0.7 a second, chosen as "a hand's width, and
+## about a second and a half to clean a spot" — is defensible on paper and
+## unusable in the game. Measured, through the real scene stack: a full second of
+## held trigger took 0.0004 of the car off, which is four minutes of unbroken
+## sweeping for one flank. The patch it cleared was about 16 cm across on a 4.3 m
+## car, so on a phone, where the whole car is a few hundred pixels, a second of
+## work moved a handful of them. It was reported as "I can't wash it off", which
+## is exactly right: a tool that works this slowly is indistinguishable from a
+## tool that does not work, and no amount of it being technically correct helps.
+##
+## The lesson is that neither number means anything on its own — what matters is
+## the jet against the size of the car and the size of the car against the screen.
+## Half a metre of radius is a patch you can see land from where the player
+## stands.
 ##
 ## Not distance-dependent, and that is a simplification rather than a decision:
 ## real water spreads and loses pressure with range, which is a reason to stand
 ## close, which is a mechanic. It wants the standoff and the reach to mean
 ## something first.
-@export var wash_radius_metres: float = 0.16
+@export var wash_radius_metres: float = 0.45
 
 ## How much mud a held jet takes off a spot per second, where [code]1.0[/code] is
 ## all of it.
 ##
-## About a second and a half from filthy to clean at the middle of the jet, and
-## longer at its edge. Tuned to feel like work without feeling like a chore, on
-## the understanding that the number that actually decides this is how big
-## [member wash_radius_metres] is against how big the car is.
-@export var wash_per_second: float = 0.7
+## Under half a second from filthy to clean in the middle of the jet, and longer
+## at its edge. Fast enough that a press is visibly an action rather than a
+## contribution — see [member wash_radius_metres] for what the cautious version
+## of these two numbers felt like.
+@export var wash_per_second: float = 2.5
 
 var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
@@ -613,18 +627,31 @@ func _resolve_aim(delta: float) -> void:
 
 ## What the tool in the player's hand does to the paint the press landed on.
 ##
-## [b]Only a ray that actually hit.[/b] A press past the car still marks the
-## nearest bodywork, because "nothing" is not a useful thing to mark — but the
-## post that mark sits on is a guess assembled out of bounding boxes, not a place
-## water went. Washing there would let a player clean the car by pointing at the
-## sky beside it, so the [code]direct[/code] flag from [method _under_the_finger]
-## is what this reads and the crosshair is not.
+## [b]The water goes where the crosshair is.[/b] Wherever the mark is sitting on
+## real bodywork — whether the ray landed there or the aim snapped there — that is
+## where the tool is pointed, and the game has just told the player so in red.
+##
+## This shipped the other way round for a day and it was wrong. The first rule was
+## "only a ray that actually hit", reasoned about a player at a desk pointing at
+## the sky beside the car, where refusing is obviously right. It is obviously
+## wrong on a touchscreen, which is the platform this game is actually played on:
+## the aim is taken a thumb's width above the finger ([ThumbLift] has why), so a
+## thumb on the flank of a low, wide car routinely sends the ray just over the
+## roof. The crosshair snaps back onto the paint and shows the player exactly
+## where their tool is aimed — and the old rule then declined to spend any water
+## there. A mark on the paint that does nothing is not a fair rule the player has
+## to learn, it is a broken tool.
+##
+## What is still refused is [code]surface[/code] being false: a point clamped onto
+## a bounding box, which is not on the mesh and whose normal is invented facing
+## the player. That one is excluded because [BoxProjection] would pick a face off
+## a normal nobody measured, not because of anything about fairness.
 ##
 ## One tool of five so far. What the other four do is a rule about the game and
 ## it goes here, next to this one, when they have somewhere to write to —
 ## [GrimeMap] already carries the channels they will use.
 func _spend_the_trigger(found: Dictionary, delta: float) -> void:
-	if _grime == null or not _grime.is_laid() or not found.get("direct", false):
+	if _grime == null or not _grime.is_laid() or not found.get("surface", false):
 		return
 	if _view_model.belt().equipped().id != DetailingTool.Id.POWER_WASH:
 		return
@@ -645,18 +672,23 @@ func _spend_the_trigger(found: Dictionary, delta: float) -> void:
 ## including when it is assembled by hand below, so the caller has one shape to
 ## read rather than two and cannot forget which case it is in.
 ##
-## Plus one key the engine does not set: [code]direct[/code], true when the ray
-## really hit that panel and false when the answer was reconstructed from the
-## boxes. Everything that draws is happy either way and says so by ignoring it;
-## anything that [i]changes[/i] the car has to know the difference, which is the
-## whole reason the flag exists rather than a second return shape.
+## Plus one key the engine does not set: [code]surface[/code], true when the
+## position and the normal came off real geometry and false when they were
+## reconstructed from a bounding box.
+##
+## It is not "did the ray hit" — two of the three answers below come from a real
+## raycast and both set it. It is "is this a place on the car, with the car's own
+## normal", which is the only question anything writing to a texture can use:
+## everything that draws is happy with an approximation and says so by ignoring
+## this, and a projection fed an invented normal picks the wrong face of the wrong
+## panel. See [method _spend_the_trigger], which had this rule wrong once.
 func _under_the_finger(from: Vector3, facing: Vector3) -> Dictionary:
 	var space: PhysicsDirectSpaceState3D = _camera.get_world_3d().direct_space_state
 	var hit: Dictionary = space.intersect_ray(
 		PhysicsRayQueryParameters3D.create(from, from + facing * aim_reach)
 	)
 	if not hit.is_empty():
-		hit["direct"] = true
+		hit["surface"] = true
 		return hit
 	return _nearest_on_the_car(space, from, facing)
 
@@ -691,17 +723,19 @@ func _nearest_on_the_car(
 	var probe: Dictionary = space.intersect_ray(
 		PhysicsRayQueryParameters3D.create(from, from + reach * PAST_THE_POST)
 	)
-	# Both answers are marked as not direct, including the probe's — which really
-	# did hit that surface, but only because a post was put in front of it. The
-	# player pointed past the car; water goes where you point.
+	# The probe really did hit the car, so it carries the car's own normal and is
+	# somewhere a tool can be used — it only needed a post put in front of it to
+	# be found. The box point below did not: it is a corner of a bounding box with
+	# a normal pointed back at the player because there was nothing to measure one
+	# from, and that is the one answer nothing may write to.
 	if not probe.is_empty():
-		probe["direct"] = false
+		probe["surface"] = true
 		return probe
 	return {
 		"position": post,
 		"normal": (from - post).normalized(),
 		"collider": panels[nearest],
-		"direct": false,
+		"surface": false,
 	}
 
 

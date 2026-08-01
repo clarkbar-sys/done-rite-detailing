@@ -144,6 +144,17 @@ func _hold(at: Vector2) -> void:
 	await wait_physics_frames(RESOLVE_FRAMES)
 
 
+## Taps [param button] the way a thumb does, through the input system rather than
+## by emitting its signal — a button that had been laid out under something else
+## would still emit and would still be untappable.
+func _press_button(button: Button) -> void:
+	var at: Vector2 = button.get_global_rect().get_center()
+	_touch(at, true)
+	await wait_process_frames(1)
+	_touch(at, false)
+	await wait_process_frames(1)
+
+
 func _lift() -> void:
 	_touch(Vector2.ZERO, false)
 	await wait_physics_frames(RESOLVE_FRAMES)
@@ -191,18 +202,24 @@ func test_letting_go_stops_the_water() -> void:
 	)
 
 
-func test_a_press_past_the_car_marks_it_without_washing_it() -> void:
-	# The crosshair snaps to the nearest bodywork when a press hits nothing,
-	# because "nothing" is not a useful thing to mark — but that post is assembled
-	# out of bounding boxes rather than a place water went. Washing there would
-	# let a player clean the car by pointing at the sky beside it.
+func test_a_mark_on_a_bounding_box_is_not_somewhere_water_can_go() -> void:
+	# The one case `surface` still refuses. A press well over the roof reaches no
+	# geometry at all, even after the second probe ray, so the crosshair ends up on
+	# a point clamped onto a bounding box with a normal invented facing the player.
+	# [BoxProjection] fed that normal picks a face off a measurement nobody took,
+	# so it would wash a texel that has nothing to do with where the mark is.
+	#
+	# Everything the ray *does* reach washes, including the snapped case — that is
+	# what `surface` means and it is not the same question as "did the player aim
+	# well". [method Garage._spend_the_trigger] has why that distinction had to be
+	# rewritten once.
+	#
 	# Held rather than held-and-released: letting go puts the mark away, so a test
-	# that lifted first would be asserting on an empty crosshair and passing for
-	# the wrong reason.
+	# that lifted first would be asserting on an empty crosshair.
 	await _settle()
 	await _press(_at_the_sky())
 	assert_true(_marker().is_marking(), "the press still marked the nearest bodywork")
-	assert_almost_eq(_grime().remaining(), 1.0, 0.0001, "and pointing at the sky washed the car")
+	assert_almost_eq(_grime().remaining(), 1.0, 0.0001, "and a box corner spent water")
 
 
 func test_only_the_power_wash_spends_the_trigger() -> void:
@@ -230,13 +247,12 @@ func test_swapping_back_to_the_wash_starts_the_water_again() -> void:
 
 
 func test_the_masks_are_bound_but_out_of_the_way() -> void:
-	# Built from the room's own maps rather than from a set of its own, and hidden
-	# until asked for: it is a developer's view of a texture, and a player who has
-	# never pressed G should never see it.
+	# Built from the room's own maps rather than from a set of its own, and put
+	# away until asked for: a player who has never asked should never see it.
 	await _settle()
 	assert_false(_masks().is_shown(), "the masks are up without being asked for")
 	assert_eq(
-		_masks().get_node("Margin/Stack/%Masks").get_child_count(),
+		_masks().get_node("%Grid").get_child_count(),
 		_car().panels().size(),
 		"one thumbnail per panel"
 	)
@@ -250,10 +266,41 @@ func test_the_masks_can_be_put_up_and_taken_down() -> void:
 	assert_false(_masks().is_shown())
 
 
+func test_a_tap_on_the_toggle_puts_the_masks_up() -> void:
+	# The half of this a phone can reach. The key is fine for whoever has one, and
+	# the thing this view diagnoses is a projection that behaves differently under
+	# a thumb — so it has to be openable on the device with the bug in it.
+	await _settle()
+	var button: Button = _masks().toggle_button()
+	assert_gte(
+		button.size.x, TouchTarget.min_design_size(), "the toggle is smaller than a thumb across"
+	)
+	assert_gte(button.size.y, TouchTarget.min_design_size(), "and up")
+	await _press_button(button)
+	assert_true(_masks().is_shown(), "a tap on the toggle did not put the masks up")
+	await _press_button(button)
+	assert_false(_masks().is_shown(), "and a second tap did not put them away")
+
+
+func test_the_toggle_does_not_sit_on_the_tool_belts_own_corner() -> void:
+	# The belt lays its T out at the bottom left and rolls its icons up out of it;
+	# this board started life in that same corner, on top of it. Asserted against
+	# the belt's real button rather than against the numbers, so moving either one
+	# is what fails this rather than editing a constant.
+	await _settle()
+	var hud: ToolBeltHud = _screen().get_node("ToolBelt") as ToolBeltHud
+	assert_false(
+		_masks().toggle_button().get_global_rect().intersects(
+			hud.toggle_button().get_global_rect()
+		),
+		"the grime toggle is sitting on the tool belt's toggle"
+	)
+
+
 func test_the_masks_do_not_eat_the_press_underneath_them() -> void:
-	# A picture and not a control. The overlay sits in the corner of the same
-	# screen the player aims through, so anything it claimed would be water that
-	# never reached the car.
+	# A picture and not a control, apart from the one button. The board sits on
+	# the same screen the player aims through, so anything else it claimed would
+	# be water that never reached the car.
 	await _settle()
 	_masks().set_shown(true)
 	await wait_process_frames(1)

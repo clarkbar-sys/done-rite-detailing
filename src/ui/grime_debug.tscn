@@ -9,27 +9,39 @@ corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
-; Bottom-left: the one corner of a 1280x720 frame that nothing else claims — the
-; readout is top-left, the roll-up's T is beside it and the motion pad owns the
-; right-hand edge. Anchored rather than positioned so it stays in the corner when
-; "expand" grows the viewport on a phone.
+; Full-rect and `mouse_filter = 2` (ignore), like `ToolBeltHud`: the toggle is a
+; real control and everything else in here is a picture, so a press that misses
+; the button has to reach the glass behind it or the water would stop wherever
+; the masks were drawn.
 ;
-; `mouse_filter = 2` (ignore) on this and on everything under it, because this is
-; a picture and not a control: a press that lands on it has to reach the glass
-; behind it, or the water would stop wherever the masks were drawn.
-[node name="GrimeDebug" type="PanelContainer"]
-anchors_preset = 2
-anchor_top = 1.0
+; Nothing is positioned here. The toggle and the board are placed by `_relayout`
+; against `TouchTarget.min_design_size()`, because where they go depends on how
+; big a tap target has to be — see that function.
+[node name="GrimeDebug" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = -12.0
-offset_bottom = -12.0
-grow_vertical = 0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_grimebg")
 script = ExtResource("1_grimedebug")
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Toggle" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_right = 164.0
+offset_bottom = 164.0
+theme_override_font_sizes/font_size = 56
+text = "~"
+
+[node name="Board" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_grimebg")
+
+[node name="Margin" type="MarginContainer" parent="Board"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/margin_left = 10
@@ -37,11 +49,11 @@ theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 8
 
-[node name="Stack" type="VBoxContainer" parent="Margin"]
+[node name="Stack" type="VBoxContainer" parent="Board/Margin"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Title" type="Label" parent="Margin/Stack"]
+[node name="Title" type="Label" parent="Board/Margin/Stack"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
@@ -49,7 +61,7 @@ theme_override_colors/font_color = Color(0.95, 0.85, 0.55, 1)
 theme_override_font_sizes/font_size = 14
 text = "GRIME MASKS"
 
-[node name="Masks" type="GridContainer" parent="Margin/Stack"]
+[node name="Grid" type="GridContainer" parent="Board/Margin/Stack"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
