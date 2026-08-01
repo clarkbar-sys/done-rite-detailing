@@ -32,8 +32,12 @@ func _camera() -> Camera3D:
 	return _garage.get_node("%Camera") as Camera3D
 
 
-func _car() -> Node3D:
-	return _garage.get_node("%Car") as Node3D
+func _car() -> MeshInstance3D:
+	return _garage.get_node("%Car") as MeshInstance3D
+
+
+func _car_body() -> StaticBody3D:
+	return _garage.get_node("%CarBody") as StaticBody3D
 
 
 ## How far the middle of the room is from the inside face of a side wall, read
@@ -125,6 +129,67 @@ func test_the_room_orbits_unless_a_screen_says_otherwise() -> void:
 	# would come up on a motionless view from somebody's eye socket.
 	assert_true(_garage.orbiting, "the room's own shot is the slow circuit")
 	assert_false(_garage.first_person, "standing in the bay is the game's idea, not the room's")
+	assert_false(_garage.walkaround, "and so is walking about in it")
+
+
+func test_steering_a_room_nobody_is_standing_in_is_ignored() -> void:
+	# The title screen instances this same scene, and its camera is not anybody's
+	# to drive. Asking anyway has to be a no-op rather than a crash on a drive
+	# that was never built — the play screen calls `steer` every single frame, and
+	# a screen that stopped being first person must not take the game down.
+	#
+	# Measured against the showcase circuit's own speed rather than against "it
+	# did not move": the circuit is still turning underneath, and a steered camera
+	# that moved by exactly the circuit's chord moved by nothing else.
+	_garage.steer(1.0, 1.0)
+	var before: Vector3 = _camera().global_position
+	_garage._process(1.0)
+	var half_sweep: float = deg_to_rad(_garage.orbit_degrees_per_second) * 0.5
+	var chord: float = 2.0 * _garage.orbit_radius * sin(half_sweep)
+	assert_almost_eq(_camera().global_position.distance_to(before), chord, TOLERANCE)
+
+
+# ---- the car's collider: what the walkaround camera measures against ---------
+
+
+func test_the_car_has_a_body_a_ray_can_find() -> void:
+	# The green box is a MeshInstance3D and a mesh is invisible to a raycast, so
+	# without this the standoff would measure nothing, find no hit, and hold
+	# whatever radius it started with — a bug that looks exactly like the feature
+	# not being wired up.
+	var body: StaticBody3D = _car_body()
+	assert_not_null(body, "the car needs something a ray can hit")
+	if body == null:
+		return
+	var shape: CollisionShape3D = body.get_node("Shape") as CollisionShape3D
+	assert_not_null(shape, "the body needs a shape")
+	assert_not_null(shape.shape as BoxShape3D, "and the shape should be the box the car is")
+
+
+func test_the_collider_is_the_same_size_and_place_as_the_car() -> void:
+	# The cost of keeping the collider out of the mesh's scale (see the class
+	# docs): the car's size is written down twice. This is what stops the second
+	# copy from quietly going stale the first time somebody resizes the first.
+	var car: MeshInstance3D = _car()
+	var painted: AABB = car.global_transform * car.get_aabb()
+	var box: BoxShape3D = (_car_body().get_node("Shape") as CollisionShape3D).shape as BoxShape3D
+	var solid: AABB = AABB(_car_body().global_position - box.size * 0.5, box.size)
+	assert_almost_eq(solid.size.distance_to(painted.size), 0.0, TOLERANCE, "same size as the car")
+	assert_almost_eq(
+		solid.get_center().distance_to(painted.get_center()),
+		0.0,
+		TOLERANCE,
+		"and in the same place"
+	)
+
+
+func test_the_collider_is_not_scaled() -> void:
+	# Why it is a sibling of the mesh rather than a child: everything in this room
+	# is a unit box scaled into place, a CollisionShape3D inherits that scale, and
+	# a non-uniformly scaled shape is the one thing the physics server asks not to
+	# be handed.
+	var scaling: Vector3 = _car_body().global_transform.basis.get_scale()
+	assert_almost_eq(scaling.distance_to(Vector3.ONE), 0.0, TOLERANCE, "shapes are not scaled")
 
 
 func test_the_view_model_anchor_is_hidden_while_the_camera_circles() -> void:

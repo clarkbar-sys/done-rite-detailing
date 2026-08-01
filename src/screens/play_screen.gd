@@ -22,10 +22,25 @@
 ## the player is holding the wand, and it would look like a UI bug for as long
 ## as it took somebody to find this line.
 ##
-## The eye is parked, and that is a decision rather than an omission: walking and
-## looking around bring a character body, collision against the room's sealed
-## walls, and touch controls with them, and none of those belong in the change
-## that put a tool in the player's hands.
+## [b]The other loop this screen owns is movement[/b], and it is the same shape:
+## the pad ([MotionPad]) says which way the player is asking to go, the room
+## ([Garage]) works out what that does to a camera, and neither has heard of the
+## other. A stick, a swipe or a pair of thumbs on the glass replaces the first
+## without the second noticing, which is the whole reason the thing crossing this
+## file is two numbers in [code]-1..1[/code] rather than a button.
+##
+## [b]Movement is polled and tool changes are not, and that is not an
+## inconsistency.[/b] Picking a tool happens at an instant, so it is a signal.
+## Holding a direction is a thing that is true across frames, so it is read once
+## a frame — from the buttons themselves and from [Input], neither of which can
+## get stuck holding a press whose release went missing while the browser tab was
+## somewhere else.
+##
+## The eye walks a rail around the car and cannot look away from it, and that is
+## a decision rather than an omission: turning your head brings a look control
+## the phone has no thumb spare for, and walking anywhere else brings a character
+## body and collision against a room that is currently six boxes. Neither belongs
+## in the change that proved the camera can move at all.
 ##
 ## There is no way back to the title screen on purpose. A Back button is a
 ## decision about how the game is paused and what that does to a job in
@@ -43,10 +58,24 @@ const CLOSE_ACTION: String = "tool_belt_close"
 ## on the key; the belt is indexed from 0 and the conversion happens once, below.
 const SLOT_ACTION_PREFIX: String = "tool_slot_"
 
+## Walks the eye left around the car: the keyboard's half of the pad's left
+## arrow.
+const TURN_LEFT_ACTION: String = "camera_left"
+
+## Walks it right.
+const TURN_RIGHT_ACTION: String = "camera_right"
+
+## Raises the eye.
+const LIFT_UP_ACTION: String = "camera_up"
+
+## Lowers it.
+const LIFT_DOWN_ACTION: String = "camera_down"
+
 var _belt: ToolBelt = null
 
 @onready var _garage: Garage = $Garage
 @onready var _hud: ToolBeltHud = $ToolBelt
+@onready var _pad: MotionPad = $MotionPad
 
 
 func _ready() -> void:
@@ -56,6 +85,22 @@ func _ready() -> void:
 	_belt = _garage.view_model().belt()
 	_hud.bind(_belt)
 	_hud.tool_selected.connect(_on_tool_selected)
+
+
+## Hands the room what the player is asking for, every frame.
+##
+## Every frame including the ones where nothing is held: "stop" is an intent like
+## any other, and a screen that only spoke up when something was pressed would
+## leave the camera coasting on the last thing it heard.
+##
+## The two input sources are summed and the room clamps the total, so holding the
+## right arrow and the pad's right button walks at one speed rather than two.
+## [method Input.get_axis] is the engine's own idiom for a held pair and returns
+## the same [code]-1..1[/code] the pad does.
+func _process(_delta: float) -> void:
+	var turn: float = _pad.turn() + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
+	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
+	_garage.steer(turn, lift)
 
 
 ## Keys, for the half of the players who will never tap the [b]T[/b].

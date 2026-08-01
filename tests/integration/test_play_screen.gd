@@ -1,18 +1,20 @@
 ## Integration test for the play screen — the garage seen from inside it.
 ##
-## What pressing Start actually changes is three settings on the [Garage]
-## instance in this scene's file rather than code anywhere: the orbit stops, the
-## camera becomes a person standing in the bay, and the anchor held things hang
-## off switches on. Settings in a scene file are exactly the kind of thing that
-## is silently wrong until somebody looks, so each of them is checked twice here
-## — once as the property that was set, and once as the effect it had on the
-## camera the player is actually looking through.
+## What pressing Start actually changes is four settings on the [Garage] instance
+## in this scene's file rather than code anywhere: the showcase orbit stops, the
+## camera becomes a person standing in the bay, the anchor held things hang off
+## switches on, and that person can walk. Settings in a scene file are exactly
+## the kind of thing that is silently wrong until somebody looks, so each of them
+## is checked twice — once as the property that was set, and once as the effect
+## it had on the camera the player is actually looking through. The last of the
+## four is [code]tests/integration/test_play_screen_walk.gd[/code]'s subject and
+## this file covers the shot the walk starts from.
 ##
 ## The geometry assertions below are the other half of the clipping decision
 ## recorded in [code]src/world/garage.gd[/code]: the viewmodel is kept inside the
 ## near plane instead of being given a camera of its own, and that is only safe
-## because the eye is parked somewhere with room around it. These are what go red
-## if it ever isn't.
+## because the eye has room around it. These are what go red if it ever hasn't —
+## here where the eye begins, and in the walk suite at every angle it reaches.
 extends GutTest
 
 const PLAY_SCREEN: String = "res://src/screens/play_screen.tscn"
@@ -27,16 +29,27 @@ const TOLERANCE: float = 0.0001
 const EYE_MIN_HEIGHT: float = 1.4
 const EYE_MAX_HEIGHT: float = 2.0
 
-## The furthest the eye may stand from the middle of the car and still count as
-## having walked up to it. The car is 4.3 m long and 1.9 m wide, so from much
-## beyond this it stops filling the frame and starts sitting in it.
-const REACHED_THE_CAR: float = 3.5
+## The furthest the eye may be from the car's own bodywork and still count as
+## having walked up to it. Measured to the box rather than to the middle of the
+## car, because the middle of a 4.3 m long car is metres from the panel you are
+## standing at and a radius says nothing about what fills the frame. Beyond this
+## the shot stops being somebody working on a car and becomes somebody looking at
+## one from across the room.
+const REACHED_THE_CAR: float = 3.0
 
 ## How far a held thing may stick out from the anchor in any direction. Half the
 ## longest tool on the belt (the power wash wand, 0.72 m) plus room to spare, so
 ## the clearance below is a promise about the proxies #42 hangs here and not just
 ## about the empty node they hang from.
 const HELD_REACH: float = 0.45
+
+## Long enough for the standoff to have eased from where the standing shot puts
+## the eye to the gap the walk wants, with room to spare. That is a metre and a
+## quarter of dolly at the correction speed the scene exports — about fifty ticks
+## — so this is a second and a half. The eye is placed before the first physics
+## tick and settled shortly after, and the tests below say which of the two they
+## mean.
+const SETTLE_FRAMES: int = 90
 
 var _screen: GameScreen = null
 var _requested: Array[GameState] = []
@@ -108,6 +121,20 @@ func _inner_half_width() -> float:
 	return absf(wall.position.x) - wall.scale.x * 0.5
 
 
+## How far the eye stands from the middle of the car, measured flat on the floor.
+func _radius() -> float:
+	var eye: Vector3 = _camera().global_position
+	var car: Vector3 = _car().global_position
+	return Vector2(eye.x - car.x, eye.z - car.z).length()
+
+
+## Lets the standoff ease from where the standing shot puts the eye to the gap
+## the walk wants, so what is measured afterwards is a settled camera rather than
+## one still arriving.
+func _settle() -> void:
+	await wait_physics_frames(SETTLE_FRAMES)
+
+
 func test_the_screen_is_a_game_screen() -> void:
 	# The host casts to [GameScreen] and refuses anything else, so a scene that
 	# lost its script would leave the player looking at an empty window.
@@ -126,16 +153,11 @@ func test_it_has_no_menu_over_it() -> void:
 	assert_false(_screen.has_node("%Start"), "pressing Start Game must take the menu away")
 
 
-func test_the_camera_has_stopped() -> void:
+func test_the_showcase_orbit_has_stopped() -> void:
+	# The camera the player walks is not the one that circles the car on its own.
+	# That the eye really does hold still until it is asked not to is the walk
+	# suite's job, because "still" only means anything next to "moving".
 	assert_false(_garage().orbiting, "the game is not a screensaver")
-
-
-func test_the_camera_really_does_not_move() -> void:
-	# The property above is the intent; this is the effect.
-	var camera: Camera3D = _camera()
-	var before: Vector3 = camera.global_position
-	await wait_process_frames(30)
-	assert_almost_eq(camera.global_position.distance_to(before), 0.0, TOLERANCE)
 
 
 # ---- the shot: a person in the bay, not the showcase rig stopped mid-circle ---
@@ -153,31 +175,43 @@ func test_the_eye_stands_at_head_height() -> void:
 	assert_between(height, EYE_MIN_HEIGHT, EYE_MAX_HEIGHT, "the camera must be somebody's eye")
 
 
-func test_the_eye_stands_where_the_export_says() -> void:
+func test_the_eye_starts_where_the_export_says() -> void:
 	# The effect of the property, not the property. `_ready()` used to aim the
 	# camera unconditionally, which would have put it straight back on the orbit
 	# and left `eye_position` looking like it worked.
-	var offset: float = _camera().global_position.distance_to(_garage().eye_position)
-	assert_almost_eq(offset, 0.0, TOLERANCE, "the eye must stand where it was told to")
+	#
+	# A second, unstepped screen, and not the one `before_each` built. The standoff
+	# eases the eye out to the gap the walk wants from the first physics tick
+	# onward, and the tick that has already happened by the time a test body runs
+	# has moved it 2.5 cm — measured, by asserting this on the shared screen and
+	# reading the failure. `_ready()` fires inside `add_child`, so placing the eye
+	# has happened here and nothing else has.
+	var packed: PackedScene = load(PLAY_SCREEN) as PackedScene
+	var fresh: GameScreen = packed.instantiate() as GameScreen
+	add_child_autofree(fresh)
+	var garage: Garage = fresh.get_node("Garage") as Garage
+	var camera: Camera3D = garage.get_node("%Camera") as Camera3D
+	var offset: float = camera.global_position.distance_to(garage.eye_position)
+	assert_almost_eq(offset, 0.0, TOLERANCE, "the eye must start where it was told to")
 
 
 func test_the_eye_has_walked_up_to_the_car() -> void:
-	# Measured flat on the floor, so the height above the car doesn't flatter it.
-	var eye: Vector3 = _camera().global_position
-	var car: Vector3 = _car().global_position
-	var flat: float = Vector2(eye.x - car.x, eye.z - car.z).length()
-	assert_lt(flat, REACHED_THE_CAR, "the car has to fill the frame, not sit in it")
-	assert_lt(flat, _garage().orbit_radius, "and it must be nearer than the showcase shot was")
+	await _settle()
+	var gap: float = _clearance(_car_box(), _camera().global_position)
+	assert_lt(gap, REACHED_THE_CAR, "the car has to fill the frame, not sit in it")
+	assert_lt(_radius(), _garage().orbit_radius, "and it must be nearer than the showcase shot was")
 
 
 func test_the_eye_is_not_standing_in_the_bodywork() -> void:
 	# The failure mode of moving a camera closer without looking: the near plane
 	# is 5 cm, so an eye inside the car renders the inside of the car's box and
 	# the room disappears.
+	await _settle()
 	assert_false(_car_box().has_point(_camera().global_position), "stand beside the car, not in it")
 
 
 func test_the_eye_stays_inside_the_room() -> void:
+	await _settle()
 	var eye: Vector3 = _camera().global_position
 	var ceiling: Node3D = _garage().get_node("View/World/Room/Ceiling") as Node3D
 	var underside: float = ceiling.position.y - ceiling.scale.y * 0.5
@@ -226,11 +260,11 @@ func test_the_anchor_clears_the_near_plane() -> void:
 
 
 func test_the_anchor_clears_the_car() -> void:
-	# The second half. Nothing in the room may come nearer to the lens than the
-	# things hanging off it, and the car is the only candidate — the walls are
-	# metres away. Measured at 0.79 m; the floor below is the budget a held proxy
-	# gets to spend reaching away from the anchor, and the longest tool on the
-	# belt is 0.72 m end to end.
+	# The second half, where the eye starts. Nothing in the room may come nearer
+	# to the lens than the things hanging off it, and the car is the only
+	# candidate — the walls are metres away. That it stays true for a whole walk
+	# is the walk suite's version of this assertion.
+	await _settle()
 	var clearance: float = _clearance(_car_box(), _view_model().global_position)
 	assert_gt(clearance, HELD_REACH, "a held tool must not be able to reach into the car")
 
