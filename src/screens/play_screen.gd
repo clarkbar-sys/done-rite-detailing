@@ -48,16 +48,31 @@
 ## [method Garage.release_aim] when it lifts. Nothing sprays yet. When something
 ## does, it goes on the far end of those two and nothing here changes.
 ##
-## [b]Pointer input is a special case, and the reason is worth knowing before
-## moving any of it.[/b] It arrives in [method Node._unhandled_input] like the
-## keys do, and that only works because this screen's root sets
-## [code]mouse_filter = ignore[/code] in its scene file. A [Control] at its
-## default [code]stop[/code] is the topmost thing under every touch that is not
-## on a button, and it swallows the event whether or not it does anything with
-## it — measured, with a probe node under a real play screen: taps reached
-## nothing at all. Set to ignore, the belt's icons and the pad's arrows still get
-## their own taps first (they are separate controls, and the hit test finds them
-## before it gives up), and everything they do not want falls through to here.
+## [b]Pointer input arrives in [method Control._gui_input] and not in
+## [method Node._unhandled_input], where the keys are, and the difference is
+## worth knowing before moving any of it.[/b] A [Control] at the default
+## [code]stop[/code] filter is the topmost thing under every touch that is not on
+## a button, and the GUI system hands the event to [i]it[/i] rather than letting
+## the event go unhandled. This screen is such a control, so this is where its
+## taps go. The belt's icons and the pad's arrows still get their own taps first
+## — they are separate controls and the hit test finds them before it reaches
+## this one.
+##
+## [b]The way that is wrong, because it was shipped for an hour and looked
+## right.[/b] The obvious alternative is to set this root to
+## [code]mouse_filter = ignore[/code] and read the presses in
+## [method Node._unhandled_input] alongside the keys. Tested against this screen
+## on its own, that works perfectly. In the actual game it does nothing at all:
+## [code]src/main/main.tscn[/code] hangs every screen off a
+## [code]%ScreenHost[/code] which is itself a plain [Control] at
+## [code]stop[/code], so a press that falls through this screen lands in that one
+## and is swallowed a layer lower down. Measured both ways with a probe — under a
+## bare play screen the taps arrive, under the real main scene the control
+## reported under the finger is [code]ScreenHost[/code] and nothing reaches here.
+## Which is also the lesson for the test:
+## [code]tests/integration/test_play_screen_trigger.gd[/code] presses through
+## [code]main.tscn[/code] and not through this scene alone, because a suite that
+## instances the screen by itself cannot see this class of bug.
 ##
 ## [b]Both fingers work, which took the long way round.[/b] The engine emulates a
 ## mouse from touch — that is what makes the belt's [Button]s work on a phone at
@@ -163,8 +178,6 @@ func _process(_delta: float) -> void:
 ## today, but the thing that will be is a pause menu on the same [kbd]Escape[/kbd]
 ## — and it should not also fire on the press that closed the roll-up.
 func _unhandled_input(event: InputEvent) -> void:
-	if _aimed_with(event):
-		return
 	if event.is_action_pressed(TOGGLE_ACTION):
 		_hud.toggle()
 		get_viewport().set_input_as_handled()
@@ -187,8 +200,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## Every way a pointer can arrive, turned into "aim there" or "stop aiming".
-## Returns whether [param event] was one of them, so the keyboard handling above
-## can stop looking.
+##
+## The GUI system's own hook rather than the unhandled-input one the keys use —
+## the class docs above have the measurement that settled which, and why the
+## other way passes its tests and does nothing in the game.
 ##
 ## Four kinds and not one, and the two that look redundant are not: touch and
 ## drag are what a phone sends, and the mouse pair is what a desk sends. The
@@ -197,30 +212,28 @@ func _unhandled_input(event: InputEvent) -> void:
 ## handled and acting on both would make the second finger a stranger. All of
 ## that reasoning is in the class docs.
 ##
-## No [method Viewport.set_input_as_handled] anywhere in here. Nothing else in
-## the game is listening for a pointer, and a screen that consumed every press
-## would be the same mistake as the [code]stop[/code] filter this had to work
-## around in the first place.
-func _aimed_with(event: InputEvent) -> bool:
+## No [method Control.accept_event] anywhere in here. Every branch either aims or
+## ignores the event, and the engine already treats a press on a
+## [code]stop[/code] control as handled — there is nothing left to consume and
+## nothing else in the game listening for a pointer.
+func _gui_input(event: InputEvent) -> void:
 	var touch: InputEventScreenTouch = event as InputEventScreenTouch
 	if touch != null:
 		_finger_moved(touch.index, touch.position, touch.pressed)
-		return true
+		return
 	var dragged: InputEventScreenDrag = event as InputEventScreenDrag
 	if dragged != null:
 		_finger_dragged(dragged.index, dragged.position)
-		return true
+		return
 	if event.device == InputEvent.DEVICE_ID_EMULATION:
-		return false
+		return
 	var click: InputEventMouseButton = event as InputEventMouseButton
 	if click != null and click.button_index == MOUSE_BUTTON_LEFT:
 		_finger_moved(MOUSE_FINGER, click.position, click.pressed)
-		return true
+		return
 	var moved: InputEventMouseMotion = event as InputEventMouseMotion
 	if moved != null:
 		_finger_dragged(MOUSE_FINGER, moved.position)
-		return true
-	return false
 
 
 ## A finger [param index] going down or coming up at [param at].

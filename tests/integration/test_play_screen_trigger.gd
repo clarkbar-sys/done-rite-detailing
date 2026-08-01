@@ -15,9 +15,20 @@
 ## and aiming mutually exclusive — so the screen reads the touch events
 ## themselves and drops the emulated mice. Every test below is a way that could
 ## have gone wrong.
+##
+## [b]This suite presses through [code]main.tscn[/code], and that is the whole
+## point of it.[/b] Every other play-screen suite instances
+## [code]play_screen.tscn[/code] on its own, which is right for asking what the
+## room does with an aim and is exactly wrong for asking whether a press reaches
+## the room at all — a screen hanging off a bare [CanvasLayer] has nothing
+## underneath it, and the game has two full-rect [Control]s underneath it.
+## Measured the hard way: a version of this feature passed a suite of its own
+## while doing nothing whatsoever in the real game, because the press was landing
+## in [code]%ScreenHost[/code] a layer below. So this one boots the real scene and
+## walks in through the title card's Start button, the way a player does.
 extends GutTest
 
-const PLAY_SCREEN: String = "res://src/screens/play_screen.tscn"
+const MAIN: String = "res://src/main/main.tscn"
 
 ## Above GUT's own output layer, so a finger aimed at the game lands on the game
 ## — the same measurement [code]test_play_screen_walk.gd[/code] records at
@@ -38,13 +49,7 @@ const SETTLE_FRAMES: int = 90
 ## for a reason that has nothing to do with the code.
 const RESOLVE_FRAMES: int = 4
 
-## How far above the car's roof to press for a shot that is certainly sky. Three
-## metres up is past the top of the frame's worth of car at every height the eye
-## can be driven to, so the ray misses everything and the nearest-point fallback
-## is what answers.
-const ABOVE_THE_ROOF: float = 3.0
-
-var _screen: GameScreen = null
+var _main: Control = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
 
@@ -56,17 +61,23 @@ func before_each() -> void:
 	var root: Window = get_tree().root
 	_window_size_before = root.size
 	root.size = root.content_scale_size
-	var packed: PackedScene = load(PLAY_SCREEN) as PackedScene
-	assert_not_null(packed, "could not load %s" % PLAY_SCREEN)
+	var packed: PackedScene = load(MAIN) as PackedScene
+	assert_not_null(packed, "could not load %s" % MAIN)
 	if packed == null:
 		return
 	var layer: CanvasLayer = CanvasLayer.new()
 	layer.layer = ABOVE_THE_RUNNER
 	add_child_autofree(layer)
-	var screen: GameScreen = packed.instantiate() as GameScreen
-	_screen = screen
-	layer.add_child(_screen)
-	await wait_process_frames(1)
+	var main: Control = packed.instantiate() as Control
+	_main = main
+	layer.add_child(_main)
+	await wait_process_frames(2)
+	# In through the front door: `main.gd` is the only thing that loads a screen,
+	# so the play screen is whatever Start put under the host rather than
+	# something this test instanced behind the game's back.
+	var title: GameScreen = _host().get_child(0) as GameScreen
+	(title.get_node("%Start") as Button).pressed.emit()
+	await wait_process_frames(2)
 
 
 func after_each() -> void:
@@ -76,8 +87,19 @@ func after_each() -> void:
 	get_tree().root.size = _window_size_before
 
 
+## Where [code]main.gd[/code] puts whichever screen the game is on — and, in this
+## suite, one of the two full-rect controls that would swallow a press if the
+## screen above it stopped claiming its own.
+func _host() -> Control:
+	return _main.get_node("%ScreenHost") as Control
+
+
+func _screen() -> GameScreen:
+	return _host().get_child(0) as GameScreen
+
+
 func _garage() -> Garage:
-	return _screen.get_node("Garage") as Garage
+	return _screen().get_node("Garage") as Garage
 
 
 func _camera() -> Camera3D:
@@ -100,7 +122,7 @@ func _marker() -> AimMarker:
 
 
 func _pad() -> MotionPad:
-	return _screen.get_node("MotionPad") as MotionPad
+	return _screen().get_node("MotionPad") as MotionPad
 
 
 ## Where [param point] in the world lands on the glass. Through the camera's own
@@ -116,10 +138,12 @@ func _at_the_car() -> Vector2:
 	return _on_screen(_car().global_position)
 
 
-## A patch of sky above the roof, on the glass — a press that hits nothing at all
-## and has to be answered by the nearest-point fallback.
-func _at_the_sky() -> Vector2:
-	return _on_screen(_car().global_position + Vector3.UP * ABOVE_THE_ROOF)
+## A different piece of the car, well away from [method _at_the_car] — what a
+## second finger tries to steal the aim with. Somewhere it would visibly move the
+## crosshair to if it succeeded, because a second press that happened to mark the
+## same spot would let the theft through unnoticed.
+func _at_the_bonnet() -> Vector2:
+	return _on_screen(_car().global_position + Vector3(0.0, 0.15, 1.4))
 
 
 ## Puts a finger on the glass at [param at], or takes it off again.
@@ -152,6 +176,47 @@ func _lift() -> void:
 ## settled camera rather than one still arriving.
 func _settle() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
+
+
+# ---- does a press reach the room at all --------------------------------------
+
+
+## The regression test for the bug this whole suite was restructured around: a
+## press in the real scene stack has to reach the room.
+##
+## It reads like a tautology and it is not. The first version of this feature put
+## the press in [method Node._unhandled_input] and set the play screen's root to
+## [code]mouse_filter = ignore[/code] so the event would get there — which works
+## when the screen is the only thing on the layer, and does nothing at all in the
+## game, because [code]main.tscn[/code]'s [code]%ScreenHost[/code] is a plain
+## [Control] at [code]stop[/code] sitting directly underneath and it swallowed
+## every tap. Nothing in a suite that instances the screen by itself can see
+## that. This can.
+func test_a_press_through_the_real_scene_stack_reaches_the_car() -> void:
+	await _settle()
+	assert_false(_marker().is_marking(), "nothing is marked before the press")
+	await _press(_at_the_car())
+	assert_true(
+		_marker().is_marking(),
+		(
+			"a press on the car marked nothing — something between the finger and the "
+			+ (
+				"room is eating it. Under the finger: %s"
+				% [get_tree().root.gui_get_hovered_control()]
+			)
+		)
+	)
+
+
+## And the other half of it: the control that used to eat the press is still
+## there, still full-rect, and still underneath. If somebody sets it to ignore
+## the test above would pass for the wrong reason.
+func test_the_screen_host_underneath_still_stops_what_it_is_handed() -> void:
+	assert_eq(
+		_host().mouse_filter,
+		Control.MOUSE_FILTER_STOP,
+		"the host still claims presses, so the screen above it has to claim its own"
+	)
 
 
 # ---- whose finger was it -----------------------------------------------------
@@ -193,7 +258,7 @@ func test_a_second_finger_does_not_steal_the_aim() -> void:
 	var first: Vector3 = _marker().marked_point()
 	var second: InputEventScreenTouch = InputEventScreenTouch.new()
 	second.index = 1
-	second.position = _at_the_sky()
+	second.position = _at_the_bonnet()
 	second.pressed = true
 	Input.parse_input_event(second)
 	Input.flush_buffered_events()

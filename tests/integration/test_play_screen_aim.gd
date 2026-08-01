@@ -49,11 +49,23 @@ const SWING_FRAMES: int = 30
 ## number [code]test_play_screen.gd[/code] and the walk suite hold the shot to.
 const HELD_REACH: float = 0.45
 
-## How far above the car's roof to press for a shot that is certainly sky. Three
-## metres up is past the top of the frame's worth of car at every height the eye
-## can be driven to, so the ray misses everything and the nearest-point fallback
-## is what answers.
-const ABOVE_THE_ROOF: float = 3.0
+## How far above the car's own silhouette to press for a shot that is certainly
+## sky, in pixels on the glass.
+##
+## [b]Measured up the screen and not up the world, which was the second attempt
+## at this.[/b] The first was "three metres above the roof", and three metres
+## above the roof is off the top of the picture: the eye stands 2.2 m off the
+## paint looking at the middle of the car, and a 16:9 frame at a 75° lens only
+## has about 23° of headroom, which is a shade over a metre of sky above the
+## roofline at that range. A press off the top of the screen is not a press at
+## all — it lands outside the control and never becomes an event — so those tests
+## were passing a nothing through the whole machine and asserting on the result.
+##
+## Sixty pixels above wherever the car's box actually projects is on the glass by
+## construction, tracks the camera when it moves, and is far enough above the
+## bodywork that only the nearest-point fallback can answer it. Asserted, in
+## [method _at_the_sky], rather than trusted.
+const SKY_MARGIN: float = 60.0
 
 var _screen: GameScreen = null
 var _window_size_before: Vector2i = Vector2i.ZERO
@@ -150,8 +162,20 @@ func _at_the_car() -> Vector2:
 
 ## A patch of sky above the roof, on the glass — a press that hits nothing at all
 ## and has to be answered by the nearest-point fallback.
+##
+## Derived from where the top of the car actually lands on the glass, then lifted
+## [constant SKY_MARGIN] px clear of it, and the result is asserted to be on the
+## picture. Without that assertion this silently stops testing anything the day
+## the shot changes, which is exactly what it did once already.
 func _at_the_sky() -> Vector2:
-	return _on_screen(_car().global_position + Vector3.UP * ABOVE_THE_ROOF)
+	var box: AABB = _car_box()
+	var roofline: Vector3 = Vector3(_car().global_position.x, box.end.y, _car().global_position.z)
+	var sky: Vector2 = _on_screen(roofline) - Vector2(0.0, SKY_MARGIN)
+	assert_true(
+		Rect2(Vector2.ZERO, Vector2(_view().size)).has_point(sky),
+		"the sky press at %v is off the picture and would not be a press at all" % sky
+	)
+	return sky
 
 
 ## Puts a finger on the glass at [param at], or takes it off again.
