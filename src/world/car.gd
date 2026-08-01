@@ -14,7 +14,7 @@
 ##
 ## The first is that collision is generated per panel. [member
 ## CSGShape3D.use_collision] only builds a body on the root of a CSG tree, so
-## one combiner is one collider for the whole car; thirteen roots are thirteen
+## one combiner is one collider for the whole car; twelve roots are twelve
 ## colliders, and [method PhysicsDirectSpaceState3D.intersect_ray] hands back
 ## the [CSGCombiner3D] itself as [code]collider[/code]. A tool pointed at the
 ## bonnet gets [code]"Hood"[/code] back, not "the car" — which is the difference

@@ -95,7 +95,7 @@ func _view_model() -> Node3D:
 ## The car's bounding box in world space — read off the car rather than written
 ## down again here, so it keeps meaning "the car" after somebody reshapes it.
 ##
-## [Car.bounds] rather than an [AABB] off a mesh, because the car is thirteen
+## [Car.bounds] rather than an [AABB] off a mesh, because the car is twelve
 ## CSG panels now and there is no one visual instance left to ask. It is wider
 ## than the bodywork by the reach of the wing mirrors, which only makes every
 ## clearance below more conservative.
@@ -117,12 +117,11 @@ func _clearance(box: AABB, point: Vector3) -> float:
 	return gap.length()
 
 
-## How far the middle of the room is from the inside face of a side wall, read
-## off the wall itself. The walls are unit boxes scaled into place, so half the
-## scale is half the thickness.
-func _inner_half_width() -> float:
-	var wall: Node3D = _garage().get_node("View/World/Room/WallLeft") as Node3D
-	return absf(wall.position.x) - wall.scale.x * 0.5
+## How far the car is from the outer edge of the modeled ground, read off the
+## grass itself.
+func _ground_half_width() -> float:
+	var grass: Node3D = _garage().get_node("View/World/Ground/GrassRight") as Node3D
+	return grass.position.x + grass.scale.x * 0.5
 
 
 ## How far the eye stands from the middle of the car, measured flat on the floor.
@@ -164,7 +163,7 @@ func test_the_showcase_orbit_has_stopped() -> void:
 	assert_false(_garage().orbiting, "the game is not a screensaver")
 
 
-# ---- the shot: a person in the bay, not the showcase rig stopped mid-circle ---
+# ---- the shot: a person on the driveway, not the showcase rig stopped mid-circle
 
 
 func test_the_shot_is_first_person() -> void:
@@ -217,10 +216,7 @@ func test_the_eye_is_not_standing_in_the_bodywork() -> void:
 func test_the_eye_stays_inside_the_room() -> void:
 	await _settle()
 	var eye: Vector3 = _camera().global_position
-	var ceiling: Node3D = _garage().get_node("View/World/Room/Ceiling") as Node3D
-	var underside: float = ceiling.position.y - ceiling.scale.y * 0.5
-	assert_lt(absf(eye.x), _inner_half_width(), "the eye must be inside the side walls")
-	assert_lt(eye.y, underside, "the eye must be under the roof")
+	assert_lt(absf(eye.x), _ground_half_width(), "the eye must be over the modeled ground")
 	assert_gt(eye.y, 0.0, "and above the floor")
 
 

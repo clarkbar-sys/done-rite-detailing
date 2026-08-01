@@ -55,7 +55,7 @@ func _camera() -> Camera3D:
 
 
 ## The car's bounding box in world space. [Car.bounds] rather than an [AABB] off
-## a mesh: the car is thirteen CSG panels now, and it is wider than the bodywork
+## a mesh: the car is twelve CSG panels now, and it is wider than the bodywork
 ## by the reach of the wing mirrors — which only makes the clearances below more
 ## conservative.
 func _car_box() -> AABB:
@@ -288,16 +288,15 @@ func test_no_proxy_reaches_into_the_car() -> void:
 			assert_false(car.has_point(corner), "%s reaches into the car" % tool.display_name)
 
 
-func test_no_proxy_leaves_the_room() -> void:
-	# The other geometry that could swallow a held tool. Read off the walls rather
-	# than written down again, so it keeps meaning "the room" if the room changes.
-	var wall: Node3D = _garage.get_node("View/World/Room/WallLeft") as Node3D
-	var half_width: float = absf(wall.position.x) - wall.scale.x * 0.5
-	var ceiling: Node3D = _garage.get_node("View/World/Room/Ceiling") as Node3D
-	var underside: float = ceiling.position.y - ceiling.scale.y * 0.5
+func test_no_proxy_leaves_the_ground() -> void:
+	# The other geometry that could swallow a held tool. Read off the grass rather
+	# than written down again, so it keeps meaning "the ground" if the ground
+	# changes.
+	var grass: Node3D = _garage.get_node("View/World/Ground/GrassRight") as Node3D
+	var half_width: float = grass.position.x + grass.scale.x * 0.5
 	for tool: DetailingTool in DetailingTool.catalogue():
 		for corner: Vector3 in _world_corners(_view_model().proxy_for(tool.id)):
-			assert_lt(absf(corner.x), half_width, "%s is in a wall" % tool.display_name)
-			assert_between(
-				corner.y, 0.0, underside, "%s is in the floor or the roof" % tool.display_name
+			assert_lt(
+				absf(corner.x), half_width, "%s is off the edge of the ground" % tool.display_name
 			)
+			assert_gt(corner.y, 0.0, "%s is in the floor" % tool.display_name)

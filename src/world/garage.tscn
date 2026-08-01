@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://src/world/garage.gd" id="1_garage"]
 [ext_resource type="Script" path="res://src/world/view_model.gd" id="2_view_model"]
@@ -11,18 +11,13 @@ size = Vector3(1, 1, 1)
 albedo_color = Color(0.29, 0.3, 0.33, 1)
 roughness = 0.7
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wall"]
-albedo_color = Color(0.62, 0.63, 0.66, 1)
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grass"]
+albedo_color = Color(0.22, 0.55, 0.16, 1)
 roughness = 0.95
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_toolbox"]
-albedo_color = Color(0.78, 0.13, 0.13, 1)
-metallic = 0.2
-roughness = 0.45
 
 [sub_resource type="Environment" id="Environment_bay"]
 background_mode = 1
-background_color = Color(0.04, 0.05, 0.07, 1)
+background_color = Color(0.53, 0.81, 0.92, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.48, 0.5, 0.56, 1)
 ambient_light_energy = 0.9
@@ -65,59 +60,22 @@ light_color = Color(1, 0.96, 0.89, 1)
 light_energy = 2.2
 omni_range = 16.0
 
-[node name="Room" type="Node3D" parent="View/World"]
+[node name="Ground" type="Node3D" parent="View/World"]
 
-[node name="Floor" type="MeshInstance3D" parent="View/World/Room"]
-transform = Transform3D(12.4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, 0, -0.1, 0)
+[node name="Driveway" type="MeshInstance3D" parent="View/World/Ground"]
+transform = Transform3D(4.4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, 0, -0.1, 0)
 mesh = SubResource("BoxMesh_unit")
 material_override = SubResource("StandardMaterial3D_floor")
 
-[node name="Ceiling" type="MeshInstance3D" parent="View/World/Room"]
-transform = Transform3D(12.4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, 0, 4.6, 0)
+[node name="GrassLeft" type="MeshInstance3D" parent="View/World/Ground"]
+transform = Transform3D(4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, -4.2, -0.1, 0)
 mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_wall")
+material_override = SubResource("StandardMaterial3D_grass")
 
-[node name="WallBack" type="MeshInstance3D" parent="View/World/Room"]
-transform = Transform3D(12.4, 0, 0, 0, 4.5, 0, 0, 0, 0.2, 0, 2.25, -6.6)
+[node name="GrassRight" type="MeshInstance3D" parent="View/World/Ground"]
+transform = Transform3D(4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, 4.2, -0.1, 0)
 mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_wall")
-
-[node name="WallFront" type="MeshInstance3D" parent="View/World/Room"]
-transform = Transform3D(12.4, 0, 0, 0, 4.5, 0, 0, 0, 0.2, 0, 2.25, 6.6)
-mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_wall")
-
-[node name="WallLeft" type="MeshInstance3D" parent="View/World/Room"]
-transform = Transform3D(0.2, 0, 0, 0, 4.5, 0, 0, 0, 13.4, -6.1, 2.25, 0)
-mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_wall")
-
-[node name="WallRight" type="MeshInstance3D" parent="View/World/Room"]
-transform = Transform3D(0.2, 0, 0, 0, 4.5, 0, 0, 0, 13.4, 6.1, 2.25, 0)
-mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_wall")
-
-[node name="Toolboxes" type="Node3D" parent="View/World"]
-
-[node name="LockerLeft" type="MeshInstance3D" parent="View/World/Toolboxes"]
-transform = Transform3D(1.1, 0, 0, 0, 2.1, 0, 0, 0, 0.6, -3.8, 1.05, -6.1)
-mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_toolbox")
-
-[node name="LockerRight" type="MeshInstance3D" parent="View/World/Toolboxes"]
-transform = Transform3D(1.1, 0, 0, 0, 2.1, 0, 0, 0, 0.6, -2.6, 1.05, -6.1)
-mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_toolbox")
-
-[node name="Bench" type="MeshInstance3D" parent="View/World/Toolboxes"]
-transform = Transform3D(2.8, 0, 0, 0, 1, 0, 0, 0, 0.7, 2, 0.5, -6.05)
-mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_toolbox")
-
-[node name="Chest" type="MeshInstance3D" parent="View/World/Toolboxes"]
-transform = Transform3D(0.9, 0, 0, 0, 1.6, 0, 0, 0, 0.6, 3.9, 0.8, -6.1)
-mesh = SubResource("BoxMesh_unit")
-material_override = SubResource("StandardMaterial3D_toolbox")
+material_override = SubResource("StandardMaterial3D_grass")
 
 [node name="Car" parent="View/World" instance=ExtResource("3_car")]
 unique_name_in_owner = true
