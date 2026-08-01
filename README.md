@@ -18,7 +18,10 @@ WASD — and a **T** in the opposite corner rolls out the five tools you carry.
 Press anywhere on the car and the tool in your hand swings to point at it,
 with a red crosshair on the paint where it lands; press past the car and the
 crosshair snaps to the nearest bodywork instead. Holding is aiming, letting go
-is not. There is nothing to clean yet: the room is boxes and the car is a green
+is not. On a touchscreen the aim is taken a thumb's width above your finger
+rather than under it — the one part of a phone you cannot see is the part you
+are touching — so the mark stays in view while you drag it around the paint. A
+mouse aims at the pointer, because a cursor hides nothing. There is nothing to clean yet: the room is boxes and the car is a green
 one, and the crosshair is as far as the trigger goes. Gameplay comes next; see
 the [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.

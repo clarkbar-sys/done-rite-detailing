@@ -14,6 +14,14 @@
 ## the mark lands on it, and whether the tool that swings to meet it stays out of
 ## the paint.
 ##
+## [b]The offset between the finger and the aim is not this suite's[/b] either —
+## it is [code]tests/integration/test_play_screen_thumb.gd[/code]'s. What it is
+## here is a fact every press below has to survive: a touch aims a thumb's width
+## above where it lands, so [method _press] takes the point the test wants to aim
+## at and works back to the finger that would ask for it. That is the whole of
+## this suite's dealings with [ThumbLift], and it is what let the offset land
+## without changing a single assertion in the file.
+##
 ## [b]Everything waits on the physics clock[/b], because that is where
 ## [method Garage._resolve_aim] casts its ray. A test that pressed and asserted
 ## in the same frame would be asserting against the tick before the press.
@@ -192,9 +200,52 @@ func _touch(at: Vector2, pressed: bool) -> void:
 	Input.flush_buffered_events()
 
 
-## Presses at [param at] and waits for the room to have answered.
+## [constant ThumbLift.REFERENCE_PX] in this window's design pixels, read the same
+## way the screen reads it rather than written down — [code]before_each[/code]
+## sizes the window to the design resolution, which makes this 80 today, and a
+## copy of 80 here would stop being true the moment that changed.
+func _lift_px() -> float:
+	return ThumbLift.design_lift(
+		get_tree().root.get_final_transform().get_scale().y, DisplayServer.screen_get_scale()
+	)
+
+
+## Where a thumb has to be to aim at [param aim].
+##
+## [b]Every press below goes through here, which is what keeps the rest of this
+## suite about aiming rather than about the offset.[/b] The helpers above answer
+## "where is the car on the glass"; the touch that asks about it is a thumb's
+## width lower down, and threading that through one function means adding the
+## lift did not change a single assertion in the file.
+##
+## The inverse of [method ThumbLift.raised], both branches of it: a straight
+## subtraction outside the strip at the top of the glass, and the parabola's own
+## inverse inside it. Asserted rather than trusted — the round trip has to come
+## back to the aim that was asked for.
+func _thumb_for(aim: Vector2) -> Vector2:
+	var lift: float = _lift_px()
+	var down: float = aim.y + lift
+	if aim.y < lift:
+		down = sqrt(4.0 * lift * maxf(aim.y, 0.0))
+	var thumb: Vector2 = Vector2(aim.x, down)
+	assert_almost_eq(
+		ThumbLift.aim_from(thumb, lift).y, maxf(aim.y, 0.0), 0.01, "a thumb at %v aims back" % thumb
+	)
+	assert_true(
+		Rect2(Vector2.ZERO, Vector2(_view().size)).has_point(thumb),
+		(
+			"the thumb for %v is at %v, which is off the picture and would not be a press"
+			% [aim, thumb]
+		)
+	)
+	return thumb
+
+
+## Presses so that the aim lands at [param at], and waits for the room to have
+## answered. The finger itself goes a thumb's width below it — see
+## [method _thumb_for].
 func _press(at: Vector2) -> void:
-	_touch(at, true)
+	_touch(_thumb_for(at), true)
 	await wait_physics_frames(RESOLVE_FRAMES)
 
 
