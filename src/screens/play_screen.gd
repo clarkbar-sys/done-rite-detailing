@@ -97,6 +97,14 @@
 ## it invented. Mouse events that are not emulated are somebody at a desk, and
 ## they are handled too.
 ##
+## [b]And the fourth loop is the bell[/b], which is the same shape read
+## backwards. The room says a patch of the car came clean ([signal Grime.patch_cleared]),
+## this file turns that into "ring the small one", and the host's [Chime] is what
+## actually makes the noise. The room has never heard of a speaker and this file
+## has never heard of an [AudioStreamPlayer] — what crosses is a [enum Bell.Voice]
+## and nothing else, and it goes up to the host rather than sideways because a
+## screen is freed the moment it asks for the next state.
+##
 ## The eye walks a rail around the car and cannot look away from it, and that is
 ## a decision rather than an omission: turning your head brings a look control
 ## the phone has no thumb spare for, and walking anywhere else brings a character
@@ -356,7 +364,24 @@ func _on_aimed(panel: String) -> void:
 ## exist for a frame after the room does — [method Garage._lay_on_the_grime] has
 ## why — and a view that bound early would draw an empty grid for the whole game.
 func _on_grimed() -> void:
-	_masks.bind(_garage.grime())
+	var grime: Grime = _garage.grime()
+	_masks.bind(grime)
+	# Bound here rather than in `_ready()` for the same reason the masks are: the
+	# grime does not exist until this fires, so there is nothing to listen to
+	# before it.
+	grime.patch_cleared.connect(_on_patch_cleared)
+
+
+## A bit of the car came clean, so the player hears about it.
+##
+## Neither the panel nor the patch is used, and that is the point rather than an
+## oversight — the bell says "that worked", and which texel it was is the
+## crosshair's job to have already made obvious. What stops a sweep of the jet
+## from being a hundred bells is [Chime], which drops any ding landing inside the
+## last one: the rule about how often a sound is worth making belongs with the
+## thing making it, not with every place that asks.
+func _on_patch_cleared(_panel: String, _patch: int) -> void:
+	ring_bell(Bell.Voice.PATCH)
 
 
 ## A tool picked out of the roll-up.

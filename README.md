@@ -32,7 +32,17 @@ passenger's door filthy; the mud *pattern* over it is sampled triplanar, which
 is the half of that job blending is safe for. Press **G** for the twelve masks
 themselves, which is how you tell a projection bug from a raycast one. Only the
 power wash does anything so far — the sponge, the cloth and the two sprays have
-their channels allocated and nothing to write to them yet. The room is still
+their channels allocated and nothing to write to them yet.
+
+And you can hear it now. Start rings a counter bell, and every patch that comes
+clean under the jet rings a smaller one — so a sweep that finishes three of them
+is three dings rather than a texture quietly changing colour. Both are struck
+bells built out of arithmetic at startup rather than recordings in the repo:
+the pitch, the length and the decay are numbers in
+[`src/core/bell.gd`](./src/core/bell.gd), so retuning the ding is a diff instead
+of a re-recording. The bell on Start is also the press a mobile browser unlocks
+audio on, which is why the game is deliberately silent until you touch it. The
+room is still
 boxes and the car is still a green one under all that; see the
 [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.
@@ -116,6 +126,7 @@ export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make
 src/core/              cross-cutting code (shared helpers, game states, process-global facts)
 src/main/              the entry scene — owns the state machine and swaps screens
 src/screens/           one scene per game state, all of them a `GameScreen`
+src/ui/                what the screens draw and play — HUD pieces, and the bell
 src/world/             the places the game happens in, instanced by the screens that show them
 tests/unit/            tests for pure logic — no scene tree
 tests/integration/     tests that need a scene tree
