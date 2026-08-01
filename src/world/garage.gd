@@ -37,6 +37,35 @@
 ## and differ in nothing but the values below, so the room still has no idea
 ## which one it is in.
 ##
+## [b]And that standing eye can now walk.[/b] [member walkaround] hands the
+## circle the standing shot was cut out of back to the player: left and right on
+## the HUD's pad walk you around the car, up and down raise and lower your eye.
+## It is deliberately a rail and not a character — there is no body, no collision
+## against the room, and no way to face away from the car — because the target is
+## a web page on a phone, where there is no mouse to capture and a virtual stick
+## costs a thumb the player needs for the tool belt. Circling the thing you are
+## working on is what a detailer physically does anyway, so the rail is close to
+## free.
+##
+## [b]The rail is not a circle, though, and that is the interesting half.[/b] The
+## car is 4.3 m long and 1.9 m wide, so one fixed radius is either scraping the
+## doors or standing a metre and a half off the bumper. What is held instead is
+## the gap between the eye and the bodywork: every physics frame a ray goes out
+## level toward the middle of the car, and [Standoff] eases the radius until the
+## paint is [member standoff_metres] away square on. The camera hugs the
+## car's outline rather than a circle drawn around it, and the day the green box
+## becomes a real car with wing mirrors, the ray finds those too — nothing here
+## says "box" anywhere.
+##
+## [b]Which is why the car grew a [StaticBody3D].[/b] It is the only thing in the
+## room a ray can hit, and it is a sibling of the mesh with its own unscaled
+## transform rather than a child of it: everything in this room is a unit
+## [BoxMesh] scaled into place, a [CollisionShape3D] inherits that scale, and a
+## non-uniformly scaled shape is the one thing the physics server asks not to be
+## handed. The cost is the car's size written down twice, and
+## [code]tests/integration/test_garage.gd[/code] asserts the two still agree
+## rather than trusting whoever resizes the car next to remember.
+##
 ## [b]The viewmodel hangs off this camera, and is kept inside the near plane
 ## rather than given a camera of its own.[/b] A mesh parented to a camera punches
 ## through the world the moment the world comes closer to the lens than the mesh
@@ -53,18 +82,29 @@
 ## script copying the eye transform across every frame. Four new moving parts,
 ## for a camera that is bolted to the floor.
 ##
-## [i]Why it isn't needed yet.[/i] The eye is parked — walking and mouselook are
-## deliberately a later epic — so the clearance is a fixed number rather than a
-## hope, and it was measured rather than hoped at: with the eye at
-## [member eye_position], the anchor stands 0.79 m clear of the car's box, which
-## is the nearest thing in the room to it by a wide margin (the walls are metres
-## away), and 0.50 m in front of a 0.05 m near plane. Held proxies eat into that:
-## the longest of them, the power wash wand, still finishes 0.50 m clear of the
-## car. All of it is asserted against the car's own bounding box — the anchor in
-## [code]tests/integration/test_play_screen.gd[/code], every proxy corner in
-## [code]tests/integration/test_view_model.gd[/code] — so the day the eye learns
-## to walk, those go red and the second viewport gets built then, with something
-## real to look at rather than as insurance against a camera that cannot move.
+## [i]Why it isn't needed yet.[/i] Because the eye is kept far enough from the
+## car that nothing in the room can get between it and the lens, and that is a
+## measurement rather than a hope. Parked at [member eye_position] the anchor
+## stands 0.79 m clear of the car's box — the nearest thing in the room to it by
+## a wide margin, since the walls are metres away — and 0.50 m in front of a
+## 0.05 m near plane; the longest held proxy, the power wash wand, still finishes
+## 0.50 m clear of the car.
+##
+## [i]And the eye has since learned to walk[/i], which is what the previous
+## version of this paragraph said would end it. It didn't, and the reason is
+## worth writing down rather than being pleased about: a walk at the parked
+## distance really does fail — 0.31 m of anchor clearance against a 0.45 m reach,
+## measured, at the corner where the hand swings across the bodywork — and what
+## fixed it was [member standoff_metres] standing the walk further off the car
+## than the parked shot ever stood. So the clearance is still a number and not a
+## hope, it is just a number the standoff now keeps rather than the scene file.
+## All of it is asserted against the car's own bounding box: the parked anchor in
+## [code]tests/integration/test_play_screen.gd[/code], every angle of a lap in
+## [code]tests/integration/test_play_screen_walk.gd[/code], and every proxy
+## corner in [code]tests/integration/test_view_model.gd[/code]. The day something
+## needs the eye nearer the paint than a held tool is long, those go red and the
+## second viewport gets built then — with something real to look at rather than
+## as insurance against a camera that cannot move.
 class_name Garage
 extends SubViewportContainer
 
@@ -95,6 +135,11 @@ extends SubViewportContainer
 ## How fast the camera circles. 12°/s is a full turn every thirty seconds —
 ## slow enough to sit behind a title screen without pulling the eye off the
 ## button.
+##
+## Only the unattended circuit's speed. What a player's thumb is worth is
+## [member turn_degrees_per_second], and the two are separate numbers because
+## they are answers to different questions: one is how fast a title card should
+## drift, the other is how fast a person walks.
 @export var orbit_degrees_per_second: float = 12.0
 
 ## Whether the camera is a person standing in the bay rather than a showcase
@@ -123,7 +168,77 @@ extends SubViewportContainer
 ## looks at the car, the same way the orbit does.
 @export var eye_position: Vector3 = Vector3(1.9, 1.7, 1.7)
 
+## Whether the player can walk that eye around the car. Ignored unless
+## [member first_person] is set — there is nobody to walk otherwise, and the
+## title screen's showcase circuit is not a thing anybody should be able to grab
+## the wheel of.
+##
+## Off by default for the same reason [member first_person] is: the room's own
+## job is the shot behind the title card, and the game turns the rest on.
+@export var walkaround: bool = false
+
+## How fast holding left or right walks the eye around the car, in degrees per
+## second. At the radius the standoff settles on, 40°/s is about 1.6 m/s along
+## the paint — a walk with somewhere to be, which is right for a control you have
+## to hold down. Slower reads as a stuck button.
+@export var turn_degrees_per_second: float = 40.0
+
+## How fast holding up or down moves the eye, in metres per second. The whole
+## range below is a shade over a second and a half at this rate; the point of the
+## axis is to get an eye onto a roof or down to a sill, not to fly.
+@export var lift_metres_per_second: float = 0.9
+
+## The lowest the eye may be driven, in metres above the floor. Crouched at a
+## wheel arch rather than lying under the car — there is nothing under there to
+## look at yet, and a camera below the floor renders the room from outside it.
+@export var eye_height_min: float = 1.1
+
+## The highest the eye may be driven. Above the car's 1.4 m roof by a metre, so
+## the roof and the bonnet can be looked down at, and a long way under the 4.5 m
+## ceiling. Not a matter of taste: past about here the ray below starts measuring
+## to the roof rather than to a flank, and the eye leans in over the car instead
+## of standing beside it.
+@export var eye_height_max: float = 2.4
+
+## How much clear air to keep between the eye and the nearest bodywork, in
+## metres, measured square on to the panel and level with the floor.
+##
+## A long way back from the 0.95 m the parked stance stands at
+## ([member eye_position]), and the number came out of a browser rather than out
+## of a spreadsheet. At the parked distance a 75° lens sees 1.84 m of frame, and
+## the car is 1.9 m wide: walking around it at that range is a wall of green
+## sliding sideways, with no way to tell a door from a wing. Screenshotted, on an
+## emulated Pixel 7, which is where this got settled. At 2.2 m the frame is
+## 3.4 m, the corner of the car and the room behind it are both in shot, and the
+## movement reads as movement.
+##
+## It also buys the room the [ViewModel] needs. The tool in the player's hand
+## hangs 0.45 m in front of the lens and swings across the bodywork as the eye
+## comes round a corner; the parked distance puts it inside the car there —
+## measured, at 0.31 m of clearance against a 0.45 m reach.
+## [code]tests/integration/test_play_screen_walk.gd[/code] holds that margin at
+## every angle of a lap rather than at the one the scene starts on.
+@export var standoff_metres: float = 2.2
+
+## How fast the standoff is allowed to correct the radius, in metres per second.
+## Slow enough to read as the camera easing around the corner of a bumper;
+## snapping to the answer instead would yank the shot every time the ray crossed
+## an edge of the bodywork.
+@export var standoff_correction_speed: float = 1.5
+
+## The tightest the standoff may pull the orbit in.
+##
+## A backstop for a ray that hit nothing sensible, and not the thing that keeps
+## the eye out of the paint — that is [member standoff_metres], which settles the
+## radius at 3.15 m alongside the car and 4.35 m off its nose, both a long way
+## clear of this. Set below either, because a fence that binds during normal play
+## would quietly stop the camera hugging the car at exactly the angles the whole
+## mechanism exists for.
+@export var standoff_radius_min: float = 1.6
+
 var _orbit: CameraOrbit = null
+var _drive: OrbitDrive = null
+var _standoff: Standoff = null
 
 @onready var _camera: Camera3D = %Camera
 @onready var _car: Node3D = %Car
@@ -153,6 +268,8 @@ func _ready() -> void:
 	_view_model.visible = first_person
 	if first_person:
 		_stand()
+		if walkaround:
+			_take_up_the_walk()
 		return
 	_orbit = CameraOrbit.new(orbit_radius, orbit_height, orbit_degrees_per_second)
 	_orbit.angle_degrees = start_angle_degrees
@@ -166,10 +283,42 @@ func _process(delta: float) -> void:
 	# `_orbit` is null in first person — there is no circle to advance — so the
 	# null check is the mode test and `orbiting` is only asked about afterwards.
 	# Checking `orbiting` alone would crash a screen that set both.
-	if _orbit == null or not orbiting:
+	#
+	# A walk owns its circle outright, and drives it on the physics clock below
+	# where the ray it measures with is allowed to be cast. So this is the
+	# unattended circuit and nothing else.
+	if _orbit == null or _drive != null or not orbiting:
 		return
 	_orbit.advance(delta)
 	_aim()
+
+
+## The walk, on the physics clock rather than the frame clock.
+##
+## Not a preference: [method _hold_the_standoff] casts a ray, and a space state
+## may only be queried while physics is stepping. Doing the movement here as well
+## keeps the whole camera in one place per tick — a camera moved on one clock and
+## measured on the other is a camera that measures where it used to be.
+func _physics_process(delta: float) -> void:
+	if _drive == null:
+		return
+	_drive.drive(_orbit, delta)
+	_hold_the_standoff(delta)
+	_aim()
+
+
+## Takes the player's intent — [param turn] to walk around the car,
+## [param lift] to raise or lower the eye, both in [code]-1..1[/code] — and does
+## nothing at all if this room is not one anybody can walk in.
+##
+## The room takes the numbers and not the buttons. What is on screen is the play
+## screen's business (a pad today, a stick or a swipe later), and none of that
+## should be able to reach in here; what arrives is "walk right", which is the
+## only part the camera has an opinion about.
+func steer(turn: float, lift: float) -> void:
+	if _drive == null:
+		return
+	_drive.steer(turn, lift)
 
 
 ## The hands the eye is looking past, and through them the [ToolBelt] driving
@@ -201,6 +350,83 @@ func _aim() -> void:
 func _stand() -> void:
 	_camera.global_position = eye_position
 	_face_car()
+
+
+## Turns where the player is standing into a circle they can walk around.
+##
+## [b]Derived from [member eye_position] rather than exported again.[/b] The
+## angle, the radius and the height all fall out of where the standing shot
+## already put the eye, so [method _stand] above has just placed the camera on
+## the first point of this circle and the walk starts from exactly there. A
+## second set of numbers would be a second answer to "where does the player begin"
+## and the two would drift the first time anybody retuned the shot.
+##
+## The height fences arrive here as heights above the [i]car[/i], because that is
+## what [member CameraOrbit.height] measures, while the exports are heights above
+## the floor — which is what a person tuning "how low can you crouch" is actually
+## thinking about.
+func _take_up_the_walk() -> void:
+	var focus: Vector3 = _car.global_position
+	var offset: Vector3 = eye_position - focus
+	var flat: Vector2 = Vector2(offset.x, offset.z)
+	_orbit = CameraOrbit.new(flat.length(), offset.y, 0.0)
+	# `atan2(x, z)` and not the usual `(y, x)`: this orbit measures its angle from
+	# +Z toward +X (see [method CameraOrbit.eye]), so the arguments swap.
+	_orbit.angle_degrees = rad_to_deg(atan2(offset.x, offset.z))
+	_drive = OrbitDrive.new(
+		turn_degrees_per_second,
+		lift_metres_per_second,
+		eye_height_min - focus.y,
+		eye_height_max - focus.y
+	)
+	# The far fence is the showcase circuit's own radius, which is already the
+	# number that keeps a camera out of the walls of this room. One fence, stated
+	# once, and a room that is made bigger moves both at the same time.
+	_standoff = Standoff.new(
+		standoff_metres, standoff_radius_min, orbit_radius, standoff_correction_speed
+	)
+
+
+## Measures how far the car actually is and lets [Standoff] close the gap.
+##
+## [b]The ray is cast level, from the eye's spot on the floor raised to the
+## middle of the car, and not from the eye itself.[/b] That is the whole trick,
+## and both of the obvious alternatives were tried and are worse:
+##
+## - [i]Straight ahead from the eye[/i] misses the car outright from any height
+##   above its 1.4 m roof — which is a standing adult — so the standoff would do
+##   nothing at exactly the height the game is played at.
+## - [i]From the eye, aimed down at the middle of the car[/i] always hits, but
+##   what it hits depends on how tall you are: measured at 1.7 m the ray finds a
+##   flank, and ten centimetres higher it finds the roof instead. The gap then
+##   stops being a horizontal distance the radius can do anything about, and the
+##   camera drifts in over the bonnet as the player raises their eye.
+##
+## A level ray at the car's own mid-height cannot do either. It hits a vertical
+## face every time, from every height, so how far you are standing from the car
+## stops depending on how tall you are — which is also true of people.
+##
+## [b]And the gap is measured along the panel's own normal[/b], not as the length
+## of the ray. Down at a corner the ray runs in diagonally and its length
+## overstates the clearance by half again, so a camera holding the ray's length
+## constant would cut the corners of the car. Projecting onto the normal makes
+## the path the car's outline pushed out by [member standoff_metres] — which is
+## the line somebody walking round a car actually takes.
+##
+## A ray that hits nothing leaves the radius alone. That is the honest answer to
+## having no measurement — the alternative is inventing one, and inventing one
+## moves the camera on the strength of a query that failed.
+func _hold_the_standoff(delta: float) -> void:
+	var focus: Vector3 = _car.global_position
+	var eye: Vector3 = _orbit.eye(focus)
+	var probe: Vector3 = Vector3(eye.x, focus.y, eye.z)
+	var space: PhysicsDirectSpaceState3D = _camera.get_world_3d().direct_space_state
+	var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(probe, focus))
+	if hit.is_empty():
+		return
+	var surface: Vector3 = hit["position"]
+	var outward: Vector3 = hit["normal"]
+	_orbit.radius = _standoff.correct(_orbit.radius, (probe - surface).dot(outward), delta)
 
 
 ## Turns the camera onto the car.

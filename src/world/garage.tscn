@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://src/world/garage.gd" id="1_garage"]
 [ext_resource type="Script" path="res://src/world/view_model.gd" id="2_view_model"]
@@ -22,6 +22,9 @@ roughness = 0.45
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_car"]
 albedo_color = Color(0.13, 0.66, 0.27, 1)
 roughness = 0.55
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_car"]
+size = Vector3(1.9, 1.4, 4.3)
 
 [sub_resource type="Environment" id="Environment_bay"]
 background_mode = 1
@@ -127,6 +130,13 @@ unique_name_in_owner = true
 transform = Transform3D(1.9, 0, 0, 0, 1.4, 0, 0, 0, 4.3, 0, 0.7, 0)
 mesh = SubResource("BoxMesh_unit")
 material_override = SubResource("StandardMaterial3D_car")
+
+[node name="CarBody" type="StaticBody3D" parent="View/World"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="View/World/CarBody"]
+shape = SubResource("BoxShape3D_car")
 
 [node name="Camera" type="Camera3D" parent="View/World"]
 unique_name_in_owner = true
