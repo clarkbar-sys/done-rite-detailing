@@ -34,14 +34,6 @@ theme_override_font_sizes/font_size = 72
 text = "Done Rite Detailing"
 horizontal_alignment = 1
 
-[node name="Build" type="Label" parent="Center/Column"]
-unique_name_in_owner = true
-modulate = Color(1, 1, 1, 0.65)
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "v0.0.0 (local)"
-horizontal_alignment = 1
-
 [node name="Gap" type="Control" parent="Center/Column"]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
@@ -53,3 +45,18 @@ layout_mode = 2
 size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 64
 text = "Start"
+
+[node name="Build" type="Label" parent="."]
+unique_name_in_owner = true
+modulate = Color(1, 0, 0, 1)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -320.0
+offset_top = 16.0
+offset_right = -16.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 24
+text = "v0.0.0 (local)"
+horizontal_alignment = 2
