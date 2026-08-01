@@ -26,5 +26,14 @@ func _ready() -> void:
 	_start.grab_focus()
 
 
+## The bell first, then the game.
+##
+## The order does not matter to the sound — the host owns the [Chime] and it
+## outlives this screen, which is the reason the bell is asked for rather than
+## played here — but it matters to what the press is [i]for[/i]. A browser will
+## not let a page make a noise until somebody has touched it, so this is the
+## press that unlocks audio for the whole game as well as the one that starts it.
+## [Chime] has the rest of that argument.
 func _on_start_pressed() -> void:
+	ring_bell(Bell.Voice.START)
 	request_transition(PlayGameState.new())

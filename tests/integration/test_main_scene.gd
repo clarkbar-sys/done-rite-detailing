@@ -50,6 +50,12 @@ func _current_screen_path() -> String:
 	return host.get_child(0).scene_file_path
 
 
+## The host's bell — the one thing in the game that makes a noise, and the whole
+## reason it hangs off the host rather than off a screen.
+func _bell() -> Chime:
+	return _main.get_node("%Bell") as Chime
+
+
 ## Presses Start on whatever is on screen and lets the swap happen.
 func _press_start() -> void:
 	var host: Control = _main.get_node("%ScreenHost") as Control
@@ -73,6 +79,23 @@ func test_start_swaps_the_title_screen_for_the_game() -> void:
 	await _press_start()
 	assert_eq(_current_screen_path(), PLAY_SCREEN)
 	assert_eq(_current_screen_path(), PlayGameState.SCENE_PATH, "the state decides this")
+
+
+func test_the_game_is_silent_until_it_is_touched() -> void:
+	# A browser drops any sound a page makes before the person on it has touched
+	# it, so a game that rang on boot would be spending its one unlock on nothing.
+	assert_eq(_bell().rings(), 0, "the game made a noise on its own")
+
+
+func test_start_rings_and_keeps_ringing_after_the_screen_it_was_pressed_on_is_gone() -> void:
+	# The failure this whole arrangement exists to prevent, and the one a
+	# screenshot cannot show: the title screen is removed *and freed* on the press
+	# that starts the game, so a bell owned by that screen would be freed
+	# mid-ding and Start would sound like a click. The host outlives every screen.
+	await _press_start()
+	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
+	assert_eq(_bell().rings(), 1, "Start rang no bell")
+	assert_true(_bell().is_ringing(), "the bell was cut off with the screen that asked for it")
 
 
 func test_only_one_screen_is_mounted_at_a_time() -> void:
