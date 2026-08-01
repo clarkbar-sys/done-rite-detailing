@@ -1,4 +1,5 @@
-## Integration test for the garage — the room, and the camera that circles it.
+## Integration test for the garage — the driveway, and the camera that circles
+## it.
 ##
 ## Under tests/integration/ because everything here needs the scene to exist and
 ## a frame to happen: the camera is aimed in `_ready()` and moved in `_process`,
@@ -40,12 +41,11 @@ func _car_body() -> StaticBody3D:
 	return _garage.get_node("%CarBody") as StaticBody3D
 
 
-## How far the middle of the room is from the inside face of a side wall, read
-## off the wall itself rather than written down again here. The walls are unit
-## boxes scaled into place, so half the scale is half the thickness.
-func _inner_half_width() -> float:
-	var wall: Node3D = _garage.get_node("View/World/Room/WallLeft") as Node3D
-	return absf(wall.position.x) - wall.scale.x * 0.5
+## How far the car is from the outer edge of the modeled ground, read off the
+## grass itself rather than written down again here.
+func _ground_half_width() -> float:
+	var grass: Node3D = _garage.get_node("View/World/Ground/GrassRight") as Node3D
+	return grass.position.x + grass.scale.x * 0.5
 
 
 func test_the_room_instantiates() -> void:
@@ -115,12 +115,14 @@ func test_a_parked_camera_holds_still() -> void:
 	assert_almost_eq(_camera().global_position.distance_to(before), 0.0, TOLERANCE)
 
 
-func test_the_camera_never_orbits_into_a_wall() -> void:
-	# The camera circles the middle of the room at a fixed radius, so the only
-	# thing keeping it out of the side walls is that radius being the smaller
-	# number. Nothing on screen would say it had stopped being true — the view
-	# would just start clipping through a wall at two points in every turn.
-	assert_lt(_garage.orbit_radius, _inner_half_width(), "the camera circle must fit in the room")
+func test_the_camera_never_orbits_off_the_edge_of_the_ground() -> void:
+	# The camera circles the middle of the driveway at a fixed radius, so the
+	# only thing keeping it over the modeled ground is that radius being the
+	# smaller number. Nothing on screen would say it had stopped being true —
+	# the view would just start showing empty space at two points in every turn.
+	assert_lt(
+		_garage.orbit_radius, _ground_half_width(), "the camera circle must fit on the ground"
+	)
 
 
 func test_the_room_orbits_unless_a_screen_says_otherwise() -> void:
@@ -128,7 +130,9 @@ func test_the_room_orbits_unless_a_screen_says_otherwise() -> void:
 	# nothing but the starting angle. If either of these flipped, the title card
 	# would come up on a motionless view from somebody's eye socket.
 	assert_true(_garage.orbiting, "the room's own shot is the slow circuit")
-	assert_false(_garage.first_person, "standing in the bay is the game's idea, not the room's")
+	assert_false(
+		_garage.first_person, "standing on the driveway is the game's idea, not the room's"
+	)
 	assert_false(_garage.walkaround, "and so is walking about in it")
 
 
@@ -201,12 +205,3 @@ func test_the_view_model_anchor_is_hidden_while_the_camera_circles() -> void:
 	var anchor: Node3D = _garage.get_node("%ViewModel") as Node3D
 	assert_not_null(anchor, "the anchor is part of the room's scene, not the play screen's")
 	assert_false(anchor.is_visible_in_tree(), "nobody is standing here to hold anything")
-
-
-func test_the_camera_never_orbits_up_through_the_roof() -> void:
-	# The other half of the same fence, and the easier one to trip: the height
-	# is measured from the middle of the car rather than from the floor, so it
-	# is always further off the ground than the number says.
-	var ceiling: Node3D = _garage.get_node("View/World/Room/Ceiling") as Node3D
-	var underside: float = ceiling.position.y - ceiling.scale.y * 0.5
-	assert_lt(_camera().global_position.y, underside, "the camera must stay under the roof")

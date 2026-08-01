@@ -39,11 +39,11 @@
 ## quietly renders something else is a viewmodel the roll-up will disagree with.
 ##
 ## [b]Silver is a material, not a colour.[/b] The power wash is the only metal on
-## the belt and it comes out of the catalogue at [code]metallic = 0.9[/code],
-## [code]roughness = 0.25[/code] — four and a half times the room's red
-## toolboxes, which sit at 0.2. Worth knowing what that buys in this room: the
-## bay's [WorldEnvironment] has a flat colour background and no sky or reflection
-## probe, so a metal here has no radiance map to mirror and its specular comes
+## the belt, and the only metal in the scene at all, and it comes out of the
+## catalogue at [code]metallic = 0.9[/code], [code]roughness = 0.25[/code].
+## Worth knowing what that buys here: the scene's [WorldEnvironment] has a flat
+## colour background and no sky or reflection probe, so a metal here has no
+## radiance map to mirror and its specular comes
 ## entirely from the two strip lights and the directional fill. That reads as
 ## dark metal with hard highlights rather than as chrome, which is right for a
 ## pressure washer and is emphatically not the light-grey plastic a

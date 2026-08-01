@@ -1,6 +1,6 @@
-## The detailing bay: a box of a room, a green box for the car, red boxes for
-## the toolboxes along the back wall, and a camera that either circles the car
-## or stands in the bay looking at it.
+## The driveway: a grey plane for the car to sit on, green planes either side
+## for the grass, a green box for the car, and a camera that either circles the
+## car or stands beside it looking at it.
 ##
 ## It is boxes on purpose. Everything here is one unit [BoxMesh] scaled into
 ## place, so the whole level is readable in the scene file and none of it is
@@ -15,22 +15,19 @@
 ## order the screens already use, and gives the 3D content its own [World3D] so
 ## the [WorldEnvironment] in here can't reach anything else.
 ##
-## [b]The key light casts no shadow, on purpose.[/b] The room is a sealed box,
-## so with shadows on, its own ceiling shadows everything inside it and the
-## whole interior falls back to ambient — measured, by rendering it: flat, near
-## black, and not obviously a lighting bug at all. The two [OmniLight3D]s
-## overhead are the shop's own strip lights and do the shaping; the directional
-## is a fill that ignores the ceiling. The alternative — take the ceiling off
-## and let a real sun in — buys a shadow under the car and costs the room its
-## roof, and this camera looks up enough to see the hole.
+## [b]The key light casts no shadow, on purpose.[/b] This was a garage once,
+## with walls and a ceiling directly overhead; a shadow-casting key lit that box
+## from one side and left the other in near-black. The two [OmniLight3D]s do the
+## shaping outdoors too, so the directional stays a plain fill rather than
+## growing shadows nobody has tuned for an open driveway yet.
 ##
 ## [b]The camera is driven here; the arithmetic is not.[/b] [CameraOrbit] is a
 ## [RefCounted] in [code]src/core/[/code] and knows nothing about cameras, which
 ## is what lets a full revolution be a unit test instead of half a minute of
 ## real frames — the Node-free tier rule from STANDARDS.md "Coverage" (R3).
 ##
-## [b]Two shots, one room.[/b] The title screen circles the car to show it off;
-## the game stands inside the bay at head height, close enough that the car
+## [b]Two shots, one driveway.[/b] The title screen circles the car to show it
+## off; the game stands beside it at head height, close enough that the car
 ## fills the frame the way it would if you had walked up to it with a sponge.
 ## That is [member first_person], and it is an export like every other
 ## difference between the two screens — both of them instance this same scene
@@ -86,9 +83,9 @@
 ## car that nothing in the room can get between it and the lens, and that is a
 ## measurement rather than a hope. Parked at [member eye_position] the anchor
 ## stands 0.79 m clear of the car's box — the nearest thing in the room to it by
-## a wide margin, since the walls are metres away — and 0.50 m in front of a
-## 0.05 m near plane; the longest held proxy, the power wash wand, still finishes
-## 0.50 m clear of the car.
+## a wide margin, since the edge of the modeled ground is metres away — and
+## 0.50 m in front of a 0.05 m near plane; the longest held proxy, the power
+## wash wand, still finishes 0.50 m clear of the car.
 ##
 ## [i]And the eye has since learned to walk[/i], which is what the previous
 ## version of this paragraph said would end it. It didn't, and the reason is
@@ -113,7 +110,7 @@ extends SubViewportContainer
 ##
 ## Ignored entirely when [member first_person] is set: an eye in someone's head
 ## does not orbit, and a screen that asked for both would otherwise drag the
-## camera out through a wall.
+## camera off the showcase circuit mid-stride.
 @export var orbiting: bool = true
 
 ## Where on its circle the camera starts, in degrees. [code]0[/code] is head-on
@@ -122,14 +119,14 @@ extends SubViewportContainer
 @export var start_angle_degrees: float = 0.0
 
 ## How far the camera stands from the car, on the ground plane. Kept under the
-## room's 6 m half-width so the camera never ends up inside a wall.
+## modeled ground's 6.2 m half-width so the camera never orbits off the edge of
+## the driveway and grass.
 @export var orbit_radius: float = 5.6
 
 ## How far above the middle of the car the camera sits. Well above rather than
-## level: from its own waist height a car reads as a brick and the room reads as
-## nothing at all, because the floor — the thing that says how big the room is —
-## is edge-on and invisible. Kept under the 4.5 m ceiling for the same reason
-## the radius is kept under the walls.
+## level: from its own waist height a car reads as a brick and the ground reads
+## as nothing at all, because the ground — the thing that says how big the space
+## is — is edge-on and invisible.
 @export var orbit_height: float = 2.6
 
 ## How fast the camera circles. 12°/s is a full turn every thirty seconds —
@@ -142,9 +139,9 @@ extends SubViewportContainer
 ## drift, the other is how fast a person walks.
 @export var orbit_degrees_per_second: float = 12.0
 
-## Whether the camera is a person standing in the bay rather than a showcase
-## rig circling the car. Off by default, because the room's own job — the shot
-## behind the title card — is the orbit; the game turns it on.
+## Whether the camera is a person standing on the driveway rather than a
+## showcase rig circling the car. Off by default, because the scene's own job —
+## the shot behind the title card — is the orbit; the game turns it on.
 ##
 ## It is a mode and not just "a parked orbit camera" because the two disagree
 ## about everything: the orbit is a radius and a height around the car and
@@ -160,9 +157,9 @@ extends SubViewportContainer
 ## 2.55 m from the middle of the car on the floor, which puts the near flank
 ## about 0.95 m away — one step back from arm's reach, the distance you would
 ## actually stand at to wash a panel, and close enough that the car fills the
-## frame instead of sitting in the middle of it. Well inside the room's 6 m
-## half-width and well under its 4.5 m ceiling, and outside the car's own box so
-## the eye is not standing in the bodywork; the tests hold all three.
+## frame instead of sitting in the middle of it. Well inside the modeled
+## ground's 6.2 m half-width, and outside the car's own box so the eye is not
+## standing in the bodywork; the tests hold both.
 ##
 ## The angle is not an export because there is nothing to choose: the camera
 ## looks at the car, the same way the orbit does.
@@ -194,10 +191,9 @@ extends SubViewportContainer
 @export var eye_height_min: float = 1.1
 
 ## The highest the eye may be driven. Above the car's 1.4 m roof by a metre, so
-## the roof and the bonnet can be looked down at, and a long way under the 4.5 m
-## ceiling. Not a matter of taste: past about here the ray below starts measuring
-## to the roof rather than to a flank, and the eye leans in over the car instead
-## of standing beside it.
+## the roof and the bonnet can be looked down at. Not a matter of taste: past
+## about here the ray below starts measuring to the roof rather than to a
+## flank, and the eye leans in over the car instead of standing beside it.
 @export var eye_height_max: float = 2.4
 
 ## How much clear air to keep between the eye and the nearest bodywork, in
@@ -342,7 +338,8 @@ func _aim() -> void:
 	_face_car()
 
 
-## Stands the camera in the bay at [member eye_position], looking at the car.
+## Stands the camera on the driveway at [member eye_position], looking at the
+## car.
 ##
 ## Called once, from [method _ready], and never again: the eye does not move.
 ## When it learns to, this is the function that grows a body under it, and
@@ -380,8 +377,8 @@ func _take_up_the_walk() -> void:
 		eye_height_max - focus.y
 	)
 	# The far fence is the showcase circuit's own radius, which is already the
-	# number that keeps a camera out of the walls of this room. One fence, stated
-	# once, and a room that is made bigger moves both at the same time.
+	# number that keeps a camera off the edge of the modeled ground. One fence,
+	# stated once, and ground that is made bigger moves both at the same time.
 	_standoff = Standoff.new(
 		standoff_metres, standoff_radius_min, orbit_radius, standoff_correction_speed
 	)

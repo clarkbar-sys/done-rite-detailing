@@ -167,12 +167,11 @@ func _clearance(box: AABB, point: Vector3) -> float:
 	return gap.length()
 
 
-## How far the middle of the room is from the inside face of a side wall, read
-## off the wall itself. The walls are unit boxes scaled into place, so half the
-## scale is half the thickness.
-func _inner_half_width() -> float:
-	var wall: Node3D = _garage().get_node("View/World/Room/WallLeft") as Node3D
-	return absf(wall.position.x) - wall.scale.x * 0.5
+## How far the car is from the outer edge of the modeled ground, read off the
+## grass itself.
+func _ground_half_width() -> float:
+	var grass: Node3D = _garage().get_node("View/World/Ground/GrassRight") as Node3D
+	return grass.position.x + grass.scale.x * 0.5
 
 
 ## How far the eye stands from the middle of the car, measured flat on the floor
@@ -299,13 +298,9 @@ func test_holding_up_raises_the_eye_and_down_lowers_it() -> void:
 
 func test_the_eye_cannot_be_walked_up_through_the_roof() -> void:
 	# Two seconds of holding up is more than the whole range, so this is the fence
-	# rather than the speed. The ceiling is read off the room rather than written
-	# down again, exactly as the showcase orbit's own version of this does.
+	# rather than the speed.
 	await _hold(LIFT_UP, 120)
-	var ceiling: Node3D = _garage().get_node("View/World/Room/Ceiling") as Node3D
-	var underside: float = ceiling.position.y - ceiling.scale.y * 0.5
 	assert_lte(_camera().global_position.y, _garage().eye_height_max + TOLERANCE)
-	assert_lt(_camera().global_position.y, underside, "and a long way under the roof")
 
 
 func test_the_eye_cannot_be_walked_down_through_the_floor() -> void:
@@ -355,7 +350,7 @@ func test_a_walk_round_the_car_keeps_its_distance_and_its_room() -> void:
 	await _settle()
 	Input.action_press(TURN_RIGHT)
 	var box: AABB = _car_box()
-	var half_width: float = _inner_half_width()
+	var half_width: float = _ground_half_width()
 	var nearest: float = INF
 	var furthest: float = 0.0
 	var tightest_radius: float = INF
@@ -379,4 +374,6 @@ func test_a_walk_round_the_car_keeps_its_distance_and_its_room() -> void:
 		widest_radius - tightest_radius, NOT_A_CIRCLE, "the lap must follow the car, not a circle"
 	)
 	assert_gt(held_clearance, HELD_REACH, "a held tool must not be able to reach into the car")
-	assert_eq(strayed, Vector3.ZERO, "the eye walked into a wall or into the car at %s" % strayed)
+	assert_eq(
+		strayed, Vector3.ZERO, "the eye walked off the ground or into the car at %s" % strayed
+	)
