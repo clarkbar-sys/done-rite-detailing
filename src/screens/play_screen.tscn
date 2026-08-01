@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/screens/play_screen.gd" id="1_play"]
 [ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
 [ext_resource type="PackedScene" path="res://src/ui/tool_belt_hud.tscn" id="3_hud"]
 [ext_resource type="PackedScene" path="res://src/ui/motion_pad.tscn" id="4_pad"]
+[ext_resource type="PackedScene" path="res://src/ui/grime_debug.tscn" id="5_grimedebug"]
 
 [node name="PlayScreen" type="Control"]
 layout_mode = 3
@@ -30,13 +31,21 @@ layout_mode = 1
 ; play_screen.gd — so it is a plain Label with a font big enough to read at the
 ; third-scale a phone renders this design at, and an outline because the thing
 ; behind it is sometimes sky and sometimes tarmac.
+; Shifted clear of the grime board's toggle, which now sits in this corner at a
+; full tap target's width. It used to start at x=12 and the two would overlap.
 [node name="PanelReadout" type="Label" parent="."]
 layout_mode = 1
-offset_left = 12.0
+offset_left = 188.0
 offset_top = 12.0
-offset_right = 360.0
+offset_right = 536.0
 offset_bottom = 56.0
 theme_override_colors/font_color = Color(0.95, 0.13, 0.16, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 32
+
+; Every panel's grime mask, drawn flat. Hidden until the key is pressed — see
+; `GRIME_DEBUG_ACTION` in play_screen.gd — and last in the tree so it draws over
+; the room rather than under it.
+[node name="GrimeDebug" parent="." instance=ExtResource("5_grimedebug")]
+layout_mode = 1

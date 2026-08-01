@@ -1,0 +1,70 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/grime_debug.gd" id="1_grimedebug"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_grimebg"]
+bg_color = Color(0, 0, 0, 0.62)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; Full-rect and `mouse_filter = 2` (ignore), like `ToolBeltHud`: the toggle is a
+; real control and everything else in here is a picture, so a press that misses
+; the button has to reach the glass behind it or the water would stop wherever
+; the masks were drawn.
+;
+; Nothing is positioned here. The toggle and the board are placed by `_relayout`
+; against `TouchTarget.min_design_size()`, because where they go depends on how
+; big a tap target has to be — see that function.
+[node name="GrimeDebug" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_grimedebug")
+
+[node name="Toggle" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_right = 164.0
+offset_bottom = 164.0
+theme_override_font_sizes/font_size = 56
+text = "~"
+
+[node name="Board" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_grimebg")
+
+[node name="Margin" type="MarginContainer" parent="Board"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Stack" type="VBoxContainer" parent="Board/Margin"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Board/Margin/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.95, 0.85, 0.55, 1)
+theme_override_font_sizes/font_size = 14
+text = "GRIME MASKS"
+
+[node name="Grid" type="GridContainer" parent="Board/Margin/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 4
+columns = 4
