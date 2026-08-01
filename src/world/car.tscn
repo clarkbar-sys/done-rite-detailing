@@ -12,7 +12,7 @@ albedo_color = Color(0.11, 0.12, 0.13, 1)
 roughness = 0.7
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tw7rx"]
-albedo_color = Color(0.09, 0.12, 0.15, 1)
+albedo_color = Color(0.35, 0.62, 0.58, 1)
 metallic = 0.3
 roughness = 0.12
 
