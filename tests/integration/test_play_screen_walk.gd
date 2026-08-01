@@ -134,8 +134,8 @@ func _camera() -> Camera3D:
 	return _garage().get_node("%Camera") as Camera3D
 
 
-func _car() -> MeshInstance3D:
-	return _garage().get_node("%Car") as MeshInstance3D
+func _car() -> Car:
+	return _garage().get_node("%Car") as Car
 
 
 func _view_model() -> Node3D:
@@ -146,11 +146,15 @@ func _pad() -> MotionPad:
 	return _screen.get_node("MotionPad") as MotionPad
 
 
-## The car's bounding box in world space — read off the mesh rather than written
-## down again here, so it keeps meaning "the car" after somebody resizes it.
+## The car's bounding box in world space — read off the car rather than written
+## down again here, so it keeps meaning "the car" after somebody reshapes it.
+##
+## [Car.bounds] rather than an [AABB] off a mesh, because the car is thirteen
+## CSG panels now and there is no one visual instance left to ask. It is wider
+## than the bodywork by the reach of the wing mirrors, which only makes every
+## clearance below more conservative.
 func _car_box() -> AABB:
-	var car: MeshInstance3D = _car()
-	return car.global_transform * car.get_aabb()
+	return _car().bounds()
 
 
 ## The gap between [param point] and the nearest face of [param box], and zero

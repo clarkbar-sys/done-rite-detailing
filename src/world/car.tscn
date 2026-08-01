@@ -1,0 +1,259 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/world/car.gd" id="1_1nwee"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i0fu5"]
+albedo_color = Color(0.13, 0.66, 0.27, 1)
+roughness = 0.55
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6fvc7"]
+albedo_color = Color(0.11, 0.12, 0.13, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tw7rx"]
+albedo_color = Color(0.09, 0.12, 0.15, 1)
+metallic = 0.3
+roughness = 0.12
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8ihkc"]
+albedo_color = Color(0.06, 0.06, 0.07, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8vk5q"]
+albedo_color = Color(0.62, 0.64, 0.68, 1)
+metallic = 0.8
+roughness = 0.35
+
+[node name="Car" type="Node3D" unique_id=637623716]
+script = ExtResource("1_1nwee")
+
+[node name="Body" type="CSGCombiner3D" parent="." unique_id=1513077034]
+use_collision = true
+
+[node name="Profile" type="CSGPolygon3D" parent="Body" unique_id=965332423]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.95, 0, 0)
+polygon = PackedVector2Array(2.15, -0.2, 2.04, 0.18, 0.62, 0.22, -1.46, 0.25, -2.02, 0.23, -2.15, 0.02, -2.15, -0.3, -1.93, -0.44, 1.93, -0.44, 2.15, -0.3)
+depth = 1.9
+material = SubResource("StandardMaterial3D_i0fu5")
+
+[node name="Plan" type="CSGPolygon3D" parent="Body" unique_id=533718954]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, -1, 0)
+operation = 1
+polygon = PackedVector2Array(-0.93, 1.62, -0.95, -1.5, -0.88, -2, -0.66, -2.15, 0.66, -2.15, 0.88, -2, 0.95, -1.5, 0.93, 1.62, 0.72, 2.15, -0.72, 2.15)
+depth = 2.0
+material = SubResource("StandardMaterial3D_i0fu5")
+
+[node name="ArchFrontLeft" type="CSGCylinder3D" parent="Body" unique_id=1208479826]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.7, -0.3, 1.38)
+operation = 2
+radius = 0.42
+height = 0.55
+sides = 16
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="ArchFrontRight" type="CSGCylinder3D" parent="Body" unique_id=353319755]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.7, -0.3, 1.38)
+operation = 2
+radius = 0.42
+height = 0.55
+sides = 16
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="ArchRearLeft" type="CSGCylinder3D" parent="Body" unique_id=942155713]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.7, -0.3, -1.32)
+operation = 2
+radius = 0.42
+height = 0.55
+sides = 16
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="ArchRearRight" type="CSGCylinder3D" parent="Body" unique_id=1394635420]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.7, -0.3, -1.32)
+operation = 2
+radius = 0.42
+height = 0.55
+sides = 16
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="MirrorLeft" type="CSGBox3D" parent="Body" unique_id=895247513]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.94, 0.28, 0.5)
+size = Vector3(0.2, 0.1, 0.09)
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="MirrorRight" type="CSGBox3D" parent="Body" unique_id=2092076378]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.94, 0.28, 0.5)
+size = Vector3(0.2, 0.1, 0.09)
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="Hood" type="CSGCombiner3D" parent="." unique_id=811474780]
+use_collision = true
+
+[node name="Panel" type="CSGBox3D" parent="Hood" unique_id=732870417]
+transform = Transform3D(1, 0, 0, 0, 0.9986295, -0.05233596, 0, 0.05233596, 0.9986295, 0, 0.215, 1.31)
+size = Vector3(1.5, 0.09, 1.42)
+material = SubResource("StandardMaterial3D_i0fu5")
+
+[node name="Deck" type="CSGCombiner3D" parent="." unique_id=1359821145]
+use_collision = true
+
+[node name="Panel" type="CSGBox3D" parent="Deck" unique_id=810684335]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.235, -1.76)
+size = Vector3(1.45, 0.09, 0.52)
+material = SubResource("StandardMaterial3D_i0fu5")
+
+[node name="Roof" type="CSGCombiner3D" parent="." unique_id=1713334743]
+use_collision = true
+
+[node name="Panel" type="CSGBox3D" parent="Roof" unique_id=266485816]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.665, -0.55)
+size = Vector3(1.4, 0.07, 1.02)
+material = SubResource("StandardMaterial3D_i0fu5")
+
+[node name="Cabin" type="CSGCombiner3D" parent="." unique_id=938354342]
+use_collision = true
+
+[node name="Shell" type="CSGBox3D" parent="Cabin" unique_id=1113719419]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.43, -0.475)
+size = Vector3(1.66, 0.46, 2.15)
+material = SubResource("StandardMaterial3D_i0fu5")
+
+[node name="RakeFront" type="CSGBox3D" parent="Cabin" unique_id=1394395650]
+transform = Transform3D(1, 0, 0, 0, 0.8415108, -0.54024035, 0, 0.54024035, 0.8415108, 0, 1.296, 0.822)
+operation = 2
+size = Vector3(2.4, 2, 3)
+
+[node name="RakeRear" type="CSGBox3D" parent="Cabin" unique_id=1514735756]
+transform = Transform3D(1, 0, 0, 0, 0.6984153, 0.71569276, 0, -0.71569276, 0.6984153, 0, 1.154, -1.975)
+operation = 2
+size = Vector3(2.4, 2, 3)
+
+[node name="TumblehomeRight" type="CSGBox3D" parent="Cabin" unique_id=2114120485]
+transform = Transform3D(0.96637607, -0.2571328, 0, 0.2571328, 0.96637607, 0, 0, 0, 1, 1.736, 0.732, -0.475)
+operation = 2
+size = Vector3(2, 2, 3.2)
+
+[node name="TumblehomeLeft" type="CSGBox3D" parent="Cabin" unique_id=1866182375]
+transform = Transform3D(0.96637607, 0.2571328, 0, -0.2571328, 0.96637607, 0, 0, 0, 1, -1.736, 0.732, -0.475)
+operation = 2
+size = Vector3(2, 2, 3.2)
+
+[node name="WindowFront" type="CSGBox3D" parent="Cabin" unique_id=1047473452]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.46, -0.06)
+operation = 2
+size = Vector3(2.4, 0.3, 0.48)
+
+[node name="WindowRear" type="CSGBox3D" parent="Cabin" unique_id=223243411]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.46, -0.79)
+operation = 2
+size = Vector3(2.4, 0.3, 0.74)
+
+[node name="Windshield" type="CSGCombiner3D" parent="." unique_id=1611035010]
+use_collision = true
+
+[node name="Glass" type="CSGBox3D" parent="Windshield" unique_id=1177283548]
+transform = Transform3D(1, 0, 0, 0, 0.8415108, -0.54024035, 0, 0.54024035, 0.8415108, 0, 0.472, 0.292)
+size = Vector3(1.52, 0.04, 0.76)
+material = SubResource("StandardMaterial3D_tw7rx")
+
+[node name="RearGlass" type="CSGCombiner3D" parent="." unique_id=61936591]
+use_collision = true
+
+[node name="Glass" type="CSGBox3D" parent="RearGlass" unique_id=1475219290]
+transform = Transform3D(1, 0, 0, 0, 0.6984153, 0.71569276, 0, -0.71569276, 0.6984153, 0, 0.469, -1.274)
+size = Vector3(1.5, 0.04, 0.58)
+material = SubResource("StandardMaterial3D_tw7rx")
+
+[node name="SideGlass" type="CSGCombiner3D" parent="." unique_id=290888064]
+use_collision = true
+
+[node name="FrontLeft" type="CSGBox3D" parent="SideGlass" unique_id=1400980432]
+transform = Transform3D(0.96637607, 0.2571328, 0, -0.2571328, 0.96637607, 0, 0, 0, 1, -0.793, 0.465, -0.06)
+size = Vector3(0.04, 0.34, 0.52)
+material = SubResource("StandardMaterial3D_tw7rx")
+
+[node name="RearLeft" type="CSGBox3D" parent="SideGlass" unique_id=693474021]
+transform = Transform3D(0.96637607, 0.2571328, 0, -0.2571328, 0.96637607, 0, 0, 0, 1, -0.793, 0.465, -0.79)
+size = Vector3(0.04, 0.34, 0.78)
+material = SubResource("StandardMaterial3D_tw7rx")
+
+[node name="FrontRight" type="CSGBox3D" parent="SideGlass" unique_id=1423566243]
+transform = Transform3D(0.96637607, -0.2571328, 0, 0.2571328, 0.96637607, 0, 0, 0, 1, 0.793, 0.465, -0.06)
+size = Vector3(0.04, 0.34, 0.52)
+material = SubResource("StandardMaterial3D_tw7rx")
+
+[node name="RearRight" type="CSGBox3D" parent="SideGlass" unique_id=2111057922]
+transform = Transform3D(0.96637607, -0.2571328, 0, 0.2571328, 0.96637607, 0, 0, 0, 1, 0.793, 0.465, -0.79)
+size = Vector3(0.04, 0.34, 0.78)
+material = SubResource("StandardMaterial3D_tw7rx")
+
+[node name="WheelFrontLeft" type="CSGCombiner3D" parent="." unique_id=1496159863]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.79, -0.37, 1.38)
+use_collision = true
+
+[node name="Tyre" type="CSGCylinder3D" parent="WheelFrontLeft" unique_id=938827083]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+radius = 0.33
+height = 0.22
+sides = 16
+material = SubResource("StandardMaterial3D_8ihkc")
+
+[node name="Rim" type="CSGCylinder3D" parent="WheelFrontLeft" unique_id=1807702804]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+radius = 0.2
+height = 0.24
+sides = 12
+material = SubResource("StandardMaterial3D_8vk5q")
+
+[node name="WheelFrontRight" type="CSGCombiner3D" parent="." unique_id=183459704]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.79, -0.37, 1.38)
+use_collision = true
+
+[node name="Tyre" type="CSGCylinder3D" parent="WheelFrontRight" unique_id=1485867626]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+radius = 0.33
+height = 0.22
+sides = 16
+material = SubResource("StandardMaterial3D_8ihkc")
+
+[node name="Rim" type="CSGCylinder3D" parent="WheelFrontRight" unique_id=1407271832]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+radius = 0.2
+height = 0.24
+sides = 12
+material = SubResource("StandardMaterial3D_8vk5q")
+
+[node name="WheelRearLeft" type="CSGCombiner3D" parent="." unique_id=1040317785]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.79, -0.37, -1.32)
+use_collision = true
+
+[node name="Tyre" type="CSGCylinder3D" parent="WheelRearLeft" unique_id=881419896]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+radius = 0.33
+height = 0.22
+sides = 16
+material = SubResource("StandardMaterial3D_8ihkc")
+
+[node name="Rim" type="CSGCylinder3D" parent="WheelRearLeft" unique_id=1441326335]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+radius = 0.2
+height = 0.24
+sides = 12
+material = SubResource("StandardMaterial3D_8vk5q")
+
+[node name="WheelRearRight" type="CSGCombiner3D" parent="." unique_id=327885403]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.79, -0.37, -1.32)
+use_collision = true
+
+[node name="Tyre" type="CSGCylinder3D" parent="WheelRearRight" unique_id=888798063]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+radius = 0.33
+height = 0.22
+sides = 16
+material = SubResource("StandardMaterial3D_8ihkc")
+
+[node name="Rim" type="CSGCylinder3D" parent="WheelRearRight" unique_id=1014086574]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+radius = 0.2
+height = 0.24
+sides = 12
+material = SubResource("StandardMaterial3D_8vk5q")
