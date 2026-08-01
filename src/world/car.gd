@@ -58,6 +58,41 @@
 class_name Car
 extends Node3D
 
+## Sixteen paint colours a detailer might actually find parked in the
+## driveway — the range you would see on the street, not a hue wheel.
+## [method _ready] picks one of these for every car.
+const PAINT_COLORS: Array[Color] = [
+	Color(0.92, 0.92, 0.90),  # Alpine White
+	Color(0.04, 0.04, 0.05),  # Jet Black
+	Color(0.52, 0.53, 0.55),  # Pewter
+	Color(0.72, 0.73, 0.75),  # Silver
+	Color(0.27, 0.28, 0.30),  # Gunmetal
+	Color(0.15, 0.16, 0.18),  # Charcoal
+	Color(0.10, 0.35, 0.16),  # British Racing Green
+	Color(0.55, 0.72, 0.35),  # Lime Green
+	Color(0.08, 0.20, 0.42),  # Deep Blue
+	Color(0.45, 0.62, 0.78),  # Ice Blue
+	Color(0.62, 0.05, 0.08),  # Crimson Red
+	Color(0.35, 0.05, 0.10),  # Burgundy
+	Color(0.90, 0.55, 0.05),  # Tangerine Orange
+	Color(0.85, 0.70, 0.10),  # Sunflower Yellow
+	Color(0.72, 0.58, 0.35),  # Champagne Gold
+	Color(0.45, 0.30, 0.18),  # Bronze
+]
+
+## The body's paint. [code]Body/Profile[/code], [code]Body/Plan[/code],
+## [code]Hood/Panel[/code], [code]Deck/Panel[/code], [code]Roof/Panel[/code]
+## and [code]Cabin/Shell[/code] all point at this same [StandardMaterial3D] in
+## the scene file — it is marked local-to-scene there, so every car gets its
+## own copy rather than six panels across every car in the game repainting
+## together. Setting [member StandardMaterial3D.albedo_color] here is enough
+## to repaint the whole body in one write.
+@export var paint: StandardMaterial3D
+
+
+func _ready() -> void:
+	paint.albedo_color = PAINT_COLORS.pick_random()
+
 
 ## Every panel of the car: the [CSGShape3D]s that are roots of their own CSG
 ## tree, which is exactly the set that has a mesh and a collider of its own.
