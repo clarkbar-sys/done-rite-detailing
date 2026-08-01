@@ -16,6 +16,12 @@ var _states: GameStateMachine = GameStateMachine.new()
 
 @onready var _host: Control = %ScreenHost
 
+## The one thing in the game that makes a noise, and it hangs off the host rather
+## than off a screen on purpose: a screen is freed the moment it asks for the
+## next state, and a bell rung by the title screen has to still be ringing after
+## Start has swapped it away. [Chime] has the whole argument.
+@onready var _bell: Chime = %Bell
+
 
 func _ready() -> void:
 	var project_name: String = str(ProjectSettings.get_setting("application/config/name"))
@@ -39,6 +45,7 @@ func _on_state_changed(state: GameState) -> void:
 	if screen == null:
 		return
 	screen.transition_requested.connect(_states.enter)
+	screen.bell_requested.connect(_bell.ring)
 	_host.add_child(screen)
 
 

@@ -13,11 +13,13 @@ const TITLE_SCREEN: String = "res://src/screens/title_screen.tscn"
 
 var _screen: GameScreen = null
 var _requested: Array[GameState] = []
+var _rung: Array[Bell.Voice] = []
 var _window_size_before: Vector2i = Vector2i.ZERO
 
 
 func before_each() -> void:
 	_requested = []
+	_rung = []
 	# A headless window is 64x64 — smaller than the Start button, small enough
 	# that a tap at the button's own coordinates lands outside the layout
 	# entirely, and the touch tests below then pass or fail for a reason that has
@@ -38,6 +40,11 @@ func before_each() -> void:
 	_screen = screen
 	add_child_autofree(_screen)
 	_screen.transition_requested.connect(_record)
+	# The screen asks for a bell rather than playing one — the host owns the
+	# [Chime], and a screen instanced on its own like this one has no host. So
+	# what a suite at this level can assert is the ask, and
+	# `tests/integration/test_main_scene.gd` asserts that the ask makes a noise.
+	_screen.bell_requested.connect(_record_bell)
 	# `_ready()` has already fired inside add_child; the frame is only here to
 	# let layout settle before the labels are read.
 	await wait_process_frames(1)
@@ -49,6 +56,10 @@ func after_each() -> void:
 
 func _record(state: GameState) -> void:
 	_requested.append(state)
+
+
+func _record_bell(voice: Bell.Voice) -> void:
+	_rung.append(voice)
 
 
 func _start_button() -> Button:
@@ -101,6 +112,15 @@ func test_start_asks_for_the_play_state() -> void:
 
 func test_it_asks_for_nothing_on_its_own() -> void:
 	assert_eq(_requested.size(), 0, "the title screen must wait for the player")
+	assert_eq(_rung.size(), 0, "and must not make a noise before it is touched")
+
+
+func test_start_rings_the_counter_bell() -> void:
+	# Through the button's own signal, like the transition above: the ding is
+	# wired in `_ready()` and a connection dropped there is silent everywhere
+	# except here.
+	_start_button().pressed.emit()
+	assert_eq(_rung, [Bell.Voice.START] as Array[Bell.Voice], "Start must ding once")
 
 
 # ---- touch: the phone-shaped half of "does Start work" -----------------------
@@ -138,6 +158,15 @@ func test_start_is_big_enough_for_a_finger() -> void:
 	var minimum: float = TouchTarget.min_design_size()
 	assert_gte(start.size.x, minimum, "Start is too narrow to hit on a phone")
 	assert_gte(start.size.y, minimum, "Start is too short to hit on a phone")
+
+
+func test_a_tap_on_start_rings_the_counter_bell() -> void:
+	# The phone-shaped half of the ding. This is the press a browser unlocks audio
+	# on — see [Chime] — so "a tap on Start dings" is the promise the rest of the
+	# game's sound rides on rather than a flourish on the button.
+	_tap(_start_button().get_global_rect().get_center())
+	await wait_process_frames(1)
+	assert_eq(_rung.size(), 1, "a tap on Start must ding")
 
 
 func test_a_tap_just_outside_start_asks_for_nothing() -> void:

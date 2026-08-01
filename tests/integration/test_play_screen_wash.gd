@@ -87,6 +87,19 @@ func _grime() -> Grime:
 	return _garage().grime()
 
 
+func _bell() -> Chime:
+	return _main.get_node("%Bell") as Chime
+
+
+## The panel called [param named], or null — the car names its own pieces, so a
+## test can ask for the bonnet rather than for "the third child".
+func _panel(named: String) -> CSGShape3D:
+	for panel: CSGShape3D in _car().panels():
+		if String(panel.name) == named:
+			return panel
+	return null
+
+
 func _marker() -> AimMarker:
 	return _garage().aim_marker()
 
@@ -241,6 +254,53 @@ func test_swapping_back_to_the_wash_starts_the_water_again() -> void:
 	_belt().equip(DetailingTool.Id.POWER_WASH)
 	await _hold(_at_the_car())
 	assert_lt(_grime().remaining(), 1.0)
+
+
+# ---- the ding ----------------------------------------------------------------
+
+
+func test_a_patch_coming_clean_rings_the_bell() -> void:
+	# The other end of the trigger: the room says a patch finished, the screen
+	# asks the host for a bell, and the host rings it. Through the real stack, so
+	# a connection dropped anywhere along it fails here.
+	#
+	# The bonnet is washed flat rather than through the crosshair, the way
+	# `tests/integration/test_grime.gd` does it: how long a held jet takes to
+	# finish a patch is a tuning number, and a suite that waited for it would go
+	# red the day somebody turns the water down. That a held press reaches the
+	# paint at all is the tests above.
+	await _settle()
+	var hood: CSGShape3D = _panel("Hood")
+	assert_not_null(hood, "the car has no Hood")
+	if hood == null:
+		return
+	var before: int = _bell().rings()
+	var box: AABB = hood.global_transform * hood.get_aabb()
+	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
+	var finished: int = 0
+	for _sweep: int in 60:
+		finished += _grime().wash(hood, on_top, Vector3.UP, 0.6, 0.1)
+	assert_gt(finished, 0, "washing the bonnet flat never finished a patch")
+	assert_gt(_bell().rings(), before, "a patch came clean and the game said nothing")
+
+
+func test_a_burst_of_patches_is_not_a_burst_of_bells() -> void:
+	# A wide jet finishes several patches in one tick, and every one of them is a
+	# `patch_cleared`. [Chime] is what stands between that and a distorted mess —
+	# this asserts the screen leaves that judgement to it rather than filtering
+	# on its own or, worse, ringing per texel.
+	await _settle()
+	var hood: CSGShape3D = _panel("Hood")
+	if hood == null:
+		return
+	var box: AABB = hood.global_transform * hood.get_aabb()
+	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
+	var before: int = _bell().rings()
+	var finished: int = 0
+	for _sweep: int in 60:
+		finished += _grime().wash(hood, on_top, Vector3.UP, 0.9, 0.2)
+	assert_gt(finished, 1, "the sweep finished at most one patch, so there is no burst to thin")
+	assert_lt(_bell().rings() - before, finished, "every patch in the burst got its own bell")
 
 
 # ---- the debug view ----------------------------------------------------------
