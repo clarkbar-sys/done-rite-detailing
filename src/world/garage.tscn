@@ -1,9 +1,10 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://src/world/garage.gd" id="1_garage"]
 [ext_resource type="Script" path="res://src/world/view_model.gd" id="2_view_model"]
 [ext_resource type="PackedScene" path="res://src/world/car.tscn" id="3_car"]
 [ext_resource type="Shader" path="res://src/world/sky.gdshader" id="4_sky"]
+[ext_resource type="Script" path="res://src/world/lens.gd" id="5_lens"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_unit"]
 size = Vector3(1, 1, 1)
@@ -129,8 +130,16 @@ material_override = SubResource("StandardMaterial3D_grass")
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
 
+; keep_aspect 0 is KEEP_WIDTH, so the 75 below is the angle measured *across* the
+; frame and the angle up and down falls out of the viewport's shape. That is the
+; whole reason this node carries a script: at 16:9 it works out at 46.7° down, and
+; on a phone held upright — where `window/stretch/aspect = "expand"` grows the
+; viewport downward instead of letterboxing — the same 75 works out at 114.8°.
+; `Lens` holds a ceiling over that second number by giving up the first. 75 stays
+; the lens the shot was framed at, and is what a wide screen still gets.
 [node name="Camera" type="Camera3D" parent="View/World"]
 unique_name_in_owner = true
+script = ExtResource("5_lens")
 keep_aspect = 0
 current = true
 fov = 75.0

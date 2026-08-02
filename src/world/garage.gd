@@ -324,9 +324,9 @@ const PAST_THE_POST: float = 1.1
 @export var standoff_radius_min: float = 1.6
 
 ## How far left or right of straight ahead the held tool may be swung, in
-## degrees. Inside the 75° lens's own half-angle, so a tool aimed at the very
-## edge of the frame is still a tool in the frame rather than one that has left
-## it.
+## degrees. A backstop rather than a frame edge: it was picked to sit inside the
+## 75° design lens's half-angle, but [Lens] narrows that on a tall window, and
+## every press is on the glass and so already inside the frame.
 @export var aim_yaw_degrees: float = 32.0
 
 ## How far up or down. Tighter than the yaw because a car is wide and low: see
@@ -453,9 +453,9 @@ var _marked: String = ""
 ## camera's own -Z, because at a 75° horizontal field of view that depth makes
 ## the visible frame 0.69 m wide — so 0.17 m to the right is halfway to the right
 ## edge and 0.15 m down is near the bottom of a 16:9 frame. A tool sitting there
-## rises into the corner of the shot with its far end running off the bottom of
-## the screen, which is what a held thing looks like; dead centre at arm's length
-## is what a thing floating in front of your face looks like.
+## rises into the corner of the shot, which is what a held thing looks like; dead
+## centre at arm's length is not. Halfway is the decision and the metres only the
+## notation, which a narrowed lens moves — see [method ViewModel.fit_to_lens].
 @onready var _view_model: ViewModel = %ViewModel
 
 

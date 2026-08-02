@@ -134,6 +134,12 @@ var _proxies: Array[MeshInstance3D] = []
 var _carries: Array[ToolCarry] = []
 var _aim: ToolAim = null
 var _rest: Vector3 = Vector3.ZERO
+
+## Where the scene file parked the hand, before any lens was fitted to it — the
+## fixed point [method fit_to_lens] recomputes [member _rest] from. Scaling
+## [member _rest] in place instead would ratchet the hand further into the corner
+## on every resize.
+var _framed: Vector3 = Vector3.ZERO
 var _mark: Vector3 = Vector3.ZERO
 var _marked: bool = false
 
@@ -146,6 +152,7 @@ func _ready() -> void:
 	# would be a hand that jumps to a stale corner the first time somebody
 	# retunes the shot.
 	_rest = position
+	_framed = position
 	_belt = ToolBelt.new()
 	for tool: DetailingTool in _belt.tools():
 		var carry: ToolCarry = _carry_for(tool)
@@ -239,6 +246,37 @@ func aim_toward(direction: Vector3) -> void:
 func mark_at(point: Vector3) -> void:
 	_mark = point
 	_marked = true
+
+
+## Re-frames the hand for a lens that is no longer the one the shot was framed at.
+##
+## [b]The scene file's offset is a fraction dressed up as a distance.[/b] The
+## anchor hangs 0.45 m down the camera's own -Z and 0.17 m to the right of it, and
+## that 0.17 was chosen because at the design lens it is halfway to the edge of
+## the frame — see [member Garage._view_model], where the arithmetic is written
+## out. Halfway is the decision; the metres are only how it was written down. So
+## when [Lens] narrows the lens on a portrait phone, leaving the metres alone
+## slides the hand out of shot: measured, at the 70° ceiling the anchor lands at
+## 1.05 of the frame's width, which is past the right-hand edge of it.
+##
+## [b]The two lateral offsets scale and the depth does not.[/b] How far in front
+## of the lens the hand hangs is what the near plane and the car's clearance were
+## both measured against, and neither of those has anything to do with how wide
+## the lens is. Only where it sits across the frame does.
+##
+## [b]It writes [member _rest] rather than [member Node3D.position][/b], because
+## [method _process] rebuilds the anchor's transform from [member _rest] every
+## frame — a position set from outside would be overwritten before it was ever
+## drawn. That is not a guess: it is what the first version of this did, and the
+## integration test caught the hand still sitting at 1.05.
+func fit_to_lens(design_fov_degrees: float, fov_degrees: float) -> void:
+	var depth: float = absf(_framed.z)
+	var design: float = LensFit.half_frame(design_fov_degrees, depth)
+	if design <= 0.0:
+		return
+	var fitted: float = LensFit.half_frame(fov_degrees, depth) / design
+	_rest = Vector3(_framed.x * fitted, _framed.y * fitted, _framed.z)
+	position = _rest
 
 
 ## Lets the hand fall back to rest. The player has lifted their finger, and a
