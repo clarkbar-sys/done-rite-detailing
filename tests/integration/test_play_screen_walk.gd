@@ -22,12 +22,12 @@ const PLAY_SCREEN: String = "res://src/screens/play_screen.tscn"
 ##
 ## GUT's runner draws its own output over the same window, on a [CanvasLayer] at
 ## layer 128 — and GUI picking goes to the highest layer first, so a tap aimed at
-## the pad's right-hand arrow lands on the runner's log instead. Measured:
-## [method Viewport.gui_get_hovered_control] under that arrow was GUT's
-## `TestOutput`, and the press reported nothing at all. Above 128, the game is
-## the thing under the finger. The tool belt's tests get away without this
-## because their corner happens to be one the runner's panel does not reach,
-## which is luck rather than a difference.
+## the game's bottom-right corner lands on the runner's log instead. Measured:
+## [method Viewport.gui_get_hovered_control] over there was GUT's `TestOutput`,
+## and the press reported nothing at all. Above 128, the game is the thing under
+## the finger. The tool belt's tests get away without this because their corner
+## happens to be one the runner's panel does not reach, which is luck rather than
+## a difference.
 const ABOVE_THE_RUNNER: int = 200
 
 ## Close enough for positions in metres — a tenth of a millimetre.
@@ -89,8 +89,8 @@ var _window_size_before: Vector2i = Vector2i.ZERO
 
 func before_each() -> void:
 	# A headless window is 64x64, which is smaller than a single tap target — so
-	# the motion pad's buttons would be clamped into nonsense and the one test
-	# below that uses a real finger would be measuring the clamp.
+	# the motion pad's stick would be laid out into nonsense and the one test
+	# below that uses a real finger would be measuring that instead.
 	# `content_scale_size` is the design resolution from project.godot. Put back
 	# in after_each: every suite shares this window.
 	var root: Window = get_tree().root
@@ -314,18 +314,36 @@ func test_the_eye_cannot_be_walked_down_through_the_floor() -> void:
 
 
 func test_a_thumb_on_the_pad_walks_the_eye_too() -> void:
-	# The whole chain, through a real finger: a touch, to a [Button], to
+	# The whole chain, through a real finger: a touch, to the stick, to
 	# [method MotionPad.turn], to the play screen's poll, to the garage, to a
 	# camera. Everything else here drives the keyboard half, which shares only the
 	# last three of those — so without this, a pad wired to nothing would pass.
 	await _settle()
 	var before: float = _bearing()
-	var at: Vector2 = _pad().button_for(MotionPad.RIGHT).get_global_rect().get_center()
+	var at: Vector2 = _pad().point_for(MotionPad.RIGHT)
 	_touch(at, true)
 	await wait_physics_frames(30)
 	var walked: float = _walked(before)
 	_touch(at, false)
-	assert_gt(walked, 0.0, "a thumb on the pad's right arrow must walk you right")
+	assert_gt(walked, 0.0, "a thumb pushing the stick right must walk you right")
+
+
+func test_a_thumb_can_walk_and_lift_at_the_same_time() -> void:
+	# The reason the four arrows became a circle, at the far end of the chain: one
+	# thumb in the corner of the stick asks for both axes, and both have to survive
+	# the summing in the play screen's poll and the clamping in [OrbitDrive].
+	# Neither is true of two buttons a single finger cannot hold at once.
+	await _settle()
+	var before: float = _bearing()
+	var standing: float = _camera().global_position.y
+	var at: Vector2 = _pad().point_for(Vector2i(1, 1))
+	_touch(at, true)
+	await wait_physics_frames(30)
+	var walked: float = _walked(before)
+	var raised: float = _camera().global_position.y
+	_touch(at, false)
+	assert_gt(walked, 0.0, "the corner of the stick walks you round the car")
+	assert_gt(raised, standing, "and raises your eye on the way")
 
 
 func test_the_eye_keeps_looking_at_the_car_as_it_walks() -> void:
