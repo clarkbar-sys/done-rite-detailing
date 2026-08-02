@@ -30,10 +30,11 @@
 ## like a crosshair with holes in it. A centimetre is far enough to win and near
 ## enough that no viewing angle in this game shows it floating.
 ##
-## [b]One tool draws its own instead.[/b] The power wash puts a [WashJet] between
-## its nozzle and the paint, and a ring under the wide end of that cone is a
-## second answer to a question the cone has already answered better — so the room
-## turns the ring off with [method draw_crosshair] while the washer is in hand.
+## [b]One tool draws its own instead.[/b] The power wash throws a [WashJet]
+## between its nozzle and the paint, and a ring under the patch that water lands
+## on is a second answer to a question the jet has already answered better — so
+## the room turns the ring off with [method draw_crosshair] while the washer is in
+## hand.
 ## What it does not turn off is the mark itself: [method mark] still records
 ## where the aim landed and [method marked_point] still answers, because where
 ## the tool is pointed is a fact about the aim rather than about which tool

@@ -12,9 +12,11 @@ type-checks, boots headlessly, and exports a playable build — in your browser,
 or as a Linux binary — from CI. It opens on a title screen played over the
 detailing bay itself, with the camera circling the car; Start drops you
 straight into that same room, standing beside the car with a tool in your
-hand. Four arrows down the right-hand edge walk you around it and raise and
-lower your eye — hold one to move, let go to stop, or use the arrow keys or
-WASD — and a **T** in the opposite corner rolls out the five tools you carry.
+hand. A thumb stick in the bottom-right corner walks you around it and raises
+and lowers your eye — push it and you move, at whatever speed you push it, in
+any direction at once; let go and it springs back and you stop. The arrow keys
+and WASD do the same job at a desk. A **T** in the opposite corner rolls out
+the five tools you carry.
 Press anywhere on the car and the tool in your hand swings to point at it,
 with a red crosshair on the paint where it lands; press past the car and the
 crosshair snaps to the nearest bodywork instead. Holding is aiming, letting go
