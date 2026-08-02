@@ -150,15 +150,18 @@
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
 ## grime work needs and the reason [signal aimed] carries a name at all.
 ##
-## [b]And the tool that sprays now draws its own sight.[/b] With the power wash
-## in hand the crosshair is replaced by a [WashJet]: a narrow cone from the
-## wand's nozzle to the mark, blue at the tip and red where it lands, as wide at
-## its base as [member wash_radius_metres] — which is to say, the patch
-## [method _spend_the_trigger] is about to clean, drawn at the size and angle it
-## is actually cleaned at. The other four tools are put on the car at a point and
-## keep the crosshair, which is the right shape for them. [method _sight_the_aim]
-## is the whole of the choice, made every tick from the belt, so swapping tools
-## mid-press swaps the sight with them.
+## [b]And the tool that sprays can draw its own sight, for whoever asked to see
+## it.[/b] With the power wash in hand and [member debug_tools] on, the crosshair
+## is replaced by a [WashJet]: a narrow cone from the wand's nozzle to the mark,
+## blue at the tip and red where it lands, as wide at its base as [member
+## wash_radius_metres] — which is to say, the patch [method _spend_the_trigger]
+## is about to clean, drawn at the size and angle it is actually cleaned at. The
+## other four tools are put on the car at a point and keep the crosshair, which
+## is the right shape for them — and so does the power wash, with debug tools
+## off, since a disc that size reads as a wheel landing rather than a mark to
+## most players. [method _sight_the_aim] is the whole of the choice, made every
+## tick from the belt and the flag together, so swapping tools or toggling
+## debug mid-press swaps the sight with them.
 ##
 ## [i]The mark is still made either way[/i] — see [AimMarker] — so the panel
 ## readout, the wand's alignment and the water all read exactly what they read
@@ -360,22 +363,21 @@ const PAST_THE_POST: float = 1.1
 ## was right for as long as this radius was invisible: nothing on screen was that
 ## size, only the mud it cleared was.
 ##
-## [WashJet] changed that. It draws this radius as a solid disc the player looks
-## straight at, and half a metre of radius put a 0.9 m circle of red at the far
-## end of the jet — wider across than the car's own wheels (0.33 m radius each,
-## see [code]src/world/car.gd[/code]) — which reads as a wheel-sized ball landing
-## on the paint rather than as a mark. The lesson above still holds; it is just
-## being applied against a new picture rather than an old one. A fifth of a
-## metre keeps the jet a size a hand plausibly holds and clears in the same
-## second or so [member wash_per_second] already promises — it costs more
-## sweeping to cover the whole car, which is the honest side effect of a smaller
-## brush and not a second regression to measure away.
+## [WashJet] draws this radius as a solid disc the player looks straight at, and
+## half a metre of radius puts a 0.9 m circle of red at the far end of the jet —
+## wider across than the car's own wheels (0.33 m radius each, see
+## [code]src/world/car.gd[/code]) — which reads as a wheel-sized ball landing on
+## the paint rather than as a mark. Shrinking the number itself to fix that once
+## also shrank the patch being cleaned, which is not the same problem: this is
+## the honest size of the water, tuned against the game and not against how it
+## looks on screen. So the disc is hidden instead — see [member debug_tools] —
+## and this stays the number that made washing feel right.
 ##
 ## Not distance-dependent, and that is a simplification rather than a decision:
 ## real water spreads and loses pressure with range, which is a reason to stand
 ## close, which is a mechanic. It wants the standoff and the reach to mean
 ## something first.
-@export var wash_radius_metres: float = 0.2
+@export var wash_radius_metres: float = 0.45
 
 ## How much mud a held jet takes off a spot per second, where [code]1.0[/code] is
 ## all of it.
@@ -385,6 +387,14 @@ const PAST_THE_POST: float = 1.1
 ## contribution — see [member wash_radius_metres] for what the cautious version
 ## of these two numbers felt like.
 @export var wash_per_second: float = 2.5
+
+## Whether the power wash draws [WashJet]'s cone instead of the plain crosshair
+## every other tool wears. Off by default: [member wash_radius_metres] is the
+## honest size of the water and not a size chosen to look right on the paint —
+## see that member — so the disc it draws stays for whoever set [member Garage]
+## up ([code]src/screens/play_screen.gd[/code]'s [code]%GrimeDebug[/code] toggles
+## this from the "~" panel's "Debug Tools" button) rather than for every player.
+var debug_tools: bool = false
 
 var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
@@ -703,7 +713,9 @@ func _resolve_aim(delta: float) -> void:
 ## second copy of "which tool is this" to fall out of step with the first.
 func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 	_marker.mark(surface, outward)
-	var washing: bool = _view_model.belt().equipped().id == DetailingTool.Id.POWER_WASH
+	var washing: bool = (
+		debug_tools and _view_model.belt().equipped().id == DetailingTool.Id.POWER_WASH
+	)
 	_marker.draw_crosshair(not washing)
 	var nozzle: Marker3D = _view_model.muzzle()
 	if not washing or nozzle == null:
