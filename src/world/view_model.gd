@@ -41,8 +41,8 @@
 ## [b]How a tool is held is now a thing tools can differ in.[/b] Four of them are
 ## held the way the table below says and never move in the hand; the power wash
 ## lies along the line from the hand to whatever is being aimed at, so that the
-## jet nobody has written yet can leave the nozzle and land on the crosshair
-## without bending in mid-air. That difference is a [ToolCarry] per tool — the
+## water can leave the nozzle and land on the crosshair without bending in
+## mid-air to get there. That difference is a [ToolCarry] per tool — the
 ## default one hands back its pose and ignores everything, [WandCarry] is the
 ## power wash's — and it is a class rather than an `if` in [method _process]
 ## because it will not be the last tool that wants to know where the aim is, and
@@ -54,8 +54,9 @@
 ## [b]The wand has an end, and the end is a node.[/b] [code]Muzzle[/code] and
 ## [code]Butt[/code] are [Marker3D]s at the two ends of the power wash proxy,
 ## with their [code]-Z[/code] pointed out of the nozzle — which is the axis a
-## [GPUParticles3D] emits along, so the water hangs off the first one and needs
-## no arithmetic of its own. They are also what a test measures the alignment
+## [GPUParticles3D] emits along, so [WashJet] is stood on the first one every tick
+## and throws water down it with no arithmetic of its own. They are also what a
+## test measures the alignment
 ## with: the line between them is the wand, and asserting on two nodes is
 ## honest in a way that re-deriving the wand's axis from the same [Basis] the
 ## code posed it with is not.
