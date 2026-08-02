@@ -381,7 +381,13 @@ const PAST_THE_POST: float = 1.1
 ## real water spreads and loses pressure with range, which is a reason to stand
 ## close, which is a mechanic. It wants the standoff and the reach to mean
 ## something first.
-@export var wash_radius_metres: float = 0.2
+##
+## Doubled from the fifth of a metre above to two fifths: a bigger circle of
+## red at the far end of [WashJet] reads as more pressure behind the wand, and
+## doubling [member wash_per_second] alongside it keeps the time to clean a
+## single spot the same — this widens the patch a press covers rather than
+## changing how long a press takes.
+@export var wash_radius_metres: float = 0.4
 
 ## How much mud a held jet takes off a spot per second, where [code]1.0[/code] is
 ## all of it.
@@ -390,7 +396,11 @@ const PAST_THE_POST: float = 1.1
 ## at its edge. Fast enough that a press is visibly an action rather than a
 ## contribution — see [member wash_radius_metres] for what the cautious version
 ## of these two numbers felt like.
-@export var wash_per_second: float = 2.5
+##
+## Doubled alongside [member wash_radius_metres]: a wider jet with the same
+## strength would take longer to clear, which reads as the water having gotten
+## weaker rather than wider.
+@export var wash_per_second: float = 5.0
 
 ## Whether the power wash wears the plain crosshair instead of drawing
 ## [WashJet]'s cone. Off by default, so what ships is the cone: it is the shape
