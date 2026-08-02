@@ -239,14 +239,102 @@ func test_a_mark_on_a_bounding_box_is_not_somewhere_water_can_go() -> void:
 	assert_almost_eq(_grime().remaining(), 1.0, 0.0001, "and a box corner spent water")
 
 
-func test_only_the_power_wash_spends_the_trigger() -> void:
-	# Four of the five tools have nothing to write to yet. A sponge that quietly
-	# washed mud off would be the wrong rule shipped invisibly — the sponge works
-	# on the layer under the mud, and only once the mud is gone.
+func test_only_the_power_wash_takes_mud_off() -> void:
+	# All five tools spend the trigger now, and exactly one of them moves mud. A
+	# sponge that quietly washed would be the wrong rule shipped invisibly — the
+	# sponge works on the layer under the mud, and only once the mud is gone.
+	#
+	# Nor does it lay any product here, and that is the same assertion read the
+	# other way: a car nobody has washed has no bare paint on it, so the bottle
+	# has nothing to draw from. No refusal is written anywhere for that — see
+	# [GrimeMap].
 	await _settle()
 	_belt().equip(DetailingTool.Id.SPONGE)
 	await _hold(_at_the_car())
 	assert_almost_eq(_grime().remaining(), 1.0, 0.0001, "the sponge washed mud off")
+	assert_almost_eq(_grime().product(), 0.0, 0.0001, "the sponge soaped a muddy car")
+
+
+## The panel a press at [param at] actually lands on, asked of the room rather
+## than worked out from the geometry here. Washes it flat on the way, so the
+## caller has bare paint to work on.
+##
+## [b]Discovered rather than named, and that is not ceremony.[/b] The aim is
+## taken a thumb's width above the finger ([ThumbLift] has why), so a press at the
+## middle of the car lands somewhat above the middle of the car — on the side
+## glass, as it happens, which was measured here rather than guessed at. A test
+## that assumed the bodywork and reached for the sponge would have quietly become
+## a test that the sponge does nothing.
+func _panel_under(at: Vector2) -> CSGShape3D:
+	# An array rather than a plain local: a GDScript lambda captures locals by
+	# value, so a `String` assigned inside this one would never come back out.
+	var seen: Array[String] = [""]
+	var noted: Callable = func(panel: String) -> void: seen[0] = panel
+	_garage().aimed.connect(noted)
+	await _press(at)
+	# Before the lift, which marks nothing and would report the empty string.
+	_garage().aimed.disconnect(noted)
+	await _lift()
+	return _panel(seen[0])
+
+
+## A cleaner that is not [param right] — the wrong bottle for whatever surface
+## the press landed on.
+func _a_cleaner_other_than(right: DetailingTool.Id) -> DetailingTool.Id:
+	for kind: Surface.Kind in [Surface.Kind.BODY, Surface.Kind.GLASS, Surface.Kind.WHEEL]:
+		var cleaner: DetailingTool.Id = Surface.cleaner_for(kind)
+		if cleaner != right:
+			return cleaner
+	return right
+
+
+func test_the_wrong_cleaner_for_a_surface_does_nothing() -> void:
+	# The one rule the buckets cannot express, so the one rule
+	# [method Garage._spend_the_trigger] writes down: a sponge is for paint and
+	# window cleaner is not, and a texture cannot tell them apart. Asserted after
+	# a wash, because before one there would be no bare paint and this would pass
+	# for the wrong reason.
+	await _settle()
+	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	assert_not_null(panel, "the press landed on nothing")
+	if panel == null:
+		return
+	var right: DetailingTool.Id = Surface.cleaner_for(_car().kind_of(panel))
+	_belt().equip(_a_cleaner_other_than(right))
+	await _hold(_at_the_car())
+	assert_almost_eq(
+		_grime().map_of(panel).product(), 0.0, 0.0001, "the wrong bottle worked on %s" % panel.name
+	)
+
+
+func test_the_right_cleaner_for_a_surface_covers_it() -> void:
+	# And the other half, so the test above cannot pass because the middle pass is
+	# broken for everything.
+	await _settle()
+	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	assert_not_null(panel, "the press landed on nothing")
+	if panel == null:
+		return
+	_belt().equip(Surface.cleaner_for(_car().kind_of(panel)))
+	await _hold(_at_the_car())
+	assert_gt(_grime().map_of(panel).product(), 0.0, "nothing was left on %s" % panel.name)
+
+
+func test_the_rag_turns_that_into_shine() -> void:
+	# The last pass, and the whole conveyor end to end through the real scene
+	# stack: a thumb on the glass three times with three different tools, and a
+	# car that is measurably further along than it was.
+	await _settle()
+	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	assert_not_null(panel, "the press landed on nothing")
+	if panel == null:
+		return
+	_belt().equip(Surface.cleaner_for(_car().kind_of(panel)))
+	await _hold(_at_the_car())
+	_belt().equip(DetailingTool.Id.DRYING_RAG)
+	await _hold(_at_the_car())
+	assert_gt(_grime().map_of(panel).shine(), 0.0, "the rag buffed nothing into %s" % panel.name)
+	assert_gt(_grime().shine(), 0.0, "and the car as a whole noticed")
 
 
 func test_swapping_back_to_the_wash_starts_the_water_again() -> void:
@@ -290,7 +378,7 @@ func test_a_patch_coming_clean_rings_the_bell() -> void:
 
 func test_a_burst_of_patches_is_not_a_burst_of_bells() -> void:
 	# A wide jet finishes several patches in one tick, and every one of them is a
-	# `patch_cleared`. [Chime] is what stands between that and a distorted mess —
+	# `patch_finished`. [Chime] is what stands between that and a distorted mess —
 	# this asserts the screen leaves that judgement to it rather than filtering
 	# on its own or, worse, ringing per texel.
 	await _settle()

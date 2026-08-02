@@ -32,9 +32,19 @@ addressed by a six-plane projection worked out from the point you hit rather
 than from a UV map anybody unwrapped, so washing the driver's door leaves the
 passenger's door filthy; the mud *pattern* over it is sampled triplanar, which
 is the half of that job blending is safe for. Press **G** for the twelve masks
-themselves, which is how you tell a projection bug from a raycast one. Only the
-power wash does anything so far — the sponge, the cloth and the two sprays have
-their channels allocated and nothing to write to them yet.
+themselves, which is how you tell a projection bug from a raycast one.
+
+And all five tools do something now, because the job is three passes rather than
+one. Water takes mud off any panel; a cleaner then goes onto the bare paint it
+left — the sponge on bodywork, the window cleaner on glass, the tyre cleaner on
+the wheels, and the wrong bottle for a surface does nothing at all; the drying
+rag buffs that product out into a shine, which is the only way a panel gets
+finished. What keeps those three in order is not a rule anybody wrote down: a
+texel divides its surface between mud, product, shine and bare paint, and each
+tool moves units from one of those to another. So a sponge on a muddy wing has
+no bare paint to draw from and a rag on a dry one has no product, and neither
+needs refusing. [`src/core/grime_map.gd`](./src/core/grime_map.gd) has the
+argument at length.
 
 And you can hear it now. Start rings a counter bell, and every patch that comes
 clean under the jet rings a smaller one — so a sweep that finishes three of them

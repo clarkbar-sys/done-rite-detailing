@@ -8,6 +8,11 @@
 ## [method Garage._lay_on_the_grime] waits, and it is pinned by its own test
 ## below rather than left to be rediscovered.
 ##
+## The three passes are here too, for the same reason: what a wash, a cleaner and
+## a rag [i]do[/i] to a texel is [GrimeMap]'s business and is tested there, but
+## that a bottle reaches the right panel with the right product on it is wiring,
+## and wiring is what breaks between a scene file and a shader.
+##
 ## What is [i]not[/i] here is the arithmetic — where a point lands in a mask and
 ## what a wash does to it are [code]tests/unit/test_box_projection.gd[/code] and
 ## [code]tests/unit/test_grime_map.gd[/code]. This is about the wiring: that
@@ -120,7 +125,7 @@ func test_every_panel_gets_its_own_mask_to_sample() -> void:
 		assert_not_null(paint, "%s has no grime material" % panel.name)
 		if paint == null:
 			continue
-		var mask: Texture2D = paint.get_shader_parameter("mud_mask")
+		var mask: Texture2D = paint.get_shader_parameter("grime_mask")
 		assert_not_null(mask, "%s has no mask" % panel.name)
 		if mask == null:
 			continue
@@ -193,7 +198,9 @@ func test_finishing_a_patch_says_which_panel_it_was_on() -> void:
 	# index is the map's own business and a test that pinned it would go red the
 	# first time somebody turned the ding's granularity up.
 	var rang: Array[String] = []
-	_grime.patch_cleared.connect(func(panel: String, _patch: int) -> void: rang.append(panel))
+	_grime.patch_finished.connect(
+		func(panel: String, _patch: int, _stage: GrimeMap.Stage) -> void: rang.append(panel)
+	)
 	var box: AABB = hood.global_transform * hood.get_aabb()
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var rung: int = 0
@@ -202,3 +209,123 @@ func test_finishing_a_patch_says_which_panel_it_was_on() -> void:
 	assert_gt(rung, 0, "washing the bonnet flat never finished a patch")
 	assert_eq(rang.size(), rung, "every finished patch was announced exactly once")
 	assert_eq(rang[0], "Hood", "and it said which panel it was on")
+
+
+# ---- the three passes, on real panels -----------------------------------------
+
+
+## Washes a panel flat at a point, so the passes after the first have bare paint
+## to work on.
+func _wash_bare(panel: CSGShape3D, at: Vector3, outward: Vector3) -> void:
+	for _sweep: int in 60:
+		_grime.wash(panel, at, outward, 0.5, 0.2)
+
+
+## The middle of the top of a panel, in world space — where a tool pointed down at
+## the car from above would land.
+func _on_top_of(panel: CSGShape3D) -> Vector3:
+	var box: AABB = panel.global_transform * panel.get_aabb()
+	return Vector3(box.get_center().x, box.end.y, box.get_center().z)
+
+
+func test_a_cleaner_covers_the_paint_the_wash_bared() -> void:
+	var hood: CSGShape3D = _panel("Hood")
+	assert_not_null(hood, "the car has no Hood")
+	if hood == null:
+		return
+	var on_top: Vector3 = _on_top_of(hood)
+	_wash_bare(hood, on_top, Vector3.UP)
+	_grime.foam(hood, on_top, Vector3.UP, 0.3, 0.9)
+	assert_gt(_grime.map_of(hood).product(), 0.0, "the sponge left nothing on the bonnet")
+
+
+func test_a_cleaner_on_a_muddy_panel_does_nothing() -> void:
+	# The ordering rule, through the real stack rather than on a bare map: a
+	# bottle on a car nobody has washed moves nothing, because there is no bare
+	# paint under it to cover.
+	var deck: CSGShape3D = _panel("Deck")
+	assert_not_null(deck, "the car has no Deck")
+	if deck == null:
+		return
+	assert_eq(_grime.foam(deck, _on_top_of(deck), Vector3.UP, 0.3, 1.0), 0)
+	assert_almost_eq(_grime.map_of(deck).product(), 0.0, 0.0001)
+	assert_almost_eq(_grime.map_of(deck).remaining(), 1.0, 0.0001, "and it took mud off")
+
+
+func test_the_rag_turns_that_product_into_shine() -> void:
+	var hood: CSGShape3D = _panel("Hood")
+	assert_not_null(hood, "the car has no Hood")
+	if hood == null:
+		return
+	var on_top: Vector3 = _on_top_of(hood)
+	_wash_bare(hood, on_top, Vector3.UP)
+	_grime.foam(hood, on_top, Vector3.UP, 0.3, 0.9)
+	var covered: float = _grime.map_of(hood).product()
+	_grime.buff(hood, on_top, Vector3.UP, 0.3, 0.9)
+	assert_almost_eq(
+		_grime.map_of(hood).shine(), covered, 0.0001, "the shine is not the product that was on it"
+	)
+	assert_gt(_grime.shine(), 0.0, "and the car as a whole noticed")
+
+
+func test_finishing_a_patch_says_which_step_it_was() -> void:
+	# One signal, three stages. A listener that wants to tell a wash from a buff
+	# has the argument to do it with — and the ding, which does not care, ignores
+	# it.
+	var hood: CSGShape3D = _panel("Hood")
+	assert_not_null(hood, "the car has no Hood")
+	if hood == null:
+		return
+	var stages: Array[GrimeMap.Stage] = []
+	_grime.patch_finished.connect(
+		func(_named: String, _patch: int, stage: GrimeMap.Stage) -> void: stages.append(stage)
+	)
+	var on_top: Vector3 = _on_top_of(hood)
+	for _sweep: int in 60:
+		_grime.wash(hood, on_top, Vector3.UP, 0.6, 0.1)
+	assert_true(stages.has(GrimeMap.Stage.WASHED), "washing a patch flat announced no stage")
+	assert_false(stages.has(GrimeMap.Stage.BUFFED), "and something claimed to be finished")
+
+
+# ---- what each panel is made of ------------------------------------------------
+
+
+func test_each_panel_is_told_what_its_cleaner_looks_like() -> void:
+	# The whole of "one channel, three products": the mask has nowhere to record
+	# which bottle left the film, so the colour is a uniform set per panel when
+	# the overlay is built. A panel that never got one would draw its suds in
+	# whatever the shader defaults to, which is white on a tyre.
+	for panel: CSGShape3D in _car.panels():
+		var paint: ShaderMaterial = panel.material_overlay as ShaderMaterial
+		assert_not_null(paint, "%s has no grime material" % panel.name)
+		if paint == null:
+			continue
+		var colour: Color = paint.get_shader_parameter("product_colour")
+		assert_eq(
+			colour,
+			Surface.product_colour(_car.kind_of(panel)),
+			"%s got the wrong product" % panel.name
+		)
+
+
+func test_the_glass_and_the_wheels_get_their_own_products() -> void:
+	# And that the groups in `car.tscn` actually reached the shader, which is the
+	# one link in that chain nothing else here would notice breaking.
+	var glass: Color = _product_on("Windshield")
+	var wheel: Color = _product_on("WheelFrontLeft")
+	var body: Color = _product_on("Hood")
+	assert_eq(glass, Surface.GLASS_PRODUCT, "the windscreen")
+	assert_eq(wheel, Surface.WHEEL_PRODUCT, "the wheel")
+	assert_eq(body, Surface.BODY_PRODUCT, "the bonnet")
+
+
+## The product colour the overlay on a named panel was actually handed. Read out
+## into a typed local because [method ShaderMaterial.get_shader_parameter] hands
+## back a [Variant], and this project's warning levels treat passing one to a
+## typed parameter as an error rather than as a cast.
+func _product_on(named: String) -> Color:
+	var paint: ShaderMaterial = _panel(named).material_overlay as ShaderMaterial
+	if paint == null:
+		return Color.TRANSPARENT
+	var colour: Color = paint.get_shader_parameter("product_colour")
+	return colour

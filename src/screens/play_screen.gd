@@ -102,7 +102,8 @@
 ## they are handled too.
 ##
 ## [b]And the fourth loop is the bell[/b], which is the same shape read
-## backwards. The room says a patch of the car came clean ([signal Grime.patch_cleared]),
+## backwards. The room says a patch of the car finished a step of the job
+## ([signal Grime.patch_finished]),
 ## this file turns that into "ring the small one", and the host's [Chime] is what
 ## actually makes the noise. The room has never heard of a speaker and this file
 ## has never heard of an [AudioStreamPlayer] — what crosses is a [enum Bell.Voice]
@@ -202,7 +203,7 @@ func _process(_delta: float) -> void:
 	# does not pay for the readout.
 	var grime: Grime = _garage.grime()
 	if _masks.is_shown() and grime != null:
-		_masks.report(grime.remaining())
+		_masks.report(grime.remaining(), grime.shine())
 
 
 ## Keys, for the half of the players who will never tap the [b]T[/b].
@@ -375,18 +376,26 @@ func _on_grimed() -> void:
 	# Bound here rather than in `_ready()` for the same reason the masks are: the
 	# grime does not exist until this fires, so there is nothing to listen to
 	# before it.
-	grime.patch_cleared.connect(_on_patch_cleared)
+	grime.patch_finished.connect(_on_patch_finished)
 
 
-## A bit of the car came clean, so the player hears about it.
+## A bit of the car finished a step of the job, so the player hears about it.
 ##
-## Neither the panel nor the patch is used, and that is the point rather than an
+## None of the three arguments is used, and that is the point rather than an
 ## oversight — the bell says "that worked", and which texel it was is the
 ## crosshair's job to have already made obvious. What stops a sweep of the jet
 ## from being a hundred bells is [Chime], which drops any ding landing inside the
 ## last one: the rule about how often a sound is worth making belongs with the
 ## thing making it, not with every place that asks.
-func _on_patch_cleared(_panel: String, _patch: int) -> void:
+##
+## [b]The same bell for all three stages[/b], washed, foamed and buffed alike.
+## There are two voices in [enum Bell.Voice] and one of them is Start, so a bell
+## per stage would mean writing two more — and what the player is being told is
+## the same thing in all three cases: the pass you are on just finished a bit of
+## the car. A distinct chime for the buff is worth having the day the shine is
+## worth celebrating separately from the wash; it is not a thing to invent
+## alongside the mechanic it would be rewarding.
+func _on_patch_finished(_panel: String, _patch: int, _stage: GrimeMap.Stage) -> void:
 	ring_bell(Bell.Voice.PATCH)
 
 

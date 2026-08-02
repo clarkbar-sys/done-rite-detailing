@@ -1,12 +1,21 @@
 ## Every panel's grime mask, drawn flat, with a button to put them up.
 ##
 ## This is the proof that the projection works, and it is the thing you look at
-## when it does not: mud is red, clean is black, and a jet of water held on the
-## near flank should darken a hole in exactly one tile of exactly one panel. If
-## the hole opens somewhere else, the face choice is wrong; if it opens in two
-## places, the projection is sharing texels; if it opens in the right place on
-## the wrong panel, the hit is being resolved against the wrong collider. None of
-## those three are distinguishable from looking at the car.
+## when it does not: mud is red, and a jet of water held on the near flank should
+## darken a hole in exactly one tile of exactly one panel. If the hole opens
+## somewhere else, the face choice is wrong; if it opens in two places, the
+## projection is sharing texels; if it opens in the right place on the wrong
+## panel, the hit is being resolved against the wrong collider. None of those
+## three are distinguishable from looking at the car.
+##
+## [b]And the channels are the three passes, so the board reads as the job.[/b]
+## [GrimeMap] keeps mud in red, product in green and shine in blue, and a texture
+## drawn raw shows exactly that: a fresh panel is red, a washed one is black, a
+## soaped one is green and a finished one is blue. Bare paint is black because it
+## is the bucket nothing stores — which makes "washed but untouched since" and
+## "never had anything on it" the same colour here, and they are the same state.
+## A panel going red → black → green → blue as the player works it is the whole
+## conveyor visible in one thumbnail.
 ##
 ## [b]Six tiles a panel, laid out as the atlas is.[/b] Each thumbnail is one
 ## panel's whole mask: the top row is [code]+X -X +Y[/code] and the bottom is
@@ -126,10 +135,19 @@ func debug_tools_button() -> CheckButton:
 	return _debug_tools
 
 
-## Reports how much of the car is still dirty in the heading, so the board
-## answers "am I getting anywhere" as well as "is it landing in the right place".
-func report(remaining: float) -> void:
-	_title.text = "GRIME MASKS — %d%% left" % roundi(remaining * 100.0)
+## Reports where the car is up to in the heading, so the board answers "am I
+## getting anywhere" as well as "is it landing in the right place".
+##
+## Two numbers because the job has two ends and neither alone is the answer.
+## [param remaining] is the mud still on it, which is what the power wash is
+## against and what goes to zero a third of the way through; [param shine] is how
+## much has been washed, treated and buffed, which is the actual progress and does
+## not move at all while the first pass is running. A heading with only the first
+## would call a soaking-wet unpolished car finished.
+func report(remaining: float, shine: float) -> void:
+	_title.text = (
+		"GRIME MASKS — %d%% mud, %d%% done" % [roundi(remaining * 100.0), roundi(shine * 100.0)]
+	)
 
 
 ## Puts the toggle in the top-left corner and the board directly under it.

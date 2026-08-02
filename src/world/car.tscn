@@ -149,7 +149,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.46, -0.79)
 operation = 2
 size = Vector3(2.4, 0.3, 0.74)
 
-[node name="Windshield" type="CSGCombiner3D" parent="." unique_id=1611035010]
+[node name="Windshield" type="CSGCombiner3D" parent="." unique_id=1611035010 groups=["glass"]]
 use_collision = true
 
 [node name="Glass" type="CSGBox3D" parent="Windshield" unique_id=1177283548]
@@ -157,7 +157,7 @@ transform = Transform3D(1, 0, 0, 0, 0.8415108, -0.54024035, 0, 0.54024035, 0.841
 size = Vector3(1.52, 0.04, 0.76)
 material = SubResource("StandardMaterial3D_tw7rx")
 
-[node name="RearGlass" type="CSGCombiner3D" parent="." unique_id=61936591]
+[node name="RearGlass" type="CSGCombiner3D" parent="." unique_id=61936591 groups=["glass"]]
 use_collision = true
 
 [node name="Glass" type="CSGBox3D" parent="RearGlass" unique_id=1475219290]
@@ -165,7 +165,7 @@ transform = Transform3D(1, 0, 0, 0, 0.6984153, 0.71569276, 0, -0.71569276, 0.698
 size = Vector3(1.5, 0.04, 0.58)
 material = SubResource("StandardMaterial3D_tw7rx")
 
-[node name="SideGlass" type="CSGCombiner3D" parent="." unique_id=290888064]
+[node name="SideGlass" type="CSGCombiner3D" parent="." unique_id=290888064 groups=["glass"]]
 use_collision = true
 
 [node name="FrontLeft" type="CSGBox3D" parent="SideGlass" unique_id=1400980432]
@@ -188,7 +188,7 @@ transform = Transform3D(0.96637607, -0.2571328, 0, 0.2571328, 0.96637607, 0, 0, 
 size = Vector3(0.04, 0.34, 0.78)
 material = SubResource("StandardMaterial3D_tw7rx")
 
-[node name="WheelFrontLeft" type="CSGCombiner3D" parent="." unique_id=1496159863]
+[node name="WheelFrontLeft" type="CSGCombiner3D" parent="." unique_id=1496159863 groups=["wheel"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.79, -0.37, 1.38)
 use_collision = true
 
@@ -206,7 +206,7 @@ height = 0.24
 sides = 12
 material = SubResource("StandardMaterial3D_8vk5q")
 
-[node name="WheelFrontRight" type="CSGCombiner3D" parent="." unique_id=183459704]
+[node name="WheelFrontRight" type="CSGCombiner3D" parent="." unique_id=183459704 groups=["wheel"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.79, -0.37, 1.38)
 use_collision = true
 
@@ -224,7 +224,7 @@ height = 0.24
 sides = 12
 material = SubResource("StandardMaterial3D_8vk5q")
 
-[node name="WheelRearLeft" type="CSGCombiner3D" parent="." unique_id=1040317785]
+[node name="WheelRearLeft" type="CSGCombiner3D" parent="." unique_id=1040317785 groups=["wheel"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.79, -0.37, -1.32)
 use_collision = true
 
@@ -242,7 +242,7 @@ height = 0.24
 sides = 12
 material = SubResource("StandardMaterial3D_8vk5q")
 
-[node name="WheelRearRight" type="CSGCombiner3D" parent="." unique_id=327885403]
+[node name="WheelRearRight" type="CSGCombiner3D" parent="." unique_id=327885403 groups=["wheel"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.79, -0.37, -1.32)
 use_collision = true
 
