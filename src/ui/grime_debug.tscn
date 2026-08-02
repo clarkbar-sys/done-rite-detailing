@@ -53,6 +53,11 @@ theme_override_constants/margin_bottom = 8
 layout_mode = 2
 mouse_filter = 2
 
+[node name="DebugTools" type="CheckButton" parent="Board/Margin/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Debug Tools"
+
 [node name="Title" type="Label" parent="Board/Margin/Stack"]
 unique_name_in_owner = true
 layout_mode = 2
