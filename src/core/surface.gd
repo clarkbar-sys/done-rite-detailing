@@ -52,7 +52,7 @@ const GLASS_GROUP: String = "glass"
 const WHEEL_GROUP: String = "wheel"
 
 ## Suds. White, because that is what soap looks like and because it reads against
-## all sixteen of [constant Car.PAINT_COLORS] — including Alpine White, which it
+## all of [constant Car.PAINT_COLORS] — including Alpine White, which it
 ## survives because the foam is patterned and lit and the paint under it is flat.
 const BODY_PRODUCT: Color = Color(0.94, 0.95, 0.97)
 

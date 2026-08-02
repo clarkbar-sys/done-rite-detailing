@@ -159,11 +159,11 @@ func test_the_glass_is_not_the_same_material_as_the_paint() -> void:
 	assert_ne(windshield.material, hood.material, "glass is not paint")
 
 
-func test_the_car_starts_painted_one_of_the_sixteen_colors() -> void:
+func test_the_car_starts_painted_one_of_the_thirteen_colors() -> void:
 	assert_has(
 		Car.PAINT_COLORS,
 		_car.paint.albedo_color,
-		"the car must start in one of the sixteen colours"
+		"the car must start in one of the thirteen colours"
 	)
 
 
