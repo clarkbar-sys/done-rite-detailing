@@ -34,8 +34,9 @@
 ## Bare paint is the remainder and is not stored, because storing it would be a
 ## fourth number that has to agree with the other three. Every tool moves units
 ## from one bucket to another and never creates or destroys any, so the four
-## always sum to [constant UNITS] — [method wash] takes mud to bare,
-## [method foam] takes bare to product, [method buff] takes product to shine.
+## always sum to [constant UNITS] — [method wash] takes mud [i]and product[/i] to
+## bare, [method foam] takes bare to product, [method buff] takes product to
+## shine.
 ##
 ## [b]That conservation is the game's rules, not an accounting convenience.[/b]
 ## It is what makes the job layered without a single line of sequencing logic:
@@ -44,6 +45,8 @@
 ##   texel has none. The jet has to make some first.
 ## - You cannot shine what you never foamed, because [method buff] draws from
 ##   product. A rag on bare paint moves nothing.
+## - And you cannot leave the water till last, because [method wash] takes the
+##   product off with the mud. The order is the only order that finishes a panel.
 ## - "Finished" is one number — every unit in blue — and it is reachable only by
 ##   having gone through the other two.
 ##
@@ -265,13 +268,26 @@ func bare_at(point: Vector3, normal: Vector3) -> float:
 	return clampf(1.0 - pixel.r - pixel.g - pixel.b, 0.0, 1.0)
 
 
-## Takes [param amount] of mud off the panel around [param point], over a brush
-## of [param radius_metres], for a surface facing [param normal] — all three in
-## the panel's own space. What it takes off becomes bare paint.
+## Takes [param amount] off the panel around [param point], over a brush of
+## [param radius_metres], for a surface facing [param normal] — all three in the
+## panel's own space. What it takes off becomes bare paint.
 ##
-## Returns the patches this call washed clean, so the caller can ring one bell per
-## patch rather than watching for the change itself. Empty when nothing
-## completed, which is nearly every call.
+## [b]Mud first, and then the product under it.[/b] Water does not politely stop
+## at the dirt, and a jet that left a soaped window alone would be a jet the
+## player could safely use at any point in the job — which is exactly the lesson
+## worth teaching. Spraying a panel you have just treated rinses the treatment
+## off, so the order stops being advice and becomes the only order that gets a
+## panel finished: wash, then the bottle, then the cloth.
+##
+## [b]Shine is deliberately left alone.[/b] The same argument does not reach it.
+## Wax is not something lying on the paint waiting to be rinsed away, and more to
+## the point, a stray jet across a finished wing undoing work the player has
+## already done three passes on is a punishment for imprecision rather than a
+## rule they can learn. A finished panel stays finished.
+##
+## Returns the patches this call washed clean — clean of [i]mud[/i], which is the
+## transition the bell is about. Rinsing product off a patch whose mud has long
+## gone reports nothing, for the reason [method _touch] records.
 func wash(point: Vector3, normal: Vector3, radius_metres: float, amount: float) -> PackedInt32Array:
 	return _brush(point, normal, radius_metres, amount, Stage.WASHED)
 
@@ -370,11 +386,23 @@ func _touch(at: Vector2i, amount: float, stage: Stage, finished: PackedInt32Arra
 	if moved <= 0:
 		return
 	var patch: int = _patch_at(at)
+	# Only the wash reports on having moved a particular bucket rather than on the
+	# patch's state alone — see below, where it is checked.
+	var stripped: int = 0
 	match stage:
 		Stage.WASHED:
-			mud -= moved
-			_mud[patch] -= moved
-			_mud_total -= moved
+			# Mud first and then whatever product is under the jet. Order rather than
+			# a split, because they are the same water: a texel that is half muddy
+			# and half soaped gets the mud taken off first and the foam after, which
+			# is what a jet does and what makes a half-washed panel behave sensibly.
+			stripped = mini(moved, mud)
+			var rinsed: int = moved - stripped
+			mud -= stripped
+			foamed -= rinsed
+			_mud[patch] -= stripped
+			_mud_total -= stripped
+			_product[patch] -= rinsed
+			_product_total -= rinsed
 		Stage.FOAMED:
 			foamed += moved
 			_product[patch] += moved
@@ -398,9 +426,17 @@ func _touch(at: Vector2i, amount: float, stage: Stage, finished: PackedInt32Arra
 	)
 	_dirty = true
 	# Reported on the transition and only once, without a flag to remember it by.
-	# Each of the three is self-limiting: a patch that has just finished a stage has
-	# no pixel left with anything in that stage's source bucket, so every later
-	# touch of one returns above and never reaches here.
+	#
+	# [b]The wash needs the extra guard and the other two do not.[/b] A patch that
+	# has just been foamed or buffed has nothing left in that stage's source
+	# bucket, so every later touch returns above and never reaches here. The wash
+	# lost that property when it started taking product off as well: with the mud
+	# already gone it goes on moving units, and "this patch has no mud" would then
+	# be true on every one of them and ring a bell each time. So it reports on
+	# having actually moved mud, which can only be the case up to the touch that
+	# takes the last of it.
+	if stage == Stage.WASHED and stripped <= 0:
+		return
 	if _stage_finished(patch, stage):
 		finished.append(patch)
 
@@ -416,7 +452,10 @@ func _source(stage: Stage, mud: int, foamed: int, buffed: int) -> int:
 			return UNITS - mud - foamed - buffed
 		Stage.BUFFED:
 			return foamed
-	return mud
+	# The wash draws from both of the buckets that are things lying on the paint,
+	# and from neither of the two that are the paint. Shine is deliberately not in
+	# here — see [method wash].
+	return mud + foamed
 
 
 ## Whether [param patch] has just finished [param stage].
