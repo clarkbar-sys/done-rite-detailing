@@ -43,7 +43,11 @@ finished. What keeps those three in order is not a rule anybody wrote down: a
 texel divides its surface between mud, product, shine and bare paint, and each
 tool moves units from one of those to another. So a sponge on a muddy wing has
 no bare paint to draw from and a rag on a dry one has no product, and neither
-needs refusing. [`src/core/grime_map.gd`](./src/core/grime_map.gd) has the
+needs refusing. Nor can you leave the water till last — the jet takes the
+product off with the mud, so spraying a window you have just cleaned rinses it
+back to bare glass. It leaves a buffed panel alone, though: wax is not something
+lying on the paint, and a stray jet costing you three passes of work would be a
+punishment for imprecision rather than a rule anybody can learn. [`src/core/grime_map.gd`](./src/core/grime_map.gd) has the
 argument at length.
 
 And you can hear it now. Start rings a counter bell, and every patch that comes
