@@ -81,6 +81,7 @@ func _ready() -> void:
 	_grid.columns = COLUMNS
 	_board.visible = false
 	resized.connect(_relayout)
+	_board.resized.connect(_relayout)
 	_relayout()
 
 
@@ -150,13 +151,19 @@ func report(remaining: float, shine: float) -> void:
 	)
 
 
-## Puts the toggle in the top-left corner and the board directly under it.
+## Puts the toggle in the top-right corner and the board directly under it.
 ##
 ## [b]The top corner, because the bottom one is taken.[/b] [ToolBeltHud] lays its
 ## own toggle out at [constant ToolBeltHud.MARGIN] from the bottom left and rolls
 ## its icons up out of it, and [MotionPad] owns the bottom-right corner. A board in
 ## the bottom corner — which is where this one started — sits straight on top of
 ## the belt's [b]T[/b].
+##
+## [b]The right side, because the board hangs off whichever edge it's flush
+## with.[/b] The board is wider than the toggle, so its position tracks its own
+## width — that width can change as [method bind] adds or removes thumbnails,
+## which is why [signal Control.resized] on [member _board] is wired to this
+## same function alongside the one on this control.
 ##
 ## Sized off [method TouchTarget.min_design_size] rather than off a number
 ## written here, so this target and the belt's are the same size for the same
@@ -170,8 +177,10 @@ func _relayout() -> void:
 	var slot: float = ceilf(TouchTarget.min_design_size())
 	_toggle.custom_minimum_size = Vector2(slot, slot)
 	_toggle.size = Vector2(slot, slot)
-	_toggle.position = Vector2(ToolBeltHud.MARGIN, ToolBeltHud.MARGIN)
-	_board.position = Vector2(ToolBeltHud.MARGIN, ToolBeltHud.MARGIN + slot + ToolBeltHud.GAP)
+	_toggle.position = Vector2(size.x - ToolBeltHud.MARGIN - slot, ToolBeltHud.MARGIN)
+	_board.position = Vector2(
+		size.x - ToolBeltHud.MARGIN - _board.size.x, ToolBeltHud.MARGIN + slot + ToolBeltHud.GAP
+	)
 
 
 func _on_toggle_pressed() -> void:
