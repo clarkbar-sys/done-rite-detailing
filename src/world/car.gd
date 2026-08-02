@@ -58,16 +58,19 @@
 class_name Car
 extends Node3D
 
-## Sixteen paint colours a detailer might actually find parked in the
+## Thirteen paint colours a detailer might actually find parked in the
 ## driveway — the range you would see on the street, not a hue wheel.
 ## [method _ready] picks one of these for every car.
+##
+## Jet Black, Gunmetal and Charcoal were cut from the original sixteen: mud is a
+## dark brown ([code]mud_colour[/code] in [code]grime.gdshader[/code]), and on a
+## near-black or near-grey panel it sits close enough in both hue and lightness
+## that a player cannot tell dirty paint from clean. The remaining colours all sit
+## far enough from mud, in hue or in lightness, that the grime reads against them.
 const PAINT_COLORS: Array[Color] = [
 	Color(0.92, 0.92, 0.90),  # Alpine White
-	Color(0.04, 0.04, 0.05),  # Jet Black
 	Color(0.52, 0.53, 0.55),  # Pewter
 	Color(0.72, 0.73, 0.75),  # Silver
-	Color(0.27, 0.28, 0.30),  # Gunmetal
-	Color(0.15, 0.16, 0.18),  # Charcoal
 	Color(0.10, 0.35, 0.16),  # British Racing Green
 	Color(0.55, 0.72, 0.35),  # Lime Green
 	Color(0.08, 0.20, 0.42),  # Deep Blue
