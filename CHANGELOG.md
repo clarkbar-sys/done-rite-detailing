@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.4.0...v1.5.0) (2026-08-02)
+
+
+### Features
+
+* give the sponge, sprays and rag a layer each to work on ([#70](https://github.com/clarkbar-sys/done-rite-detailing/issues/70)) ([49112be](https://github.com/clarkbar-sys/done-rite-detailing/commit/49112be9ed9861df1c452d191ad83fc5704fcfcf))
+* let the power wash rinse product off as well as mud ([#72](https://github.com/clarkbar-sys/done-rite-detailing/issues/72)) ([eb5ac6f](https://github.com/clarkbar-sys/done-rite-detailing/commit/eb5ac6f4e4940b34810d11eb41642ab815a47748))
+* spray the power wash as water particles instead of a cone ([#66](https://github.com/clarkbar-sys/done-rite-detailing/issues/66)) ([2e55470](https://github.com/clarkbar-sys/done-rite-detailing/commit/2e55470b29a2e4a48d3aa676407074cb4d6bd479))
+* **ui:** swap the four arrow buttons for a thumb stick ([#67](https://github.com/clarkbar-sys/done-rite-detailing/issues/67)) ([209abcb](https://github.com/clarkbar-sys/done-rite-detailing/commit/209abcbcf7f4cb6a905caade73c05cd290d3cf51))
+* **world:** paint a Bryce-style sky over the driveway ([#69](https://github.com/clarkbar-sys/done-rite-detailing/issues/69)) ([089fadf](https://github.com/clarkbar-sys/done-rite-detailing/commit/089fadfdd30af2ea857611c4de491e2772165d90))
+
 ## [1.4.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.3.0...v1.4.0) (2026-08-02)
 
 
