@@ -1,8 +1,9 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://src/world/garage.gd" id="1_garage"]
 [ext_resource type="Script" path="res://src/world/view_model.gd" id="2_view_model"]
 [ext_resource type="PackedScene" path="res://src/world/car.tscn" id="3_car"]
+[ext_resource type="Shader" path="res://src/world/sky.gdshader" id="4_sky"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_unit"]
 size = Vector3(1, 1, 1)
@@ -15,12 +16,59 @@ roughness = 0.7
 albedo_color = Color(0.22, 0.55, 0.16, 1)
 roughness = 0.95
 
+; The sky. Every number in the *look* of it lives in the shader's own uniform
+; defaults rather than being overridden here, so there is one file to open when
+; the weather is wrong — see res://src/world/sky.gdshader, which also carries
+; the renderer note about why it is a single full-res pass.
+;
+; The one exception is below, and it is an exception because it is not a fact
+; about weather: where the sun stands is a fact about this driveway, the same
+; kind of thing as the Key light's transform a few lines down, and it belongs in
+; the room rather than in the paint. It is also the number that has to be
+; readable without a rendering device — the shader's own defaults are not, which
+; tests/integration/test_garage.gd found the hard way.
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("4_sky")
+shader_parameter/sun_direction = Vector3(0.45, 0.56, 0.7)
+
+; PROCESS_MODE_INCREMENTAL and the smallest radiance map going, because with
+; reflections off below neither one is feeding anything: this keeps the engine
+; from spending a cubemap bake per frame on a sky nothing samples.
+[sub_resource type="Sky" id="Sky_driveway"]
+sky_material = SubResource("ShaderMaterial_sky")
+process_mode = 2
+radiance_size = 0
+
+; background_mode 2 is BG_SKY. The two lines under `sky` are the deliberate
+; part, and both are decisions rather than defaults:
+;
+;   ambient_light_source = 2 is AMBIENT_SOURCE_COLOR — the grey that was tuned
+;   against the flat backdrop, kept. Switching it to 3 (SKY) would hand the
+;   ambient over to the sky, which is a nicer-sounding sentence than it is a
+;   picture: it tints the whole car and the grass blue and every value the two
+;   strip lights were balanced at has to be found again. That is a relight, and
+;   a relight is its own change.
+;
+;   reflected_light_source = 1 is REFLECTION_SOURCE_DISABLED, and it is doing
+;   real work — the default (0, BG) would start mirroring this sky the moment
+;   the background became one. The power wash is the only metal in the game at
+;   metallic 0.9 / roughness 0.25, and it is meant to read as dark metal with
+;   hard highlights.
+;
+;   Rendered both ways rather than argued about. With this at 2 the wand in the
+;   viewmodel goes pale blue chrome end to end, its one hard highlight replaced
+;   by a mirrored sky, and the mud on the car lifts and desaturates with it —
+;   the red paint showing through a half-washed panel stops reading as paint.
+;   It is one line to look at it yourself, and it is worth looking at once; the
+;   cost is that plus a cubemap bake. src/world/view_model.gd's class docs carry
+;   the same note.
 [sub_resource type="Environment" id="Environment_bay"]
-background_mode = 1
-background_color = Color(0.53, 0.81, 0.92, 1)
+background_mode = 2
+sky = SubResource("Sky_driveway")
 ambient_light_source = 2
 ambient_light_color = Color(0.48, 0.5, 0.56, 1)
 ambient_light_energy = 0.9
+reflected_light_source = 1
 
 [node name="Garage" type="SubViewportContainer"]
 layout_mode = 3
