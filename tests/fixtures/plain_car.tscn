@@ -1,0 +1,68 @@
+[gd_scene format=3]
+
+; A car with nothing about it worth looking at: three axis-aligned slabs, one of
+; each Surface.Kind (two of bodywork), at round numbers a test can do arithmetic
+; with in its head.
+;
+; WHY THIS EXISTS. src/world/car.tscn is a blockout that is going to be replaced
+; by real geometry, and a test that says "wash the Hood" is a test that breaks
+; when somebody renames a panel or reshapes the nose — for reasons that have
+; nothing to do with washing. Everything about the rules of the job (a cleaner
+; needs bare paint, the wrong bottle does nothing, a hit reaches the right map)
+; is true of any car at all, so those tests use this one and stop caring what the
+; game's car looks like.
+;
+; WHAT IT DELIBERATELY DOES NOT REPLACE. Anything that measures the real car:
+; the camera's clearance around it, the viewmodel's reach across it, the standoff
+; hugging its outline. Those tests are supposed to go red when the art changes —
+; that is the bug they exist to catch — and pointing them at a fixture would
+; delete their reason to exist. tests/integration/test_car.gd stays on the real
+; scene too, because it is the contract between this file and reality: it is
+; what fails if the groups come off the real car's glass while every test in here
+; goes on passing.
+;
+; It runs the real Car script rather than a stand-in, so panels(), kind_of() and
+; the paint all behave exactly as they do in the game. What is fake here is the
+; geometry, and only the geometry.
+
+[ext_resource type="Script" path="res://src/world/car.gd" id="1_plaincar"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_paint"]
+resource_local_to_scene = true
+albedo_color = Color(0.13, 0.66, 0.27, 1)
+roughness = 0.55
+
+[node name="Car" type="Node3D" unique_id=910000001]
+script = ExtResource("1_plaincar")
+paint = SubResource("StandardMaterial3D_paint")
+
+; Two body panels rather than one, a metre apart along X. No group on either, so
+; Car.kind_of reads them as bodywork by the same defaulting the real car relies
+; on — and two of the same kind is what "washing one panel leaves the next one
+; filthy" needs to mean anything. Both 2 x 1 x 2 m, at round numbers.
+[node name="BodyFront" type="CSGBox3D" parent="." unique_id=910000002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 0)
+use_collision = true
+size = Vector3(2, 1, 2)
+material = SubResource("StandardMaterial3D_paint")
+
+[node name="BodyRear" type="CSGBox3D" parent="." unique_id=910000005]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0)
+use_collision = true
+size = Vector3(2, 1, 2)
+material = SubResource("StandardMaterial3D_paint")
+
+; A metre cube of glass, clear of the body in +Y so a brush on one cannot reach
+; the other and a test that wanted the two to be independent gets that for free.
+[node name="Window" type="CSGBox3D" parent="." unique_id=910000003 groups=["glass"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+use_collision = true
+size = Vector3(1, 1, 1)
+
+; And a metre cube of rubber, clear of both. A box rather than a cylinder: this
+; file is about being easy to project into and reason about, and the real car is
+; where a curved wheel has to work.
+[node name="Wheel" type="CSGBox3D" parent="." unique_id=910000004 groups=["wheel"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)
+use_collision = true
+size = Vector3(1, 1, 1)

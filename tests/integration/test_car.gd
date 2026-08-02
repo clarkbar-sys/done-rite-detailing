@@ -247,6 +247,26 @@ func test_every_panel_of_the_car_has_a_cleaner_for_it() -> void:
 		assert_true(belt.index_of(cleaner) >= 0, "%s has no cleaner on the belt" % panel.name)
 
 
+func test_the_real_car_carries_every_kind_the_fixture_stands_in_for() -> void:
+	# THE CONTRACT BETWEEN THE FIXTURE AND REALITY, and the reason this file stays
+	# on `src/world/car.tscn` while `test_grime.gd` moved off it.
+	#
+	# The rules of the job are tested against `tests/fixtures/plain_car.tscn`,
+	# which has a slab of each kind and always will. That is only safe while the
+	# real car also has one of each — the day somebody re-models the glass and the
+	# group does not come with it, every test over there goes on passing and the
+	# window cleaner stops working in the game. This is what fails instead.
+	#
+	# By kind and not by name on purpose: renaming a panel is allowed, losing a
+	# whole surface is not.
+	for kind: Surface.Kind in [Surface.Kind.BODY, Surface.Kind.GLASS, Surface.Kind.WHEEL]:
+		var found: int = 0
+		for panel: CSGShape3D in _car.panels():
+			if _car.kind_of(panel) == kind:
+				found += 1
+		assert_gt(found, 0, "the real car has no panel of kind %d left" % kind)
+
+
 func test_something_that_is_not_a_panel_is_treated_as_bodywork() -> void:
 	# The caller is [method Garage._spend_the_trigger], holding whatever a raycast
 	# handed back. A null there should pick a tool nobody can use on it, not crash

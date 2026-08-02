@@ -100,6 +100,16 @@ func _panel(named: String) -> CSGShape3D:
 	return null
 
 
+## One panel of [param kind] on the real car. Asked for by what it is made of
+## rather than by name, so reshaping or renaming the blockout cannot make a test
+## about the bell quietly become a test about nothing.
+func _a_panel_of(kind: Surface.Kind) -> CSGShape3D:
+	for panel: CSGShape3D in _car().panels():
+		if _car().kind_of(panel) == kind:
+			return panel
+	return null
+
+
 func _marker() -> AimMarker:
 	return _garage().aim_marker()
 
@@ -179,6 +189,18 @@ func _lift() -> void:
 
 func _settle() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
+
+
+## A brush wide enough to cover a whole face of [param panel], so a test that
+## wants a patch finished gets one whatever size the panel is.
+##
+## Measured off the panel rather than written down, and that is not fussiness: a
+## patch is a fraction of a panel's own box, so 0.6 m covers one comfortably on a
+## bonnet and does not reach the corner of one on the car's whole shell. A fixed
+## radius here silently stopped finishing patches the moment these tests started
+## asking for "a body panel" instead of naming the bonnet.
+func _whole_face_of(panel: CSGShape3D) -> float:
+	return (panel.global_transform * panel.get_aabb()).size.length()
 
 
 # ---- is there mud at all -----------------------------------------------------
@@ -362,8 +384,8 @@ func test_a_patch_coming_clean_rings_the_bell() -> void:
 	# red the day somebody turns the water down. That a held press reaches the
 	# paint at all is the tests above.
 	await _settle()
-	var hood: CSGShape3D = _panel("Hood")
-	assert_not_null(hood, "the car has no Hood")
+	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
 	var before: int = _bell().rings()
@@ -371,7 +393,7 @@ func test_a_patch_coming_clean_rings_the_bell() -> void:
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var finished: int = 0
 	for _sweep: int in 60:
-		finished += _grime().wash(hood, on_top, Vector3.UP, 0.6, 0.1)
+		finished += _grime().wash(hood, on_top, Vector3.UP, _whole_face_of(hood), 0.1)
 	assert_gt(finished, 0, "washing the bonnet flat never finished a patch")
 	assert_gt(_bell().rings(), before, "a patch came clean and the game said nothing")
 
@@ -382,7 +404,7 @@ func test_a_burst_of_patches_is_not_a_burst_of_bells() -> void:
 	# this asserts the screen leaves that judgement to it rather than filtering
 	# on its own or, worse, ringing per texel.
 	await _settle()
-	var hood: CSGShape3D = _panel("Hood")
+	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
 	if hood == null:
 		return
 	var box: AABB = hood.global_transform * hood.get_aabb()
@@ -390,7 +412,7 @@ func test_a_burst_of_patches_is_not_a_burst_of_bells() -> void:
 	var before: int = _bell().rings()
 	var finished: int = 0
 	for _sweep: int in 60:
-		finished += _grime().wash(hood, on_top, Vector3.UP, 0.9, 0.2)
+		finished += _grime().wash(hood, on_top, Vector3.UP, _whole_face_of(hood), 0.2)
 	assert_gt(finished, 1, "the sweep finished at most one patch, so there is no burst to thin")
 	assert_lt(_bell().rings() - before, finished, "every patch in the burst got its own bell")
 
