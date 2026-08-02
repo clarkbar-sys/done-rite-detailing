@@ -223,13 +223,15 @@ func test_the_screen_host_underneath_still_stops_what_it_is_handed() -> void:
 
 
 func test_a_tap_on_the_motion_pad_is_not_an_aim() -> void:
-	# The pad's arrows are their own controls and get their own taps. A screen that
-	# also aimed on them would put a crosshair on the car every time the player
-	# took a step.
+	# The stick claims presses that land on it, and this is the half of that claim
+	# only the real screen can show: a screen that also aimed on them would put a
+	# crosshair on the car every time the player took a step. It works because the
+	# pad takes the touch in [method Node._input], before the GUI hands it to the
+	# screen underneath — so a pad that had merely stopped picking it up in the
+	# right place would fail here rather than in a browser.
 	await _settle()
-	var arrow: Button = _pad().button_for(MotionPad.RIGHT)
-	await _press(arrow.get_global_rect().get_center())
-	assert_true(arrow.button_pressed, "the arrow took the press")
+	await _press(_pad().point_for(MotionPad.RIGHT))
+	assert_true(_pad().is_held(), "the stick took the press")
 	assert_false(_marker().is_marking(), "and the room was not asked to aim")
 
 
@@ -239,15 +241,15 @@ func test_walking_and_aiming_at_the_same_time_both_work() -> void:
 	# the *first* finger, so a thumb parked on the pad would otherwise make the
 	# second finger produce no event at all.
 	await _settle()
-	var arrow: Button = _pad().button_for(MotionPad.RIGHT)
+	var stick: Vector2 = _pad().point_for(MotionPad.RIGHT)
 	var before: Vector3 = _camera().global_position
-	_touch(arrow.get_global_rect().get_center(), true)
+	_touch(stick, true)
 	await wait_physics_frames(RESOLVE_FRAMES)
 	await _press(_at_the_car())
 	await wait_physics_frames(RESOLVE_FRAMES * 4)
 	assert_true(_marker().is_marking(), "the second finger aimed")
 	assert_gt(before.distance_to(_camera().global_position), 0.0, "while the first one walked")
-	_touch(arrow.get_global_rect().get_center(), false)
+	_touch(stick, false)
 
 
 func test_a_second_finger_does_not_steal_the_aim() -> void:

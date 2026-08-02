@@ -25,9 +25,10 @@
 ## [b]The other loop this screen owns is movement[/b], and it is the same shape:
 ## the pad ([MotionPad]) says which way the player is asking to go, the room
 ## ([Garage]) works out what that does to a camera, and neither has heard of the
-## other. A stick, a swipe or a pair of thumbs on the glass replaces the first
-## without the second noticing, which is the whole reason the thing crossing this
-## file is two numbers in [code]-1..1[/code] rather than a button.
+## other. That seam has already been cashed in once: the pad was four arrow
+## buttons and is now a thumb stick, and nothing in this file or the room changed
+## — which is the whole reason the thing crossing here is two numbers in
+## [code]-1..1[/code] rather than a button.
 ##
 ## [b]Movement is polled and tool changes are not, and that is not an
 ## inconsistency.[/b] Picking a tool happens at an instant, so it is a signal.
@@ -65,9 +66,12 @@
 ## [code]stop[/code] filter is the topmost thing under every touch that is not on
 ## a button, and the GUI system hands the event to [i]it[/i] rather than letting
 ## the event go unhandled. This screen is such a control, so this is where its
-## taps go. The belt's icons and the pad's arrows still get their own taps first
-## — they are separate controls and the hit test finds them before it reaches
-## this one.
+## taps go. The belt's icons still get their own taps first — they are separate
+## controls and the hit test finds them before it reaches this one — and the
+## motion pad's stick gets in earlier still, by claiming the touches that land on
+## it in [method Node._input], before the GUI pass runs at all. Both of those are
+## the same rule from two directions: a press that belongs to the HUD is not an
+## aim.
 ##
 ## [b]The way that is wrong, because it was shipped for an hour and looked
 ## right.[/b] The obvious alternative is to set this root to
@@ -88,7 +92,7 @@
 ## [b]Both fingers work, which took the long way round.[/b] The engine emulates a
 ## mouse from touch — that is what makes the belt's [Button]s work on a phone at
 ## all, and [code]project.godot[/code] says so — but it only emulates the
-## [i]first[/i] finger. So a thumb parked on the pad's right arrow would eat the
+## [i]first[/i] finger. So a thumb parked on the pad's stick would eat the
 ## emulation and a second finger on the car would produce no mouse event
 ## whatsoever: walk and aim, the two things a player does at once, would be
 ## mutually exclusive. The fix is to read the touch events themselves and ignore
@@ -128,8 +132,8 @@ const CLOSE_ACTION: String = "tool_belt_close"
 ## on the key; the belt is indexed from 0 and the conversion happens once, below.
 const SLOT_ACTION_PREFIX: String = "tool_slot_"
 
-## Walks the eye left around the car: the keyboard's half of the pad's left
-## arrow.
+## Walks the eye left around the car: the keyboard's half of pushing the pad's
+## stick left.
 const TURN_LEFT_ACTION: String = "camera_left"
 
 ## Walks it right.
@@ -186,9 +190,10 @@ func _ready() -> void:
 ## leave the camera coasting on the last thing it heard.
 ##
 ## The two input sources are summed and the room clamps the total, so holding the
-## right arrow and the pad's right button walks at one speed rather than two.
-## [method Input.get_axis] is the engine's own idiom for a held pair and returns
-## the same [code]-1..1[/code] the pad does.
+## right arrow key with the stick already pushed right walks at one speed rather
+## than two. [method Input.get_axis] is the engine's own idiom for a held pair and
+## returns the same [code]-1..1[/code] the pad does — the difference being that a
+## key is only ever at an end of that range and a thumb can be anywhere in it.
 func _process(_delta: float) -> void:
 	var turn: float = _pad.turn() + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
 	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)

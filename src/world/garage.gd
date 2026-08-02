@@ -151,18 +151,18 @@
 ## grime work needs and the reason [signal aimed] carries a name at all.
 ##
 ## [b]And the tool that sprays draws its own sight.[/b] With the power wash in
-## hand the crosshair is replaced by a [WashJet]: a narrow cone from the wand's
-## nozzle to the mark, blue at the tip and red where it lands, as wide at its
-## base as [member wash_radius_metres] — which is to say, the patch [method
-## _spend_the_trigger] is about to clean, drawn at the size and angle it is
-## actually cleaned at. The other four tools are put on the car at a point and
+## hand the crosshair is replaced by a [WashJet]: water thrown from the wand's
+## nozzle at the mark, bright blue as it leaves and darker as it lands, spreading to
+## [member wash_radius_metres] where it arrives — which is to say, the patch
+## [method _spend_the_trigger] is about to clean, sprayed at the size and angle it
+## is actually cleaned at. The other four tools are put on the car at a point and
 ## keep the crosshair, which is the right shape for them.
 ##
-## [b]The crosshair is what [member debug_tools] puts back.[/b] The cone is the
+## [b]The crosshair is what [member debug_tools] puts back.[/b] The water is the
 ## honest picture of the water and it is what the game shows; the bare
 ## crosshair, under the power wash too, is the diagnostic — it says where the
 ## aim resolved with nothing drawn over the top of it, which is the question
-## worth asking when the cone and the mud disagree. [method _sight_the_aim] is
+## worth asking when the jet and the mud disagree. [method _sight_the_aim] is
 ## the whole of the choice, made every tick from the belt and the flag together,
 ## so swapping tools or toggling debug mid-press swaps the sight with them.
 ##
@@ -366,8 +366,8 @@ const PAST_THE_POST: float = 1.1
 ## was right for as long as this radius was invisible: nothing on screen was that
 ## size, only the mud it cleared was.
 ##
-## [WashJet] changed that. It draws this radius as a solid disc the player looks
-## straight at, and half a metre of radius put a 0.9 m circle of red at the far
+## [WashJet] changed that. It puts this radius on screen as the patch the water
+## lands on, and half a metre of radius put a 0.9 m circle of spray at the far
 ## end of the jet — wider across than the car's own wheels (0.33 m radius each,
 ## see [code]src/world/car.gd[/code]) — which reads as a wheel-sized ball landing
 ## on the paint rather than as a mark. The lesson above still holds; it is just
@@ -382,8 +382,8 @@ const PAST_THE_POST: float = 1.1
 ## close, which is a mechanic. It wants the standoff and the reach to mean
 ## something first.
 ##
-## Doubled from the fifth of a metre above to two fifths: a bigger circle of
-## red at the far end of [WashJet] reads as more pressure behind the wand, and
+## Doubled from the fifth of a metre above to two fifths: a wider patch of
+## water at the far end of [WashJet] reads as more pressure behind the wand, and
 ## doubling [member wash_per_second] alongside it keeps the time to clean a
 ## single spot the same — this widens the patch a press covers rather than
 ## changing how long a press takes.
@@ -402,30 +402,28 @@ const PAST_THE_POST: float = 1.1
 ## weaker rather than wider.
 @export var wash_per_second: float = 5.0
 
-## How wide the three cleaners reach, as a radius in metres. Half the jet's, and
-## that is the difference in feel between the two: water is thrown at the car
-## from a step back and a sponge is pressed against it.
+## How wide the three cleaners reach, as a radius in metres. Half the jet's:
+## water is thrown from a step back and a sponge is pressed against the paint.
 @export var scrub_radius_metres: float = 0.22
 
 ## How much product a held cleaner lays down per second, where [code]1.0[/code]
-## is full cover. Slower than the jet on purpose: the wash is the coarse pass
-## over the whole car and wants to feel powerful, and the cleaners are the pass
-## where the player is picking out a window or a wheel.
+## is full cover. Slower than the jet: the wash is the coarse pass over the whole
+## car, and the cleaners are the pass where a window or a wheel is picked out.
 @export var scrub_per_second: float = 3.0
 
 ## How wide the drying rag reaches. A cloth is a bigger thing than a sponge.
 @export var buff_radius_metres: float = 0.3
 
 ## How much product a held rag turns into shine per second. The fastest of the
-## three: the buff is the last pass over ground the player has already covered
-## twice, and the reveal is the reward rather than a third round of work.
+## three: it is the last pass over ground already covered twice, and the reveal
+## is meant to be the reward rather than a third round of work.
 @export var buff_per_second: float = 4.5
 
-## Whether the power wash wears the plain crosshair instead of drawing
-## [WashJet]'s cone. Off by default, so what ships is the cone: it is the shape
-## of the water and the thing a player is meant to be looking at. Switched on —
+## Whether the power wash wears the plain crosshair instead of spraying
+## [WashJet]'s water. Off by default, so what ships is the water: it is the thing
+## a player is meant to be looking at. Switched on —
 ## [code]src/screens/play_screen.gd[/code] wires this to the "~" panel's "Debug
-## Tools" button — the cone is stowed and the bare crosshair shows through, which
+## Tools" button — the jet is stowed and the bare crosshair shows through, which
 ## is the developer's view of where the aim landed with nothing drawn over it.
 ##
 ## Only the sight changes. [method _spend_the_trigger] still spends the same
@@ -587,10 +585,10 @@ func aim_marker() -> AimMarker:
 	return _marker
 
 
-## The power wash's cone of water, or [code]null[/code] on a screen that never
-## took up aiming. Public for the same reason [method aim_marker] is: a test
-## should be able to ask where the water actually went rather than trust that
-## something drew it.
+## The power wash's water, or [code]null[/code] on a screen that never took up
+## aiming. Public for the same reason [method aim_marker] is: a test should be
+## able to ask where the water actually went rather than trust that something
+## sprayed it.
 func wash_jet() -> WashJet:
 	return _jet
 
@@ -731,18 +729,18 @@ func _resolve_aim(delta: float) -> void:
 	aimed.emit(_marked)
 
 
-## Draws the aim the way the tool in hand wants it drawn: a cone of water for the
-## power wash, the crosshair for the other four.
+## Draws the aim the way the tool in hand wants it drawn: water for the power
+## wash, the crosshair for the other four.
 ##
 ## [b]The mark is made first and always[/b], whichever sight is showing. It is
 ## what the panel readout names, what the wand lines itself up with, and what the
 ## trigger spends water on — see [AimMarker] — so this function only ever decides
 ## what is drawn on top of it.
 ##
-## [b]The cone is hung off the nozzle and not off the eye.[/b] The wand is
+## [b]The water is thrown from the nozzle and not from the eye.[/b] The wand is
 ## already aligned to the mark by [WandCarry], so the two agree once it has
-## finished coming up; drawing from the nozzle rather than from the aim's own ray
-## means the cone is anchored to the thing the player can see spraying it, and
+## finished coming up; spraying from the nozzle rather than from the aim's own ray
+## means the jet is anchored to the thing the player can see spraying it, and
 ## converges onto the wand while the wand is still swinging.
 ##
 ## Asked of the belt every tick rather than wired up on a swap: a tool changed
@@ -765,7 +763,9 @@ func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 ##
 ## [b]The water goes where the crosshair is.[/b] Wherever the mark is sitting on
 ## real bodywork — whether the ray landed there or the aim snapped there — that is
-## where the tool is pointed, and the game has just told the player so in red.
+## where the tool is pointed, and the game has just said so — in red for the four
+## tools that wear the crosshair, and with the water itself for the one that
+## sprays.
 ##
 ## This shipped the other way round for a day and it was wrong. The first rule was
 ## "only a ray that actually hit", reasoned about a player at a desk pointing at
