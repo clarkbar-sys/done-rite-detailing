@@ -204,3 +204,51 @@ func test_a_panel_can_be_baked_to_a_real_mesh() -> void:
 	assert_not_null(baked, "a panel must bake down to a real mesh")
 	if baked != null:
 		assert_gt(baked.get_surface_count(), 0, "and the mesh must have something in it")
+
+
+# ---- what each panel is made of ------------------------------------------------
+
+
+func test_the_glass_panels_are_glass() -> void:
+	# Read off groups set in `car.tscn` rather than off panel names — see
+	# [method Car.kind_of]. What this pins is that the groups are actually on the
+	# nodes, which is the half of that arrangement a script cannot check itself.
+	for named: String in ["Windshield", "RearGlass", "SideGlass"]:
+		var panel: CSGShape3D = _panel(named)
+		assert_not_null(panel, "the car has no %s" % named)
+		if panel != null:
+			assert_eq(_car.kind_of(panel), Surface.Kind.GLASS, named)
+
+
+func test_the_wheels_are_wheels() -> void:
+	for named: String in ["WheelFrontLeft", "WheelFrontRight", "WheelRearLeft", "WheelRearRight"]:
+		var panel: CSGShape3D = _panel(named)
+		assert_not_null(panel, "the car has no %s" % named)
+		if panel != null:
+			assert_eq(_car.kind_of(panel), Surface.Kind.WHEEL, named)
+
+
+func test_everything_else_is_bodywork() -> void:
+	# The default, which is what makes adding a panel safe: a new wing gets the
+	# sponge without anybody remembering to say so.
+	for named: String in ["Body", "Hood", "Deck", "Roof", "Cabin"]:
+		var panel: CSGShape3D = _panel(named)
+		assert_not_null(panel, "the car has no %s" % named)
+		if panel != null:
+			assert_eq(_car.kind_of(panel), Surface.Kind.BODY, named)
+
+
+func test_every_panel_of_the_car_has_a_cleaner_for_it() -> void:
+	# The property that matters more than any individual assignment above: there
+	# is no panel a player cannot finish because no bottle claims it.
+	var belt: ToolBelt = ToolBelt.new()
+	for panel: CSGShape3D in _car.panels():
+		var cleaner: DetailingTool.Id = Surface.cleaner_for(_car.kind_of(panel))
+		assert_true(belt.index_of(cleaner) >= 0, "%s has no cleaner on the belt" % panel.name)
+
+
+func test_something_that_is_not_a_panel_is_treated_as_bodywork() -> void:
+	# The caller is [method Garage._spend_the_trigger], holding whatever a raycast
+	# handed back. A null there should pick a tool nobody can use on it, not crash
+	# a physics tick.
+	assert_eq(_car.kind_of(null), Surface.Kind.BODY)

@@ -1,5 +1,5 @@
-## Unit tests for [GrimeMap] — the mud on one panel, and the bookkeeping that
-## says when a bit of it is done.
+## Unit tests for [GrimeMap] — what is sitting on one panel, and the bookkeeping
+## that says when a bit of it is done.
 ##
 ## Under tests/unit/ despite owning an [Image] and an [ImageTexture]: neither
 ## needs a scene tree, a renderer or a frame, which is the rule this project
@@ -63,14 +63,14 @@ func test_the_atlas_is_three_tiles_by_two() -> void:
 	assert_eq(_map.image().get_height(), TILE * BoxProjection.ROWS)
 
 
-func test_the_channels_the_other_tools_will_use_start_empty() -> void:
-	# Green is the film a sponge works on and blue is the water a cloth dries.
-	# Allocated, documented and deliberately not seeded — see the class docs. A
-	# future tool starting its layer somewhere other than zero is a decision that
-	# should break this test and be made on purpose.
-	var pixel: Color = _map.image().get_pixel(0, 0)
-	assert_almost_eq(pixel.g, 0.0, TOLERANCE, "the film")
-	assert_almost_eq(pixel.b, 0.0, TOLERANCE, "the water")
+func test_a_fresh_panel_has_no_product_no_shine_and_no_bare_paint() -> void:
+	# The one seeding the conservation law allows: every unit in the mud bucket.
+	# A panel that started with bare paint on it would be a panel a sponge works
+	# on before the water has run.
+	assert_almost_eq(_map.product(), 0.0, TOLERANCE, "the product")
+	assert_almost_eq(_map.shine(), 0.0, TOLERANCE, "the shine")
+	assert_almost_eq(_map.bare_at(_middle(), Vector3.RIGHT), 0.0, TOLERANCE, "the bare paint")
+	assert_false(_map.is_finished(), "and it is certainly not done")
 
 
 func test_the_patch_count_is_the_atlas_diced_by_the_knob() -> void:

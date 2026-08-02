@@ -23,23 +23,30 @@
 ## this class to know what every panel is painted, which is a copy of the car's
 ## own scene file waiting to go stale.
 ##
-## [b]Only the power wash, and only the red channel.[/b] This is the first tool
-## of five and the first of three layers; see [GrimeMap] for what green and blue
-## are held back for. What a tool does is not decided here — [Garage] holds the
-## trigger and this takes the instruction — because "the sponge works on film,
-## and only where the mud is already off" is a rule about the game, and this
-## class is about a texture.
+## [b]All three layers, and one of them knows what the panel is made of.[/b]
+## [method wash] and [method buff] work anywhere; [method foam] is the middle step
+## and the only one that cares, because a sponge is for paint and a bottle of
+## glass cleaner is not. Which cleaner goes with which panel is [Surface], and
+## which panel is which kind is [method Car.kind_of] — neither is decided here,
+## and neither is the rule about which tool the player is holding, because
+## [Garage] holds the trigger and this takes the instruction. What this class
+## knows is a texture and the panel it is stretched over.
 class_name Grime
 extends Node3D
 
-## A patch of a panel has just been washed clean. Carries the panel it was on and
-## which patch, so a listener can ring, score it, or ignore the panel name
-## entirely and just count.
+## A patch of a panel has just finished a step of the job. Carries the panel it
+## was on, which patch, and which step — so a listener can ring, score it, or
+## ignore all three and just count.
 ##
 ## Per patch and not per panel: a bonnet is a lot of washing to do for one piece
 ## of feedback, and the size of a patch is [member patches_per_tile] rather than
 ## a decision taken here — how often this fires is a matter of taste.
-signal patch_cleared(panel: String, patch: int)
+##
+## One signal carrying a stage rather than three signals, because everything
+## listening so far wants the same thing from all three — a small noise saying
+## "that worked" — and a listener that wants to tell them apart has the argument
+## to do it with.
+signal patch_finished(panel: String, patch: int, stage: GrimeMap.Stage)
 
 ## Where the overlay comes from.
 const SHADER: String = "res://src/world/grime.gdshader"
@@ -77,7 +84,7 @@ func lay_on(car: Car) -> void:
 	for panel: CSGShape3D in _panels:
 		var map: GrimeMap = GrimeMap.new(panel.get_aabb(), tile_pixels, patches_per_tile)
 		_maps.append(map)
-		panel.material_overlay = _overlay(shader, map, panel.get_aabb())
+		panel.material_overlay = _overlay(shader, map, panel.get_aabb(), car.kind_of(panel))
 
 
 ## Whether [method lay_on] has run. False on a room that never took up grime —
@@ -117,6 +124,31 @@ func remaining() -> float:
 	return left / float(_maps.size())
 
 
+## How much of the car is under product right now, as [code]0..1[/code]. Goes up
+## under the cleaners and back down under the rag — see [method GrimeMap.product].
+func product() -> float:
+	if _maps.is_empty():
+		return 0.0
+	var on: float = 0.0
+	for map: GrimeMap in _maps:
+		on += map.product()
+	return on / float(_maps.size())
+
+
+## How much of the car is buffed to a shine, as [code]0..1[/code].
+##
+## The progress number, and the one a bar should be reading: it only ever rises,
+## and unlike [method remaining] it does not call a car finished when the mud
+## comes off. Unweighted for the same reason [method remaining] is.
+func shine() -> float:
+	if _maps.is_empty():
+		return 0.0
+	var buffed: float = 0.0
+	for map: GrimeMap in _maps:
+		buffed += map.shine()
+	return buffed / float(_maps.size())
+
+
 ## Takes [param amount] of mud off [param panel] at [param world_point], over a
 ## brush of [param radius_metres], for a surface facing [param world_normal].
 ##
@@ -125,11 +157,53 @@ func remaining() -> float:
 ## is the only thing that knows how, and a caller that got it wrong would wash a
 ## spot the crosshair is not on.
 ##
-## Returns how many patches it finished, and emits [signal patch_cleared] once
+## Returns how many patches it finished, and emits [signal patch_finished] once
 ## for each. Zero for a panel that is not part of this car, so a stray hit on the
 ## driveway is not an error.
 func wash(
 	panel: Node, world_point: Vector3, world_normal: Vector3, radius_metres: float, amount: float
+) -> int:
+	return _work(panel, world_point, world_normal, radius_metres, amount, GrimeMap.Stage.WASHED)
+
+
+## Lays [param amount] of product onto the bare paint of [param panel], the same
+## way [method wash] takes mud off it.
+##
+## [b]It does not check what the panel is made of or what the player is holding.[/b]
+## That rule lives with the trigger — see [method Garage._spend_the_trigger] —
+## because "the window cleaner is for glass" is a decision about the game and this
+## class is about a texture. What stops a bottle working on a muddy panel is not a
+## rule at all: there is no bare paint to cover, so nothing moves.
+func foam(
+	panel: Node, world_point: Vector3, world_normal: Vector3, radius_metres: float, amount: float
+) -> int:
+	return _work(panel, world_point, world_normal, radius_metres, amount, GrimeMap.Stage.FOAMED)
+
+
+## Wipes [param amount] of product off [param panel], turning it into shine.
+##
+## Works on any panel, and does nothing at all on one that has no product on it —
+## which is the whole of "you have to soap it before you buff it", and is again
+## arithmetic rather than a refusal.
+func buff(
+	panel: Node, world_point: Vector3, world_normal: Vector3, radius_metres: float, amount: float
+) -> int:
+	return _work(panel, world_point, world_normal, radius_metres, amount, GrimeMap.Stage.BUFFED)
+
+
+## One tool, one press: finds the panel's map, puts the hit into the panel's own
+## space, and runs [param stage] over it.
+##
+## The three public methods above differ in nothing but which stage they name, so
+## the world-to-panel conversion — the part that is easy to get subtly wrong —
+## exists exactly once.
+func _work(
+	panel: Node,
+	world_point: Vector3,
+	world_normal: Vector3,
+	radius_metres: float,
+	amount: float,
+	stage: GrimeMap.Stage
 ) -> int:
 	var shape: CSGShape3D = panel as CSGShape3D
 	var map: GrimeMap = map_of(shape)
@@ -138,20 +212,35 @@ func wash(
 	var into: Transform3D = shape.global_transform.affine_inverse()
 	# The normal is turned by the basis alone — it is a direction, and putting it
 	# through the full transform would add the panel's position to it and send
-	# every wash to whichever face the car happens to be parked toward.
+	# every touch to whichever face the car happens to be parked toward.
 	var facing: Vector3 = (into.basis * world_normal).normalized()
-	var finished: PackedInt32Array = map.wash(into * world_point, facing, radius_metres, amount)
+	var at: Vector3 = into * world_point
+	var finished: PackedInt32Array
+	match stage:
+		GrimeMap.Stage.WASHED:
+			finished = map.wash(at, facing, radius_metres, amount)
+		GrimeMap.Stage.FOAMED:
+			finished = map.foam(at, facing, radius_metres, amount)
+		_:
+			finished = map.buff(at, facing, radius_metres, amount)
 	for patch: int in finished:
-		patch_cleared.emit(String(shape.name), patch)
+		patch_finished.emit(String(shape.name), patch, stage)
 	return finished.size()
 
 
-## The overlay material for one panel: the shader, its mask, and the box the
-## projection measures in.
-func _overlay(shader: Shader, map: GrimeMap, box: AABB) -> ShaderMaterial:
+## The overlay material for one panel: the shader, its mask, the box the
+## projection measures in, and what the cleaner for this kind of panel looks like.
+##
+## The product colour is set once, here, and never again — which is how one
+## channel of the mask carries white suds on the paint, blue on the glass and
+## green on the tyres without the mask having anywhere to record which. A panel
+## does not change what it is made of. [method Surface.product_colour] has the
+## argument at length.
+func _overlay(shader: Shader, map: GrimeMap, box: AABB, kind: Surface.Kind) -> ShaderMaterial:
 	var paint: ShaderMaterial = ShaderMaterial.new()
 	paint.shader = shader
-	paint.set_shader_parameter("mud_mask", map.texture())
+	paint.set_shader_parameter("grime_mask", map.texture())
 	paint.set_shader_parameter("box_origin", box.position)
 	paint.set_shader_parameter("box_size", box.size)
+	paint.set_shader_parameter("product_colour", Surface.product_colour(kind))
 	return paint

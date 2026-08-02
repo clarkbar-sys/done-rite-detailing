@@ -109,6 +109,31 @@ func panels() -> Array[CSGShape3D]:
 	return found
 
 
+## What [param panel] is made of, which is what decides the bottle a detailer
+## reaches for — see [method Surface.cleaner_for].
+##
+## [b]Read off a group, not off the panel's name.[/b] [method panels] goes out of
+## its way not to carry a list of panel names, because a list written down in a
+## script goes stale the first time somebody adds a panel in the editor; answering
+## this by matching [code]"Windshield"[/code] and [code]"SideGlass"[/code] would
+## put that list back, one function further down. A group is set on the node in
+## [code]car.tscn[/code], next to the geometry it describes, so a new window is
+## marked as glass in the same place it is given a shape.
+##
+## [b]Paint is the default and has no group.[/b] Most of the car is bodywork, and
+## a panel added without a thought about this gets the sponge — which is right far
+## more often than it is wrong, and is wrong in the direction of "my tool did
+## nothing" rather than "the glass cleaner works on the doors".
+func kind_of(panel: Node) -> Surface.Kind:
+	if panel == null:
+		return Surface.Kind.BODY
+	if panel.is_in_group(Surface.GLASS_GROUP):
+		return Surface.Kind.GLASS
+	if panel.is_in_group(Surface.WHEEL_GROUP):
+		return Surface.Kind.WHEEL
+	return Surface.Kind.BODY
+
+
 ## The car's bounding box, in world space, around every panel it actually has.
 ##
 ## What the old green box gave callers for free as [method VisualInstance3D.get_aabb],

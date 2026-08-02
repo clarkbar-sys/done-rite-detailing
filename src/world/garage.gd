@@ -402,6 +402,25 @@ const PAST_THE_POST: float = 1.1
 ## weaker rather than wider.
 @export var wash_per_second: float = 5.0
 
+## How wide the three cleaners reach, as a radius in metres. Half the jet's, and
+## that is the difference in feel between the two: water is thrown at the car
+## from a step back and a sponge is pressed against it.
+@export var scrub_radius_metres: float = 0.22
+
+## How much product a held cleaner lays down per second, where [code]1.0[/code]
+## is full cover. Slower than the jet on purpose: the wash is the coarse pass
+## over the whole car and wants to feel powerful, and the cleaners are the pass
+## where the player is picking out a window or a wheel.
+@export var scrub_per_second: float = 3.0
+
+## How wide the drying rag reaches. A cloth is a bigger thing than a sponge.
+@export var buff_radius_metres: float = 0.3
+
+## How much product a held rag turns into shine per second. The fastest of the
+## three: the buff is the last pass over ground the player has already covered
+## twice, and the reveal is the reward rather than a third round of work.
+@export var buff_per_second: float = 4.5
+
 ## Whether the power wash wears the plain crosshair instead of drawing
 ## [WashJet]'s cone. Off by default, so what ships is the cone: it is the shape
 ## of the water and the thing a player is meant to be looking at. Switched on —
@@ -764,13 +783,27 @@ func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 ## the player. That one is excluded because [BoxProjection] would pick a face off
 ## a normal nobody measured, not because of anything about fairness.
 ##
-## One tool of five so far. What the other four do is a rule about the game and
-## it goes here, next to this one, when they have somewhere to write to —
-## [GrimeMap] already carries the channels they will use.
+## [b]All five tools now, and the routing is the whole function.[/b] The job is
+## three passes over every panel — the power wash takes mud off any of them, one
+## of the three cleaners lays product on the surface it is for, and the drying rag
+## buffs that into a shine anywhere.
+##
+## [b]Only the cleaners are refused, and only for the wrong surface.[/b] What
+## keeps the three passes in order is not this function — it is [GrimeMap]'s
+## buckets, where a cleaner draws from bare paint and a rag draws from product, so
+## soaping a muddy wing or buffing a dry one moves nothing without anybody
+## checking. The one rule that cannot be expressed that way is which bottle goes
+## with which surface, because a sponge and a window cleaner are indistinguishable
+## to a texture. So it is the only rule written here, it is one comparison against
+## [method Surface.cleaner_for], and it fails by doing nothing.
+##
+## Doing nothing rather than working slowly, deliberately. A tool that half-works
+## on the wrong surface teaches the player to hold the trigger longer; a tool that
+## does not work at all teaches them to pick up the other bottle, which is the
+## thing worth learning.
+##
 func _spend_the_trigger(found: Dictionary, delta: float) -> void:
 	if _grime == null or not _grime.is_laid() or not found.get("surface", false):
-		return
-	if _view_model.belt().equipped().id != DetailingTool.Id.POWER_WASH:
 		return
 	# Read out into typed locals rather than passed straight through: a
 	# [Dictionary] hands back [Variant], and this project's warning levels treat
@@ -778,7 +811,16 @@ func _spend_the_trigger(found: Dictionary, delta: float) -> void:
 	var panel: Node = found["collider"]
 	var surface: Vector3 = found["position"]
 	var outward: Vector3 = found["normal"]
-	_grime.wash(panel, surface, outward, wash_radius_metres, wash_per_second * delta)
+	var held: DetailingTool.Id = _view_model.belt().equipped().id
+	if held == DetailingTool.Id.POWER_WASH:
+		_grime.wash(panel, surface, outward, wash_radius_metres, wash_per_second * delta)
+		return
+	if held == DetailingTool.Id.DRYING_RAG:
+		_grime.buff(panel, surface, outward, buff_radius_metres, buff_per_second * delta)
+		return
+	if held != Surface.cleaner_for(_car.kind_of(panel)):
+		return
+	_grime.foam(panel, surface, outward, scrub_radius_metres, scrub_per_second * delta)
 
 
 ## What the press landed on: the panel the ray hit, or failing that the nearest
