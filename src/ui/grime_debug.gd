@@ -36,6 +36,12 @@
 ## the same size as the belt's, in the corner the belt does not use, and
 ## [kbd]G[/kbd] still works for whoever has a keyboard.
 ##
+## [b]But only in a debug build.[/b] A released build's players are not chasing
+## this projection's bugs, so the tap target has no business sitting in their
+## corner of the screen — [method OS.is_debug_build] is false in an exported
+## release, and the toggle hides itself accordingly. [kbd]G[/kbd] is untouched
+## either way; this only gates the tap target's visibility.
+##
 ## [b]The board also carries a "Debug Tools" switch[/b] that has nothing to do
 ## with grime: it is the one place in the game a developer's eye is expected to
 ## be looking, so it is where [Garage.debug_tools] lives its UI life too — see
@@ -76,6 +82,7 @@ const COLUMNS: int = 4
 
 func _ready() -> void:
 	_toggle.text = TOGGLE_TEXT
+	_toggle.visible = OS.is_debug_build()
 	_toggle.pressed.connect(_on_toggle_pressed)
 	_debug_tools.toggled.connect(_on_debug_tools_toggled)
 	_grid.columns = COLUMNS
