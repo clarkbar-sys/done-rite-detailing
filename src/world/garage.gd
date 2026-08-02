@@ -150,15 +150,21 @@
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
 ## grime work needs and the reason [signal aimed] carries a name at all.
 ##
-## [b]And the tool that sprays now draws its own sight.[/b] With the power wash
-## in hand the crosshair is replaced by a [WashJet]: a narrow cone from the
-## wand's nozzle to the mark, blue at the tip and red where it lands, as wide at
-## its base as [member wash_radius_metres] — which is to say, the patch
-## [method _spend_the_trigger] is about to clean, drawn at the size and angle it
-## is actually cleaned at. The other four tools are put on the car at a point and
-## keep the crosshair, which is the right shape for them. [method _sight_the_aim]
-## is the whole of the choice, made every tick from the belt, so swapping tools
-## mid-press swaps the sight with them.
+## [b]And the tool that sprays draws its own sight.[/b] With the power wash in
+## hand the crosshair is replaced by a [WashJet]: a narrow cone from the wand's
+## nozzle to the mark, blue at the tip and red where it lands, as wide at its
+## base as [member wash_radius_metres] — which is to say, the patch [method
+## _spend_the_trigger] is about to clean, drawn at the size and angle it is
+## actually cleaned at. The other four tools are put on the car at a point and
+## keep the crosshair, which is the right shape for them.
+##
+## [b]The crosshair is what [member debug_tools] puts back.[/b] The cone is the
+## honest picture of the water and it is what the game shows; the bare
+## crosshair, under the power wash too, is the diagnostic — it says where the
+## aim resolved with nothing drawn over the top of it, which is the question
+## worth asking when the cone and the mud disagree. [method _sight_the_aim] is
+## the whole of the choice, made every tick from the belt and the flag together,
+## so swapping tools or toggling debug mid-press swaps the sight with them.
 ##
 ## [i]The mark is still made either way[/i] — see [AimMarker] — so the panel
 ## readout, the wand's alignment and the water all read exactly what they read
@@ -375,7 +381,13 @@ const PAST_THE_POST: float = 1.1
 ## real water spreads and loses pressure with range, which is a reason to stand
 ## close, which is a mechanic. It wants the standoff and the reach to mean
 ## something first.
-@export var wash_radius_metres: float = 0.2
+##
+## Doubled from the fifth of a metre above to two fifths: a bigger circle of
+## red at the far end of [WashJet] reads as more pressure behind the wand, and
+## doubling [member wash_per_second] alongside it keeps the time to clean a
+## single spot the same — this widens the patch a press covers rather than
+## changing how long a press takes.
+@export var wash_radius_metres: float = 0.4
 
 ## How much mud a held jet takes off a spot per second, where [code]1.0[/code] is
 ## all of it.
@@ -384,7 +396,23 @@ const PAST_THE_POST: float = 1.1
 ## at its edge. Fast enough that a press is visibly an action rather than a
 ## contribution — see [member wash_radius_metres] for what the cautious version
 ## of these two numbers felt like.
-@export var wash_per_second: float = 2.5
+##
+## Doubled alongside [member wash_radius_metres]: a wider jet with the same
+## strength would take longer to clear, which reads as the water having gotten
+## weaker rather than wider.
+@export var wash_per_second: float = 5.0
+
+## Whether the power wash wears the plain crosshair instead of drawing
+## [WashJet]'s cone. Off by default, so what ships is the cone: it is the shape
+## of the water and the thing a player is meant to be looking at. Switched on —
+## [code]src/screens/play_screen.gd[/code] wires this to the "~" panel's "Debug
+## Tools" button — the cone is stowed and the bare crosshair shows through, which
+## is the developer's view of where the aim landed with nothing drawn over it.
+##
+## Only the sight changes. [method _spend_the_trigger] still spends the same
+## water on the same patch either way, so a bug chased with this on is the same
+## bug with it off.
+var debug_tools: bool = false
 
 var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
@@ -703,7 +731,9 @@ func _resolve_aim(delta: float) -> void:
 ## second copy of "which tool is this" to fall out of step with the first.
 func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 	_marker.mark(surface, outward)
-	var washing: bool = _view_model.belt().equipped().id == DetailingTool.Id.POWER_WASH
+	var washing: bool = (
+		not debug_tools and _view_model.belt().equipped().id == DetailingTool.Id.POWER_WASH
+	)
 	_marker.draw_crosshair(not washing)
 	var nozzle: Marker3D = _view_model.muzzle()
 	if not washing or nozzle == null:

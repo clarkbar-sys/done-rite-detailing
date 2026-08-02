@@ -26,8 +26,23 @@
 ## on the device with the bug is not a diagnostic. So the toggle is a tap target
 ## the same size as the belt's, in the corner the belt does not use, and
 ## [kbd]G[/kbd] still works for whoever has a keyboard.
+##
+## [b]The board also carries a "Debug Tools" switch[/b] that has nothing to do
+## with grime: it is the one place in the game a developer's eye is expected to
+## be looking, so it is where [Garage.debug_tools] lives its UI life too — see
+## [signal debug_tools_toggled]. Off by default and unconnected to anything of
+## the masks' own: a player who opens this panel to check "am I getting anywhere"
+## is not thereby asking the power wash to drop its cone for a bare crosshair, so
+## the two switches are independent rather than one flipping the other.
 class_name GrimeDebug
 extends Control
+
+## The player flipped the "Debug Tools" switch inside this panel. [param
+## enabled] is its new state, handed to whoever wants to act on it —
+## [code]src/screens/play_screen.gd[/code] forwards it straight to
+## [member Garage.debug_tools], which swaps the power wash's cone for the plain
+## crosshair.
+signal debug_tools_toggled(enabled: bool)
 
 ## What the toggle says. A glyph the font already has rather than an icon, for
 ## the reason [constant ToolBeltHud.TOGGLE_TEXT] is a letter: there is no asset
@@ -47,11 +62,13 @@ const COLUMNS: int = 4
 @onready var _board: PanelContainer = %Board
 @onready var _grid: GridContainer = %Grid
 @onready var _title: Label = %Title
+@onready var _debug_tools: CheckButton = %DebugTools
 
 
 func _ready() -> void:
 	_toggle.text = TOGGLE_TEXT
 	_toggle.pressed.connect(_on_toggle_pressed)
+	_debug_tools.toggled.connect(_on_debug_tools_toggled)
 	_grid.columns = COLUMNS
 	_board.visible = false
 	resized.connect(_relayout)
@@ -96,6 +113,19 @@ func toggle_button() -> Button:
 	return _toggle
 
 
+## Whether "Debug Tools" is switched on right now. Public for the same reason
+## [method is_shown] is: a caller should be able to ask rather than assume it
+## agrees with the last signal it happened to catch.
+func debug_tools_enabled() -> bool:
+	return _debug_tools.button_pressed
+
+
+## The switch itself, so a test can tap the thing a player taps rather than
+## flip [member CheckButton.button_pressed] behind its back.
+func debug_tools_button() -> CheckButton:
+	return _debug_tools
+
+
 ## Reports how much of the car is still dirty in the heading, so the board
 ## answers "am I getting anywhere" as well as "is it landing in the right place".
 func report(remaining: float) -> void:
@@ -128,6 +158,10 @@ func _relayout() -> void:
 
 func _on_toggle_pressed() -> void:
 	toggle()
+
+
+func _on_debug_tools_toggled(enabled: bool) -> void:
+	debug_tools_toggled.emit(enabled)
 
 
 ## One panel's mask with its name under it.
