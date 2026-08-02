@@ -211,3 +211,76 @@ func test_the_view_model_anchor_is_hidden_while_the_camera_circles() -> void:
 	var anchor: Node3D = _garage.get_node("%ViewModel") as Node3D
 	assert_not_null(anchor, "the anchor is part of the room's scene, not the play screen's")
 	assert_false(anchor.is_visible_in_tree(), "nobody is standing here to hold anything")
+
+
+# ---- the sky: what is over the driveway, and what it is not allowed to light --
+
+
+func _environment() -> Environment:
+	var world: WorldEnvironment = _garage.get_node("View/World/Environment") as WorldEnvironment
+	return world.environment
+
+
+## Where the room puts the sun, or [constant Vector3.ZERO] if it does not say.
+##
+## Read off the [ShaderMaterial] in the scene, which is why `garage.tscn` sets
+## this one uniform rather than leaving it at the shader's default like every
+## other number in the look. A shader's compiled-in defaults are only readable
+## through [method RenderingServer.shader_get_parameter_default], and under the
+## headless server this suite and CI both run on, that answers `null` for
+## everything — measured here, by writing the test that way first and watching
+## it fail against a shader that was perfectly correct.
+func _sky_sun_direction() -> Vector3:
+	var sky: Sky = _environment().sky
+	var material: ShaderMaterial = sky.sky_material as ShaderMaterial
+	var raw: Variant = material.get_shader_parameter(&"sun_direction")
+	if typeof(raw) != TYPE_VECTOR3:
+		return Vector3.ZERO
+	return raw
+
+
+func test_the_driveway_has_a_sky_over_it() -> void:
+	var environment: Environment = _environment()
+	assert_eq(
+		environment.background_mode,
+		Environment.BG_SKY,
+		"the room's background is a sky, not a flat colour"
+	)
+	assert_not_null(environment.sky, "BG_SKY with no Sky resource renders the clear colour")
+	var material: ShaderMaterial = environment.sky.sky_material as ShaderMaterial
+	assert_not_null(material, "the sky is this project's shader, not a built-in material")
+	if material != null:
+		assert_eq(material.shader.resource_path, "res://src/world/sky.gdshader")
+
+
+func test_the_sky_is_a_backdrop_and_not_a_light() -> void:
+	# The two lines that keep "add a sky" from silently becoming "relight the
+	# whole game". Reflections off is the load-bearing one: its default is BG,
+	# which starts mirroring the sky the moment the background becomes one, and
+	# the first thing anyone would see is the power wash turning to chrome in
+	# their own hands. `src/world/view_model.gd`'s class docs are the long
+	# version, and this is what stops that paragraph from quietly going stale.
+	var environment: Environment = _environment()
+	assert_eq(
+		environment.reflected_light_source,
+		Environment.REFLECTION_SOURCE_DISABLED,
+		"the sky must not become a radiance map behind anybody's back"
+	)
+	assert_eq(
+		environment.ambient_light_source,
+		Environment.AMBIENT_SOURCE_COLOR,
+		"the ambient stays the tuned grey the strip lights were balanced against"
+	)
+
+
+func test_the_painted_sun_is_above_the_horizon() -> void:
+	# The bug this exists to stop is the one that was found writing the shader,
+	# and it is silent: a sun direction with a negative Y draws no disc and no
+	# halo anywhere in the sky, because every part of the sky the player can see
+	# is on the other side of the horizon from it. Nothing errors, nothing warns,
+	# the sun is simply not there — which is exactly what happened when the disc
+	# was aimed at the room's own `Key`, whose basis Z points 42° BELOW the
+	# skyline. A number, not a screenshot somebody remembers taking.
+	var sun: Vector3 = _sky_sun_direction()
+	assert_gt(sun.length(), 0.0, "sun_direction must be a vec3 uniform with something in it")
+	assert_gt(sun.y, 0.0, "a sun below the horizon is a sun nobody can see")

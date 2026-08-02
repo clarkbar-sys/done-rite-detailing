@@ -76,15 +76,24 @@
 ## [b]Silver is a material, not a colour.[/b] The power wash is the only metal on
 ## the belt, and the only metal in the scene at all, and it comes out of the
 ## catalogue at [code]metallic = 0.9[/code], [code]roughness = 0.25[/code].
-## Worth knowing what that buys here: the scene's [WorldEnvironment] has a flat
-## colour background and no sky or reflection probe, so a metal here has no
-## radiance map to mirror and its specular comes
-## entirely from the two strip lights and the directional fill. That reads as
-## dark metal with hard highlights rather than as chrome, which is right for a
-## pressure washer and is emphatically not the light-grey plastic a
-## [code]metallic = 0[/code] cylinder would have been. Giving it a reflection
-## probe to chew on would mean changing the room, and the room is also the title
-## screen's.
+## Worth knowing what that buys here: the scene's [WorldEnvironment] hands it no
+## radiance map at all, so its specular comes entirely from the two strip lights
+## and the directional fill. That reads as dark metal with hard highlights
+## rather than as chrome, which is right for a pressure washer and is
+## emphatically not the light-grey plastic a [code]metallic = 0[/code] cylinder
+## would have been.
+##
+## That used to be true by accident — the background was a flat colour, so there
+## was nothing to mirror. It is now true [i]on purpose[/i]: the room has a real
+## sky over it (see [code]src/world/sky.gdshader[/code]) and the environment
+## sets [code]reflected_light_source[/code] to
+## [constant Environment.REFLECTION_SOURCE_DISABLED] to keep it out of here.
+## Left on, a bright cloudy sky is precisely the radiance map that turns this
+## cylinder to chrome. Rendered rather than predicted: with reflections switched
+## to the sky, the wand goes pale blue end to end and the single hard highlight
+## this paragraph is about is gone. The change that added the sky was not the
+## change to relight the wand. One line in [code]garage.tscn[/code] undoes it,
+## and that line says so.
 ##
 ## [b]The belt lives here for now.[/b] Nothing else has asked for one yet. When
 ## the roll-up lands it needs [i]this[/i] belt and not one of its own — two belts
