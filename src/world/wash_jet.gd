@@ -21,6 +21,17 @@
 ## happens to be standing, which means walking closer visibly narrows the cone
 ## the same way it narrows the patch being cleaned.
 ##
+## [b]A needle that opens, not a wedge from the nozzle.[/b] [member
+## Garage.wash_radius_metres] has to land on the base disc — that is the physics
+## promise above — but nothing says the wall in between has to widen at a
+## constant rate to get there, and a constant rate is what read as a floodlight
+## being aimed rather than a jet being sprayed. [constant TAPER] holds the profile
+## in near the nozzle and lets it out only over the last stretch of the throw, so
+## the water is a thin stream for most of its reach and a nozzle's fan cone right
+## at the paint, which is where a real one opens too. [method spread] and
+## [method landing] read the same base disc either way — the taper only reshapes
+## the wall of the cone, not the disc the physics is drawn as.
+##
 ## [b]Blue at the tip, red at the base.[/b] Vertex colours down the cone rather
 ## than two meshes or a shader: water is at pressure where it leaves the nozzle
 ## and spent where it lands, and the red end is the same red the crosshair used
@@ -70,9 +81,23 @@ const SPRAY: Color = Color(0.95, 0.13, 0.16, 1.0)
 const OPACITY: float = 0.33
 
 ## How many faces go round the cone. Twenty-four is smooth enough that the base
-## reads as a disc rather than as a polygon at the range a car is washed from,
-## and it is 48 triangles — nothing, for something built once and never rebuilt.
+## reads as a disc rather than as a polygon at the range a car is washed from.
 const SEGMENTS: int = 24
+
+## How many bands the taper is built from along the cone's length. Four is
+## enough for [constant TAPER]'s curve to read as a curve rather than a kink at
+## the range this is seen from, and at [constant SEGMENTS] round it is still
+## under 300 triangles — nothing, for something built once and never rebuilt.
+const LOFT_RINGS: int = 4
+
+## How sharply the profile is held in near the nozzle before it opens out, as
+## the power in `t ^ TAPER` — `t` running 0 at the apex to 1 at the base. Linear
+## (`t`) is the floodlight this shape replaces: it is already a third of the way
+## to full width a third of the way down the throw. Cubed keeps it under a
+## twentieth of its final width for the first half of the reach and opens the
+## rest out over the second, which is a needle that flares into a fan rather
+## than a wedge that was always that shape.
+const TAPER: float = 3.0
 
 ## How far short of the paint the cone stops, in metres. Two centimetres, the
 ## same clearance [constant AimMarker.LIFT] keeps and for the same reason: a base
@@ -173,7 +198,8 @@ func spread() -> float:
 
 
 ## The unit cone: apex at the origin in [constant TIP], base a unit down
-## [code]-Z[/code] in [constant SPRAY], with the cap on.
+## [code]-Z[/code] in [constant SPRAY], tapered per [constant TAPER] in between,
+## with the cap on.
 ##
 ## [b]The cap earns its keep.[/b] Seen from behind the nozzle — which is where
 ## the player always is — the far disc is the footprint the water covers, drawn
@@ -182,38 +208,103 @@ func spread() -> float:
 ##
 ## Colours per vertex rather than per surface: one mesh, one material, and the
 ## blue-to-red run is a property of the geometry rather than of a shader nobody
-## can diff.
+## can diff. The first band fans from the apex, which is a single point rather
+## than a ring at [code]t = 0[/code]; every band after it is a loft between two
+## real rings, and the last of those rings [i]is[/i] the base ring the cap fans
+## from, so there is no seam between the taper and the disc it ends on.
 func _cone() -> ArrayMesh:
 	var surface: SurfaceTool = SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for step: int in SEGMENTS:
-		var here: Vector3 = _rim(step)
-		var next: Vector3 = _rim(step + 1)
-		_wedge(surface, Vector3.ZERO, TIP, here, next)
-		_wedge(surface, FAR_END, SPRAY, here, next)
+		for ring: int in LOFT_RINGS:
+			var near: float = float(ring) / float(LOFT_RINGS)
+			var far: float = float(ring + 1) / float(LOFT_RINGS)
+			if ring == 0:
+				_wedge(
+					surface,
+					Vector3.ZERO,
+					TIP,
+					_rim_at(step, far),
+					_rim_at(step + 1, far),
+					_tint(far)
+				)
+			else:
+				_band(surface, step, near, far)
+		_wedge(surface, FAR_END, SPRAY, _rim(step), _rim(step + 1))
 	return surface.commit()
 
 
-## One triangle from [param point] out to two neighbouring points on the base
-## ring — the wall of the cone when the point is the apex, the cap when it is the
-## middle of the base. Winding is not stated because the material draws both
-## faces; see [method _water].
+## One triangle from [param point] out to two neighbouring points a ring gives
+## [param here] and [param next] — the wall of the cone's first band when the
+## point is the apex, the cap when it is the middle of the base. [param rim_tint]
+## defaults to [constant SPRAY] for the cap, where it always is; the apex wedge
+## passes the colour its own ring is tapered to. Winding is not stated because the
+## material draws both faces; see [method _water].
 func _wedge(
-	surface: SurfaceTool, point: Vector3, tint: Color, here: Vector3, next: Vector3
+	surface: SurfaceTool,
+	point: Vector3,
+	tint: Color,
+	here: Vector3,
+	next: Vector3,
+	rim_tint: Color = SPRAY
 ) -> void:
 	surface.set_color(tint)
 	surface.add_vertex(point)
-	surface.set_color(SPRAY)
+	surface.set_color(rim_tint)
 	surface.add_vertex(next)
-	surface.set_color(SPRAY)
+	surface.set_color(rim_tint)
 	surface.add_vertex(here)
 
 
+## The quad — two triangles — between the ring at [param near] and the ring at
+## [param far], [param step] of the way round [constant SEGMENTS], each corner
+## coloured for the ring it sits on.
+func _band(surface: SurfaceTool, step: int, near: float, far: float) -> void:
+	var near_here: Vector3 = _rim_at(step, near)
+	var near_next: Vector3 = _rim_at(step + 1, near)
+	var far_here: Vector3 = _rim_at(step, far)
+	var far_next: Vector3 = _rim_at(step + 1, far)
+	var near_tint: Color = _tint(near)
+	var far_tint: Color = _tint(far)
+	surface.set_color(near_tint)
+	surface.add_vertex(near_here)
+	surface.set_color(far_tint)
+	surface.add_vertex(far_here)
+	surface.set_color(far_tint)
+	surface.add_vertex(far_next)
+	surface.set_color(near_tint)
+	surface.add_vertex(near_here)
+	surface.set_color(far_tint)
+	surface.add_vertex(far_next)
+	surface.set_color(near_tint)
+	surface.add_vertex(near_next)
+
+
 ## One point on the unit cone's base ring, [param step] of [constant SEGMENTS] of
-## the way round it.
+## the way round it — [method _rim_at] at [code]t = 1[/code], named on its own
+## because the cap fans from exactly this ring and reads better without a literal
+## in it.
 func _rim(step: int) -> Vector3:
+	return _rim_at(step, 1.0)
+
+
+## One point [param step] of [constant SEGMENTS] round the cone, [param t] of the
+## way from the apex ([code]0[/code]) to the base ([code]1[/code]). The radius at
+## that point is [constant TAPER]'s curve rather than [param t] itself — see the
+## class docs — so the ring narrows toward the axis long before it narrows toward
+## the apex.
+func _rim_at(step: int, t: float) -> Vector3:
 	var turn: float = TAU * float(step) / float(SEGMENTS)
-	return Vector3(cos(turn), sin(turn), FAR_END.z)
+	var radius: float = pow(t, TAPER)
+	return Vector3(cos(turn) * radius, sin(turn) * radius, FAR_END.z * t)
+
+
+## The vertex colour at [param t] of the way down the taper — [constant TIP] at
+## the apex fading to [constant SPRAY] at the base, the same run [method _cone]
+## always drew, now sampled at whichever ring is being built rather than only at
+## the two ends.
+func _tint(t: float) -> Color:
+	return TIP.lerp(SPRAY, t)
 
 
 ## What the water is made of.

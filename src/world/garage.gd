@@ -354,16 +354,28 @@ const PAST_THE_POST: float = 1.1
 ## is exactly right: a tool that works this slowly is indistinguishable from a
 ## tool that does not work, and no amount of it being technically correct helps.
 ##
-## The lesson is that neither number means anything on its own — what matters is
-## the jet against the size of the car and the size of the car against the screen.
-## Half a metre of radius is a patch you can see land from where the player
-## stands.
+## The lesson from that pass was that neither number means anything on its own —
+## what matters is the jet against the size of the car and the size of the car
+## against the screen. Half a metre of radius is where that lesson landed, and it
+## was right for as long as this radius was invisible: nothing on screen was that
+## size, only the mud it cleared was.
+##
+## [WashJet] changed that. It draws this radius as a solid disc the player looks
+## straight at, and half a metre of radius put a 0.9 m circle of red at the far
+## end of the jet — wider across than the car's own wheels (0.33 m radius each,
+## see [code]src/world/car.gd[/code]) — which reads as a wheel-sized ball landing
+## on the paint rather than as a mark. The lesson above still holds; it is just
+## being applied against a new picture rather than an old one. A fifth of a
+## metre keeps the jet a size a hand plausibly holds and clears in the same
+## second or so [member wash_per_second] already promises — it costs more
+## sweeping to cover the whole car, which is the honest side effect of a smaller
+## brush and not a second regression to measure away.
 ##
 ## Not distance-dependent, and that is a simplification rather than a decision:
 ## real water spreads and loses pressure with range, which is a reason to stand
 ## close, which is a mechanic. It wants the standoff and the reach to mean
 ## something first.
-@export var wash_radius_metres: float = 0.45
+@export var wash_radius_metres: float = 0.2
 
 ## How much mud a held jet takes off a spot per second, where [code]1.0[/code] is
 ## all of it.
