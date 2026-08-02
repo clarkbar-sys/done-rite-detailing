@@ -373,26 +373,28 @@ func test_the_masks_do_not_eat_the_press_underneath_them() -> void:
 	assert_lt(_grime().remaining(), 1.0, "the masks swallowed the press")
 
 
-# ---- the power wash's landing disc, behind the same panel --------------------
+# ---- the crosshair, behind the same panel ------------------------------------
 
 
-func test_the_landing_disc_is_off_until_debug_tools_is_switched_on() -> void:
+func test_the_cone_is_what_a_player_gets_until_debug_tools_is_switched_on() -> void:
 	# [member Garage.debug_tools] is the flag, and this is the default a player
-	# who has never opened the "~" panel gets: the crosshair every other tool
-	# wears, not [WashJet]'s disc.
+	# who has never opened the "~" panel gets: [WashJet]'s cone, not the bare
+	# crosshair the other four tools wear.
 	await _settle()
 	assert_false(_garage().debug_tools, "debug tools was on without being asked for")
-	await _hold(_at_the_car())
-	assert_false(_jet().is_spraying(), "the landing disc drew without debug tools on")
-	assert_true(
-		_marker().is_crosshair_drawn(), "and the power wash wore the plain crosshair instead"
-	)
+	# `_press`, not `_hold`: the jet only sprays while the finger is still down,
+	# and `_hold` lifts it before handing back (see `test_letting_go_stows_the_cone`
+	# in `test_play_screen_jet.gd`), so a check made after release would find the
+	# cone stowed whatever the flag said.
+	await _press(_at_the_car())
+	assert_true(_jet().is_spraying(), "the power wash drew no cone by default")
+	assert_false(_marker().is_crosshair_drawn(), "and the crosshair showed through it")
 
 
-func test_a_tap_on_debug_tools_switches_the_landing_disc_on() -> void:
+func test_a_tap_on_debug_tools_puts_the_crosshair_back() -> void:
 	# The half of the wiring a phone can reach: the switch lives in the same
 	# panel the grime masks do, and a tap on it — not a call straight through to
-	# [Garage] — is what a player actually has.
+	# [Garage] — is what a developer on a device actually has.
 	#
 	# The board is opened first, the same way a player would have to: the switch
 	# sits inside it, and a hidden control's children get no input at all — a
@@ -404,10 +406,6 @@ func test_a_tap_on_debug_tools_switches_the_landing_disc_on() -> void:
 	await _press_button(button)
 	assert_true(_masks().debug_tools_enabled(), "the tap did not switch the panel's own state")
 	assert_true(_garage().debug_tools, "and did not reach the room behind it")
-	# `_press`, not `_hold`: the jet only sprays while the finger is still down,
-	# and `_hold` lifts it before handing back — the exact shape the disc's own
-	# on/off already answers to (see `test_letting_go_stows_the_cone` in
-	# `test_play_screen_jet.gd`), so a check made after release would find it
-	# stowed regardless of the switch.
 	await _press(_at_the_car())
-	assert_true(_jet().is_spraying(), "the landing disc still did not draw with debug tools on")
+	assert_false(_jet().is_spraying(), "the cone still drew with debug tools on")
+	assert_true(_marker().is_crosshair_drawn(), "and the crosshair did not come back")

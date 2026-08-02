@@ -88,11 +88,6 @@ func before_each() -> void:
 	_screen = screen
 	layer.add_child(_screen)
 	await wait_process_frames(1)
-	# This whole suite is about the cone [Garage.debug_tools] gates off by
-	# default — see that member. On for every test here so the thing under test
-	# actually draws; the switch itself is [code]test_play_screen_wash.gd[/code]'s
-	# to hold, alongside the rest of the "~" panel.
-	_garage().debug_tools = true
 
 
 func after_each() -> void:

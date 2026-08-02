@@ -32,15 +32,16 @@
 ## be looking, so it is where [Garage.debug_tools] lives its UI life too — see
 ## [signal debug_tools_toggled]. Off by default and unconnected to anything of
 ## the masks' own: a player who opens this panel to check "am I getting anywhere"
-## is not thereby asking to see the power wash's landing disc, so the two
-## switches are independent rather than one flipping the other.
+## is not thereby asking the power wash to drop its cone for a bare crosshair, so
+## the two switches are independent rather than one flipping the other.
 class_name GrimeDebug
 extends Control
 
 ## The player flipped the "Debug Tools" switch inside this panel. [param
 ## enabled] is its new state, handed to whoever wants to act on it —
 ## [code]src/screens/play_screen.gd[/code] forwards it straight to
-## [member Garage.debug_tools].
+## [member Garage.debug_tools], which swaps the power wash's cone for the plain
+## crosshair.
 signal debug_tools_toggled(enabled: bool)
 
 ## What the toggle says. A glyph the font already has rather than an icon, for

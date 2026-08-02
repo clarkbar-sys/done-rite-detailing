@@ -385,11 +385,12 @@ func _on_patch_cleared(_panel: String, _patch: int) -> void:
 	ring_bell(Bell.Voice.PATCH)
 
 
-## The "Debug Tools" switch inside the "~" panel was flipped, so the power
-## wash's landing disc — see [member Garage.debug_tools] — comes on or off with
-## it. Forwarded rather than read straight off [GrimeDebug] every tick, for the
-## same reason every other loop on this screen is a signal: the two things only
-## have to agree the instant one changes, not be polled to stay that way.
+## The "Debug Tools" switch inside the "~" panel was flipped, so the power wash
+## trades its cone for the bare crosshair — see [member Garage.debug_tools] —
+## or takes it back. Forwarded rather than read straight off [GrimeDebug] every
+## tick, for the same reason every other loop on this screen is a signal: the two
+## things only have to agree the instant one changes, not be polled to stay that
+## way.
 func _on_debug_tools_toggled(enabled: bool) -> void:
 	_garage.debug_tools = enabled
 
