@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.3.0...v1.4.0) (2026-08-02)
+
+
+### Features
+
+* aim the power wash wand down the line to the crosshair ([#59](https://github.com/clarkbar-sys/done-rite-detailing/issues/59)) ([db3794a](https://github.com/clarkbar-sys/done-rite-detailing/commit/db3794a729b6c3003676f843ff66ac70b680ca74))
+* give the power wash a jet cone instead of the crosshair ([#61](https://github.com/clarkbar-sys/done-rite-detailing/issues/61)) ([0389f89](https://github.com/clarkbar-sys/done-rite-detailing/commit/0389f893ddbbfa56503506d4201dcfb47e7b02e1))
+* paint the car one of sixteen colours on startup ([#57](https://github.com/clarkbar-sys/done-rite-detailing/issues/57)) ([11aaa7c](https://github.com/clarkbar-sys/done-rite-detailing/commit/11aaa7ce0bc0c03944141320c977f1ebde9c23d4))
+* ring a bell on Start and on every patch that comes clean ([#55](https://github.com/clarkbar-sys/done-rite-detailing/issues/55)) ([e6d548f](https://github.com/clarkbar-sys/done-rite-detailing/commit/e6d548f5e9f3039f3b6151d8ee2bca36f48ac30c))
+
 ## [1.3.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.2.0...v1.3.0) (2026-08-01)
 
 
