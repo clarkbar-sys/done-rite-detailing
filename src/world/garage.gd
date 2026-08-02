@@ -152,7 +152,7 @@
 ##
 ## [b]And the tool that sprays draws its own sight.[/b] With the power wash in
 ## hand the crosshair is replaced by a [WashJet]: water thrown from the wand's
-## nozzle at the mark, blue as it leaves and red as it lands, spreading to
+## nozzle at the mark, bright blue as it leaves and darker as it lands, spreading to
 ## [member wash_radius_metres] where it arrives — which is to say, the patch
 ## [method _spend_the_trigger] is about to clean, sprayed at the size and angle it
 ## is actually cleaned at. The other four tools are put on the car at a point and
@@ -746,7 +746,9 @@ func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 ##
 ## [b]The water goes where the crosshair is.[/b] Wherever the mark is sitting on
 ## real bodywork — whether the ray landed there or the aim snapped there — that is
-## where the tool is pointed, and the game has just told the player so in red.
+## where the tool is pointed, and the game has just said so — in red for the four
+## tools that wear the crosshair, and with the water itself for the one that
+## sprays.
 ##
 ## This shipped the other way round for a day and it was wrong. The first rule was
 ## "only a ray that actually hit", reasoned about a player at a desk pointing at

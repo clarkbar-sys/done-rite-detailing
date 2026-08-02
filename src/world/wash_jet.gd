@@ -1,6 +1,5 @@
 ## The power wash's water, as water: a few hundred droplets thrown out of the
-## nozzle at the paint, going blue-to-red down the throw and dying where they
-## land.
+## nozzle at the paint, darkening down the throw and dying where they land.
 ##
 ## [b]This is the thing the cone was scaffolding for.[/b] What stood here was a
 ## solid cone of geometry from the nozzle to the mark, and its own class docs
@@ -56,14 +55,26 @@
 ## panel edge for a tenth of a second at a shallow angle. Water that goes through
 ## the car a little is a much better trade than a bake that goes stale.
 ##
-## [b]Blue at the nozzle, red where it lands[/b] — the cone's gradient, in the
-## colour ramp instead of in vertex colours. Water is at pressure where it leaves
-## the wand and spent where it arrives, and the red end is the same red the
-## crosshair used to be ([constant AimMarker.COLOR]) in the same place it used to
-## be, so a player who learned "red is where my tool is pointed" still has that.
-## The last stretch of the ramp fades to nothing as well as to red, which is what
-## keeps the far end of the throw from reading as a flat wall of droplets all
-## stopping at once.
+## [b]Bright blue at the nozzle, darker where it lands[/b] — the cone's gradient
+## in a colour ramp instead of in vertex colours, and one end of it repainted.
+## Water is at pressure where it leaves the wand and spent where it arrives, so
+## the light goes out of it down the throw: the same blue with less in it, which
+## is what water does as it breaks up and stops catching the sky.
+##
+## [b]It used to arrive red, and the red was load-bearing right up until the
+## water was real.[/b] The cone ended in [constant AimMarker.COLOR], in the place
+## the crosshair had been, so that a player who had learned "red is where my tool
+## is pointed" kept the lesson through the swap. What that argument did not
+## survive is being drawn as a few hundred separate things: a solid disc of red on
+## the paint reads as a mark, and red droplets scattered over a panel read as
+## something splashed on the car — screenshotted, and it is the wrong noun
+## entirely. The question the red was answering is answered better by the water
+## itself now, because a jet visibly converges on the place it is going, which no
+## static cone could say.
+##
+## The last stretch of the ramp fades to nothing as well as to the darker blue,
+## which is what keeps the far end of the throw from reading as a flat wall of
+## droplets all stopping at once.
 ##
 ## [b]And each droplet is at most [constant OPACITY] of the way opaque[/b], which
 ## is the cone's third of an alpha nudged up because it now means one droplet
@@ -107,11 +118,13 @@ const WATER: String = "Water"
 ## mistaken for the wand throwing a colour.
 const TIP: Color = Color(0.24, 0.60, 1.0, 1.0)
 
-## The colour where it lands. The crosshair's own red — see [constant
-## AimMarker.COLOR] — because this end of the throw is doing that mark's job now,
-## and a player who learned "red is where my tool is pointed" should not have to
-## learn it twice.
-const SPRAY: Color = Color(0.95, 0.13, 0.16, 1.0)
+## The colour where it lands: [constant TIP] with about two fifths of the light
+## taken out of it and nothing else changed. Water under pressure catches the sky
+## and water that has broken up and slowed down does not, so the far end of the
+## throw is the same blue gone deeper rather than a second colour arriving. See
+## the class docs for what this used to be and why a red end stopped being the
+## right answer the moment the water became a few hundred things.
+const SPRAY: Color = Color(0.12, 0.34, 0.66, 1.0)
 
 ## How opaque the middle of one droplet renders, 0 to 1. See the class docs: a
 ## bit under half is what lets the thick middle of the jet stack up to something
@@ -122,8 +135,8 @@ const OPACITY: float = 0.45
 
 ## How far along the throw the fade to nothing starts, 0 at the nozzle to 1 at
 ## the end of a droplet's life. The last quarter or so, which is enough to take
-## the flat front off a wall of droplets that all stop at the same distance
-## without eating into the red that is doing the crosshair's job.
+## the flat front off a wall of droplets that all stop at the same distance and
+## still leaves the darkening in [constant SPRAY] somewhere to happen.
 const SPENT: float = 0.72
 
 ## How fast the water leaves the nozzle, in metres per second. Fast enough that
@@ -410,10 +423,10 @@ func _mist() -> StandardMaterial3D:
 	return material
 
 
-## The blue-to-red run down the throw, plus the fade that takes the flat front
+## The bright-to-deep run down the throw, plus the fade that takes the flat front
 ## off the far end of it. Three stops: [constant TIP] at the nozzle,
-## [constant SPRAY] at [constant SPENT], and the same red gone to nothing by the
-## time the droplet dies.
+## [constant SPRAY] at [constant SPENT], and the same deep blue gone to nothing by
+## the time the droplet dies.
 func _ramp() -> GradientTexture1D:
 	var gradient: Gradient = Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, SPENT, 1.0])

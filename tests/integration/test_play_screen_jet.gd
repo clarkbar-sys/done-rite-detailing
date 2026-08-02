@@ -13,9 +13,10 @@
 ## [WashJet]'s own read-backs — which take their answers off the emitter that is
 ## actually flying the droplets, so a jet that quietly stopped short or fanned
 ## twice as wide fails here. Its colours and its opacity are read off the colour
-## ramp the droplets are tinted from, since "blue at the nozzle, red on the paint,
-## a third opaque" is the whole brief and a gradient that came out grey would pass
-## every geometric assertion in the file. What no test can say is whether it
+## ramp the droplets are tinted from, since "bright blue at the nozzle, deeper
+## where it lands, half see-through" is the whole brief and a gradient that came
+## out grey would pass every geometric assertion in the file. What no test can say
+## is whether it
 ## [i]looks[/i] like water; that is what the thing is for.
 ##
 ## [b]Nothing here waits for a droplet.[/b] The particles are simulated on the
@@ -152,7 +153,7 @@ func _flight() -> ParticleProcessMaterial:
 	return _water().process_material as ParticleProcessMaterial
 
 
-## The blue-to-red run the droplets are tinted from.
+## The bright-to-deep run the droplets are tinted from.
 func _ramp() -> Gradient:
 	var ramp: GradientTexture1D = _flight().color_ramp as GradientTexture1D
 	return ramp.gradient
@@ -300,13 +301,13 @@ func test_the_spray_lands_as_wide_as_the_water_it_stands_in_for() -> void:
 	)
 
 
-func test_the_droplets_run_blue_at_the_nozzle_to_red_where_they_land() -> void:
+func test_the_droplets_run_bright_at_the_nozzle_and_deep_where_they_land() -> void:
 	# The brief, read back off the ramp the droplets are tinted from. The gradient
-	# is the whole of the colour: pressure blue at birth, the crosshair's red by
-	# the time it arrives, and gone by the time it dies — that last stop is what
-	# keeps a few hundred droplets all stopping at the same distance from reading
-	# as a wall. The opacity is one number and is the reason the car is still
-	# visible through all of this.
+	# is the whole of the colour: bright blue at birth, the same blue with the
+	# light gone out of it by the time it arrives, and gone altogether by the time
+	# it dies — that last stop is what keeps a few hundred droplets all stopping at
+	# the same distance from reading as a wall. The opacity is one number and is
+	# the reason the car is still visible through all of this.
 	await _settle()
 	await _press(_at_the_car())
 	var ramp: Gradient = _ramp()
@@ -314,16 +315,24 @@ func test_the_droplets_run_blue_at_the_nozzle_to_red_where_they_land() -> void:
 	assert_lt(
 		_off_tint(ramp.get_color(0), Color(WashJet.TIP, WashJet.OPACITY)),
 		TOLERANCE,
-		"a droplet leaves the nozzle blue and a third opaque"
+		"a droplet leaves the nozzle bright and about half opaque"
 	)
 	assert_lt(
 		_off_tint(ramp.get_color(1), Color(WashJet.SPRAY, WashJet.OPACITY)),
 		TOLERANCE,
-		"and arrives red"
+		"and arrives deeper"
 	)
 	assert_almost_eq(ramp.get_offset(1), WashJet.SPENT, TOLERANCE, "with the fade left to run")
 	assert_almost_eq(ramp.get_color(2).a, 0.0, TOLERANCE, "before it goes out altogether")
-	assert_ne(WashJet.TIP, WashJet.SPRAY, "which are two colours and therefore a gradient")
+	# Darker and not merely different: the far end is the near end with light taken
+	# out of it, which is the whole of what the run down the throw is saying. A
+	# gradient that came out brighter at the paint would pass an `assert_ne` and
+	# would be a jet lighting up as it lost pressure.
+	assert_lt(
+		WashJet.SPRAY.get_luminance(),
+		WashJet.TIP.get_luminance(),
+		"which is a gradient, and one that runs the way water does"
+	)
 	var mist: StandardMaterial3D = _water().material_override as StandardMaterial3D
 	assert_true(mist.vertex_color_use_as_albedo, "so the ramp above is what gets drawn")
 	assert_eq(
