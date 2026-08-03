@@ -1,5 +1,7 @@
-## The red crosshair on the paint: where the tool in your hands is pointed, drawn
-## on the car rather than over it.
+## Where the tool in your hands is pointed: the mark every other part of the game
+## reads, and the red crosshair that used to be the only way to see it — drawn on
+## the car rather than over it, and now drawn only under
+## [member Garage.debug_tools] (see below).
 ##
 ## [b]In the world and not on the HUD.[/b] A flat reticle at the touch point
 ## would have been fewer moving parts, and it would have answered a different
@@ -30,16 +32,24 @@
 ## like a crosshair with holes in it. A centimetre is far enough to win and near
 ## enough that no viewing angle in this game shows it floating.
 ##
-## [b]One tool draws its own instead.[/b] The power wash throws a [WashJet]
-## between its nozzle and the paint, and a ring under the patch that water lands
-## on is a second answer to a question the jet has already answered better — so
-## the room turns the ring off with [method draw_crosshair] while the washer is in
-## hand.
-## What it does not turn off is the mark itself: [method mark] still records
+## [b]Every tool draws its own instead, so the ring is off in play.[/b] It was
+## written when it was the only answer the game had, and one by one the belt
+## stopped needing it: the power wash throws a [WashJet] between its nozzle and
+## the paint, the two bottles hover over the spot and spray a [SprayMist] at it,
+## and the sponge and the rag are put down on it, the sponge trailing
+## [SpongeSuds] out around its own footprint. A tool that shows where it is
+## working by working there has answered the question better than a red ring can,
+## so [ToolSight] now calls [method draw_crosshair] with [code]false[/code] under
+## all five of them and the ring survives only in [member Garage.debug_tools],
+## which is the view of where the aim resolved with nothing drawn on top.
+##
+## What none of that turns off is the mark itself: [method mark] still records
 ## where the aim landed and [method marked_point] still answers, because where
 ## the tool is pointed is a fact about the aim rather than about which tool
 ## happens to be drawing it. Everything that reads this — the panel readout, the
-## jet, the wand that lines up with it — goes on working unchanged.
+## jet, the wand that lines up with it — goes on working unchanged. The two calls
+## are separate for exactly this reason, and retiring the ring cost one argument
+## because of it.
 class_name AimMarker
 extends Node3D
 
@@ -144,8 +154,11 @@ func is_marking() -> bool:
 ##
 ## Separate from marking on purpose — see the class docs. A tool that shows the
 ## player where it is pointed by some better means says so here, and the mark
-## goes on being made either way; a caller that never asks gets the crosshair,
-## which is what four of the five tools want.
+## goes on being made either way. All five of them now do, so what a caller asks
+## for in play is [code]false[/code] and the only thing that asks for the ring is
+## [member Garage.debug_tools]. The default is still "drawn", because a caller
+## that never asks at all is a test or a new sight that has nothing else to show,
+## and a mark nobody can see is the worse of the two failures.
 ##
 ## Set on the pieces rather than on this node, because hiding the node itself is
 ## what [method unmark] means and one flag cannot be two states.

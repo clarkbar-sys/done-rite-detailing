@@ -26,7 +26,7 @@ layout_mode = 1
 [node name="MotionPad" parent="." instance=ExtResource("4_pad")]
 layout_mode = 1
 
-; Which panel the crosshair is on, in the one corner of the screen neither the
+; Which panel the mark is on, in the one corner of the screen neither the
 ; belt nor the pad reaches. Debug scaffolding — see `_on_aimed` in
 ; play_screen.gd — so it is a plain Label with a font big enough to read at the
 ; third-scale a phone renders this design at, and an outline because the thing

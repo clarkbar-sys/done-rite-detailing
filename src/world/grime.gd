@@ -205,7 +205,7 @@ func shine() -> float:
 ## Takes the hit in world space because that is what a raycast hands back, and
 ## converts here rather than making every caller do it: the panel's own transform
 ## is the only thing that knows how, and a caller that got it wrong would wash a
-## spot the crosshair is not on.
+## spot the mark is not on.
 ##
 ## Returns how many patches it finished, and emits [signal patch_finished] once
 ## for each. Zero for a panel that is not part of this car, so a stray hit on the

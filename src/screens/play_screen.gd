@@ -40,7 +40,7 @@
 ## [b]And the third loop is the trigger[/b], which is the same shape a third
 ## time. A finger goes down on the picture of the room, this file turns it into a
 ## point on the glass, and [method Garage.aim_at] turns that into a tool pointed
-## somewhere and a crosshair on the paint. What crosses is a [Vector2] and
+## somewhere and a mark on the paint. What crosses is a [Vector2] and
 ## nothing else: the room has never heard of a touch event, and this file has
 ## never heard of a camera, a ray or a car panel.
 ##
@@ -52,7 +52,7 @@
 ## [b]The [Vector2] that crosses is not quite where the finger is[/b], and that
 ## is this file's one piece of judgement about the trigger rather than an
 ## accident. A thumb covers the part of the screen it is touching, so an aim
-## taken at the contact point puts the crosshair — and later the spray, and later
+## taken at the contact point puts the mark — and later the spray, and later
 ## still the patch of grime the player is trying to watch disappear — underneath
 ## the hand asking for it. [ThumbLift] moves the aim a thumb's width up the glass
 ## before it is handed over; [method _aim_point] is where that happens, and it
@@ -286,7 +286,7 @@ func _gui_input(event: InputEvent) -> void:
 ## taking over — two fingers cannot aim one tool, and the alternative is a tool
 ## that snaps between them. And a release only counts from the finger that
 ## claimed the aim, so lifting a thumb off the motion pad cannot put the
-## crosshair away.
+## mark away.
 func _finger_moved(index: int, at: Vector2, pressed: bool) -> void:
 	if pressed:
 		if _finger != NO_FINGER:
@@ -354,7 +354,7 @@ func _on_the_glass(where: Vector2) -> Vector2:
 	return into_the_room * (get_global_transform_with_canvas() * where)
 
 
-## The panel under the crosshair, or [code]""[/code] when the player is not
+## The panel under the mark, or [code]""[/code] when the player is not
 ## aiming at anything.
 ##
 ## Debug scaffolding, and deliberately the plainest possible version of it: the
@@ -383,7 +383,7 @@ func _on_grimed() -> void:
 ##
 ## None of the three arguments is used, and that is the point rather than an
 ## oversight — the bell says "that worked", and which texel it was is the
-## crosshair's job to have already made obvious. What stops a sweep of the jet
+## sight's job to have already made obvious. What stops a sweep of the jet
 ## from being a hundred bells is [Chime], which drops any ding landing inside the
 ## last one: the rule about how often a sound is worth making belongs with the
 ## thing making it, not with every place that asks.
@@ -399,12 +399,12 @@ func _on_patch_finished(_panel: String, _patch: int, _stage: GrimeMap.Stage) -> 
 	ring_bell(Bell.Voice.PATCH)
 
 
-## The "Debug Tools" switch inside the "~" panel was flipped, so the power wash
-## trades its cone for the bare crosshair — see [member Garage.debug_tools] —
-## or takes it back. Forwarded rather than read straight off [GrimeDebug] every
-## tick, for the same reason every other loop on this screen is a signal: the two
-## things only have to agree the instant one changes, not be polled to stay that
-## way.
+## The "Debug Tools" switch inside the "~" panel was flipped, so every tool
+## trades the effect it draws for itself for the bare crosshair — see
+## [member Garage.debug_tools] — or takes it back. Forwarded rather than read
+## straight off [GrimeDebug] every tick, for the same reason every other loop on
+## this screen is a signal: the two things only have to agree the instant one
+## changes, not be polled to stay that way.
 func _on_debug_tools_toggled(enabled: bool) -> void:
 	_garage.debug_tools = enabled
 

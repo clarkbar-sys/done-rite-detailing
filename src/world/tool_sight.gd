@@ -1,6 +1,6 @@
-## What the aim looks like: the crosshair on the paint, the water the power wash
-## throws at it, the product the two bottles spray at it, and the suds the sponge
-## squeezes out around itself. One object, because they are one decision.
+## What the aim looks like: the water the power wash throws at the spot, the product
+## the two bottles spray at it, the suds the sponge squeezes out around itself, and
+## the crosshair that all three replaced. One object, because they are one decision.
 ##
 ## [b]Why these four are a thing rather than four things.[/b] They are mutually
 ## exclusive answers to a single question — [i]where is my tool pointed, and what
@@ -125,20 +125,32 @@ func sponge_suds() -> SpongeSuds:
 ## one of them. A caller that had to work out which end belonged to which effect
 ## would be making this decision a second time, somewhere it could disagree.
 ##
-## [b]The crosshair comes off for the water and stays on for the product.[/b] A red
-## disc under a patch of water is a second answer to a question the jet has already
-## answered better; a can hovering over the paint is answering a different question
-## and leaves "exactly which spot" to the ring.
+## [b]The crosshair is not drawn during play at all.[/b] It answers "where is my
+## tool pointed", and it was the only answer in the game when it was written. It is
+## no longer any of them: the wash throws water at the spot, the two bottles hover
+## over it and spray product at it, and the sponge and the rag are put down on it —
+## with the sponge's foam creeping out around itself, and the ring sitting mostly
+## underneath the sponge in any case. Every tool now shows the player where it is
+## working by working there, so a red disc under one of them is a fifth answer
+## nobody needs.
 ##
-## [param debug] takes both effects away and leaves the bare crosshair under every
-## tool — see [member Garage.debug_tools], which is where that switch lives and
-## what it is for.
+## What comes off is the drawing and not the aim. [method AimMarker.mark] is called
+## first and always, above, and [method AimMarker.marked_point] goes on answering
+## for the panel readout, the wand's alignment, [ReachCarry] and the trigger — the
+## two are separate calls precisely so this can be a change to what is drawn and to
+## nothing else.
+##
+## [param debug] takes all three effects away and puts the bare crosshair back under
+## every tool — see [member Garage.debug_tools], which is where that switch lives
+## and what it is for. It is now the only way to see the ring, which is most of what
+## makes it worth having: where the aim resolved with nothing drawn on top is the
+## question worth asking when an effect and the mud disagree.
 func sight(
 	surface: Vector3, outward: Vector3, held: DetailingTool, nozzle: Marker3D, debug: bool
 ) -> void:
 	_marker.mark(surface, outward)
+	_marker.draw_crosshair(debug)
 	var washing: bool = not debug and held.id == DetailingTool.Id.POWER_WASH
-	_marker.draw_crosshair(not washing)
 	if washing and nozzle != null:
 		_jet.spray(nozzle.global_position, surface, _wash_radius)
 	else:

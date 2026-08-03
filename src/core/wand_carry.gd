@@ -2,7 +2,7 @@
 ## player is aiming at, rather than at a fixed angle in it.
 ##
 ## [b]What this is for.[/b] The jet has to come out of the end of the wand and
-## land on the crosshair, and it has to do that while the water is still an
+## land on the mark, and it has to do that while the water is still an
 ## effect nobody has written yet. A wand held at a hand-tuned angle can only
 ## manage that by having the particles ignore the mesh they leave — spawned at
 ## the nozzle and then sent somewhere the wand is not pointing — which reads as
@@ -13,7 +13,7 @@
 ## [b]Pointing the wand at the mark also puts the nozzle on the line to it.[/b]
 ## That is the property worth stating, because "parallel to the aim" and "on the
 ## line to the mark" are different things and only the second one lets a jet land
-## on the crosshair. The wand turns about the hand, so every point along it — the
+## on the mark. The wand turns about the hand, so every point along it — the
 ## nozzle included — sits on the ray that leaves the hand along the wand's own
 ## axis. Aim that ray at the mark and the nozzle is a point on the segment
 ## between the hand and the mark, which makes the wand's axis and the

@@ -1,4 +1,4 @@
-## How far above the finger the crosshair sits, so the thumb making the aim is
+## How far above the finger the aim lands, so the thumb making it is
 ## not the thing hiding it.
 ##
 ## Touch aiming shipped pointing exactly at the contact point, which is correct
@@ -10,8 +10,8 @@
 ##
 ## [b]The lift is applied to the aim and not to the drawing.[/b] One point goes
 ## into [method Garage.aim_at] and everything downstream — the ray, the panel it
-## names, the crosshair, the swing of the tool in the player's hands — comes off
-## that one point. Moving only the crosshair would be the cheaper edit and it
+## names, the mark, the swing of the tool in the player's hands — comes off
+## that one point. Moving only the drawing would be the cheaper edit and it
 ## would leave the wand pointed at the thumb while the mark sat somewhere else,
 ## which reads as a rendering bug rather than as an offset.
 ##
@@ -36,7 +36,7 @@
 ## [b]A mouse gets no lift[/b], and that is the caller's decision rather than
 ## this class's — see [code]src/screens/play_screen.gd[/code]. A cursor is drawn
 ## by the compositor and occludes a few pixels of arrow; a hand occludes a
-## thumb's worth of screen. Lifting a mouse aim would move the crosshair away
+## thumb's worth of screen. Lifting a mouse aim would move the mark away
 ## from a pointer that was already showing the player exactly where they were
 ## aiming.
 ##
@@ -123,7 +123,7 @@ static func aim_from(touch: Vector2, lift: float) -> Vector2:
 ## [b]Why the ease, rather than a clamp at zero.[/b] The obvious version is
 ## [code]maxf(y - lift, 0.0)[/code], and it has a bug the player feels
 ## immediately: every touch in the top strip aims at the same place, so a thumb
-## dragged up there keeps moving while the crosshair sits still. Aiming that
+## dragged up there keeps moving while the mark sits still. Aiming that
 ## stops responding is a worse failure than aiming that responds slowly, and it
 ## happens in the one part of the screen a player probes at when they are trying
 ## to understand what the offset even is.
