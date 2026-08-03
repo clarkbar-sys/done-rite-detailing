@@ -151,13 +151,13 @@
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
 ## grime work needs and the reason [signal aimed] carries a name at all.
 ##
-## [b]And the tools that spray draw their own sight.[/b] The crosshair, the water
-## the power wash throws and the product the two bottles spray are one decision and
-## live in one place — [ToolSight], which has the argument for each of them. What
-## the room owns is the two numbers those sprays are drawn at
-## ([member wash_radius_metres] and [member scrub_radius_metres], which are the
-## patches [method _spend_the_trigger] is about to work on) and the switch that
-## takes the effects away ([member debug_tools]).
+## [b]And the tools that work the paint draw their own sight.[/b] The crosshair, the
+## water the power wash throws, the product the two bottles spray and the suds the
+## sponge squeezes out are one decision and live in one place — [ToolSight], which
+## has the argument for each of them. What the room owns is the two numbers those
+## effects are drawn at ([member wash_radius_metres] and
+## [member scrub_radius_metres], which are the patches [method _spend_the_trigger]
+## is about to work on) and the switch that takes them away ([member debug_tools]).
 ##
 ## [i]The mark is still made whichever sight is showing[/i] — see [AimMarker] — so
 ## the panel readout, the wand's alignment and the trigger all read exactly what
@@ -577,7 +577,10 @@ func release_aim() -> void:
 ## actually landed and where the water and the product actually went, rather than
 ## trusting a signal to have meant it. The forwards are kept rather than replaced
 ## by [code]sight().marker()[/code] because where the crosshair is has been a
-## question about the room since long before there was a [ToolSight] to keep it in.
+## question about the room since long before there was a [ToolSight] to keep it in
+## — and they stop at three, because a fourth would be this file growing an
+## accessor per effect all over again. The sponge's foam is reached through
+## [method ToolSight.sponge_suds], which is where it lives.
 func tool_sight() -> ToolSight:
 	return _sight
 
@@ -748,10 +751,12 @@ func _resolve_aim(delta: float) -> void:
 ## player's hands, and where its business end is. Both are asked of the belt and
 ## the viewmodel every tick rather than wired up on a swap, so a tool changed while
 ## the finger is down changes the sight on the same tick and there is no second copy
-## of "which tool is this" to fall out of step with the first.
+## of "which tool is this" to fall out of step with the first. The tool itself goes
+## over rather than its id, because the sponge's foam is drawn at the size of the
+## sponge — see [method ToolSight.sight], which has the argument.
 func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
-	var held: DetailingTool.Id = _view_model.belt().equipped().id
-	_sight.sight(surface, outward, held, _view_model.muzzle_of(held), debug_tools)
+	var held: DetailingTool = _view_model.belt().equipped()
+	_sight.sight(surface, outward, held, _view_model.muzzle_of(held.id), debug_tools)
 
 
 ## What the tool in the player's hand does to the paint the press landed on.
