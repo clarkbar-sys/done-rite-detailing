@@ -1,11 +1,11 @@
 ## Integration test for the title screen.
 ##
 ## Under tests/integration/ because every one of these facts is established in
-## `_ready()` — the labels are filled and the button is wired only once the
+## `_ready()` — the build label is filled and the button is wired only once the
 ## scene is in a tree. Nothing here can be asserted by loading the script alone.
 ##
-## The two label assertions moved here from the entry-scene test when the title
-## card became a state of its own; they are the same promise as before, made
+## The build label assertion moved here from the entry-scene test when the title
+## card became a state of its own; it is the same promise as before, made
 ## where the text now lives.
 extends GutTest
 
@@ -89,11 +89,6 @@ func test_the_title_screen_plays_the_game_behind_the_card() -> void:
 	assert_true(_garage().first_person, "and somebody standing in the bay doing it")
 
 
-func test_title_shows_the_project_name() -> void:
-	var title: Label = _screen.get_node("%Title") as Label
-	assert_eq(title.text, str(ProjectSettings.get_setting("application/config/name")))
-
-
 func test_build_label_shows_the_build_identity() -> void:
 	# The on-screen build line and the stdout line CI greps must agree; if this
 	# drifts, the "I can see which commit this build is" promise quietly dies.
@@ -129,19 +124,6 @@ func test_the_logo_is_framed_rather_than_pasted_on() -> void:
 	if box == null:
 		return
 	assert_eq(box.bg_color, Brand.PANEL, "the card must be the site's panel colour")
-
-
-func test_the_name_under_the_logo_survives_the_room_behind_it() -> void:
-	# The site can demote this line to grey because it sits on a near-black page.
-	# Here it sits on a lit garage, a yellow truck and a green verge, and without
-	# the shadow it is grey-on-daylight — legible in the web build and not much
-	# more than that, which is what put this assertion here.
-	var title: Label = _screen.get_node("%Title") as Label
-	assert_eq(title.get_theme_color("font_color"), Brand.MUTED, "the name is secondary type")
-	assert_gt(
-		title.get_theme_color("font_shadow_color").a, 0.0, "...and secondary type needs a shadow"
-	)
-	assert_gt(title.get_theme_constant("shadow_outline_size"), 0, "...with enough spread to read")
 
 
 func test_start_wears_the_brand_pill() -> void:
