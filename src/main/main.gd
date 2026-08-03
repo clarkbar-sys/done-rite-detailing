@@ -22,6 +22,12 @@ var _states: GameStateMachine = GameStateMachine.new()
 ## Start has swapped it away. [Chime] has the whole argument.
 @onready var _bell: Chime = %Bell
 
+## The music, hanging off the host for the same reason the [Chime] does and with
+## a sharper edge on it: the title screen asks for a three-second fade as it
+## hands over, and [method _on_state_changed] frees that screen on the very next
+## line. [Bandstand] has the argument.
+@onready var _music: Bandstand = %Music
+
 
 func _ready() -> void:
 	var project_name: String = str(ProjectSettings.get_setting("application/config/name"))
@@ -46,6 +52,8 @@ func _on_state_changed(state: GameState) -> void:
 		return
 	screen.transition_requested.connect(_states.enter)
 	screen.bell_requested.connect(_bell.ring)
+	screen.music_requested.connect(_music.start)
+	screen.music_stop_requested.connect(_music.fade_out)
 	_host.add_child(screen)
 
 

@@ -56,6 +56,23 @@ func _bell() -> Chime:
 	return _main.get_node("%Bell") as Chime
 
 
+## The host's music, which hangs off the host for the same reason the bell does
+## and with a sharper edge on it: the title screen asks for a three-second fade
+## and is freed on the next line.
+func _music() -> Bandstand:
+	return _main.get_node("%Music") as Bandstand
+
+
+## Touches the screen the way a player would, which is what unlocks audio in a
+## browser and what the title screen starts the theme on.
+func _touch() -> void:
+	var event: InputEventMouseButton = InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	get_tree().root.push_input(event)
+	await wait_process_frames(1)
+
+
 ## Presses Start on whatever is on screen and lets the swap happen.
 func _press_start() -> void:
 	var host: Control = _main.get_node("%ScreenHost") as Control
@@ -96,6 +113,32 @@ func test_start_rings_and_keeps_ringing_after_the_screen_it_was_pressed_on_is_go
 	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
 	assert_eq(_bell().rings(), 1, "Start rang no bell")
 	assert_true(_bell().is_ringing(), "the bell was cut off with the screen that asked for it")
+
+
+func test_the_music_is_silent_until_the_screen_is_touched() -> void:
+	# Same bargain as the bell above, and the same reason: a browser drops any
+	# sound a page makes before somebody has touched it.
+	assert_false(_music().playing(), "the game started playing music on its own")
+
+
+func test_touching_the_title_screen_starts_the_theme() -> void:
+	# The whole wiring, end to end through the real host: the screen sees a
+	# press, the host owns the player, and neither reaches for the other.
+	await _touch()
+	assert_true(_music().playing(), "the title screen never got its music")
+
+
+func test_start_fades_the_music_and_it_keeps_playing_after_the_screen_is_gone() -> void:
+	# The failure this arrangement exists to prevent, and the sharper twin of the
+	# bell's: the title screen is removed *and freed* on the press that starts
+	# the game, so a fade owned by that screen would be killed on the first frame
+	# of itself and Start would cut the music dead instead of easing it out.
+	await _touch()
+	assert_true(_music().playing(), "nothing to fade")
+	await _press_start()
+	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
+	assert_true(_music().playing(), "the music was cut off with the screen that asked for it")
+	assert_true(_music().fading(), "the music is playing on into the game instead of fading")
 
 
 func test_only_one_screen_is_mounted_at_a_time() -> void:

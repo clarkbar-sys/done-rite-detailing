@@ -20,11 +20,29 @@
 ## the difference between the title card and the game is once again nothing but what
 ## is switched on in one [Garage] instance.
 ##
-## [b]It stays silent.[/b] [signal Grime.patch_finished] is left unconnected here
-## deliberately — the play screen rings a bell on it, and a title screen that dinged
-## its way through a car wash before anybody had touched it would be both annoying
-## and, in a browser, impossible: audio is locked until the first press. [Chime] has
-## that argument, and Start is still the press it is unlocked by.
+## [b]The bay works in silence; the theme is separate.[/b]
+## [signal Grime.patch_finished] is left unconnected here deliberately — the play
+## screen rings a bell on it, and a title screen that dinged its way through a car
+## wash on its own would be both annoying and, in a browser, impossible: audio is
+## locked until the first press. [Chime] has that argument.
+##
+## What this screen does play is [Fanfare], and [method _input] is the whole of
+## when. Not [method _ready]: a browser drops any sound a page makes before
+## somebody has touched it, and it drops it silently, so a theme started when the
+## screen opens would simply not exist for most of the people who see this game.
+## The first press, key or touch anywhere on the screen is both the gesture the
+## browser is waiting for and the earliest moment the music is allowed to exist,
+## so it is the moment it starts — on every platform, not only in a browser,
+## because one path that always works beats two that disagree about when.
+##
+## The cost of that, stated rather than hidden: somebody who opens the page and
+## watches the attract mode without touching anything hears nothing. That is the
+## same bargain the bell already made and the same one the README already
+## describes the game as making.
+##
+## Start does not cut it off. It asks for a fade — see
+## [method GameScreen.stop_music] — and the [Bandstand] that honours it hangs off
+## the host, because this screen is freed before the first frame of that fade.
 ##
 ## Start leads straight into [PlayGameState] — there is no menu screen between
 ## the title card and the game, on purpose. A player who has already seen the
@@ -55,6 +73,10 @@
 ## grep finds.
 extends GameScreen
 
+## Whether the theme has been asked for yet. The title screen only gets one first
+## touch and the music only starts on it — see [method _input].
+var _sounded: bool = false
+
 @onready var _build: Label = %Build
 @onready var _start: Button = %Start
 @onready var _logo_card: PanelContainer = %LogoCard
@@ -67,6 +89,46 @@ func _ready() -> void:
 	# So the screen is playable from the keyboard or a pad the moment it opens,
 	# rather than only by whoever brought a mouse.
 	_start.grab_focus()
+
+
+## Starts the theme on the first press, key or touch this screen sees.
+##
+## [method Node._input] rather than [method Node._unhandled_input]: a click that
+## lands on Start is consumed by the button and never reaches the unhandled pass,
+## and the press that starts the game is exactly the press somebody who came here
+## to play makes first. Nothing is marked handled here, so Start still works —
+## this listens to the input, it does not take it.
+##
+## [b]Which events count.[/b] Only the four that a browser accepts as a gesture:
+## a mouse button going down, a touch, a key, a pad button. Not mouse motion —
+## moving the pointer over a page does not unlock its audio, so starting the
+## theme on it would burn the one flag this screen has on an event that cannot
+## make a sound and the music would never play at all.
+func _input(event: InputEvent) -> void:
+	if _sounded or not _is_gesture(event):
+		return
+	_sounded = true
+	# Nothing left to listen for, and this runs on every event the game sees.
+	set_process_input(false)
+	request_music()
+
+
+## Whether [param event] is the kind of thing a browser unlocks audio on: a
+## press, rather than a release or a movement.
+##
+## Static and pure so [code]tests/integration/test_title_screen_music.gd[/code]
+## can ask it about an event directly, instead of only through the screen's own
+## flag.
+static func _is_gesture(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		return (event as InputEventMouseButton).pressed
+	if event is InputEventScreenTouch:
+		return (event as InputEventScreenTouch).pressed
+	if event is InputEventKey:
+		return (event as InputEventKey).pressed
+	if event is InputEventJoypadButton:
+		return (event as InputEventJoypadButton).pressed
+	return false
 
 
 ## Puts the brand on: the frame around the logo and the four faces of the pill.
@@ -89,14 +151,22 @@ func _dress() -> void:
 		_start.add_theme_color_override(role, Brand.WHITE)
 
 
-## The bell first, then the game.
+## The bell, the theme stepping aside, then the game.
 ##
-## The order does not matter to the sound — the host owns the [Chime] and it
-## outlives this screen, which is the reason the bell is asked for rather than
-## played here — but it matters to what the press is [i]for[/i]. A browser will
-## not let a page make a noise until somebody has touched it, so this is the
-## press that unlocks audio for the whole game as well as the one that starts it.
-## [Chime] has the rest of that argument.
+## The order does not matter to the sound — the host owns both the [Chime] and
+## the [Bandstand], and both outlive this screen, which is the reason each is
+## asked for rather than played here — but it matters to what the press is
+## [i]for[/i]. A browser will not let a page make a noise until somebody has
+## touched it, so this is the press that unlocks audio for the whole game as well
+## as the one that starts it. [Chime] has the rest of that argument.
+##
+## The fade is asked for [i]before[/i] the transition, and that ordering is the
+## one thing here worth not moving: [method request_transition] frees this screen
+## synchronously, so a fade requested after it would be emitted from a node on
+## its way out. It survives either way — the signal is already connected to the
+## host — but the version that reads correctly is the one that does not rely on
+## that.
 func _on_start_pressed() -> void:
 	ring_bell(Bell.Voice.START)
+	stop_music()
 	request_transition(PlayGameState.new())

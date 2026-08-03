@@ -14,6 +14,15 @@ signal transition_requested(state: GameState)
 ## — see that class for why a screen cannot own the thing making the noise.
 signal bell_requested(voice: Bell.Voice)
 
+## Emitted when this screen wants the title theme playing. The host owns the
+## [Bandstand] for the same reason it owns the [Chime], only more so: a screen
+## that owned the music would take it with it when it was freed, and being freed
+## is exactly when this screen asks for the music to be faded rather than cut.
+signal music_requested
+
+## Emitted when this screen wants the theme taken away over [param seconds].
+signal music_stop_requested(seconds: float)
+
 
 ## Asks the host to enter [param state].
 ##
@@ -33,3 +42,19 @@ func request_transition(state: GameState) -> void:
 ## is an error here and only counts uses inside the declaring script.
 func ring_bell(voice: Bell.Voice) -> void:
 	bell_requested.emit(voice)
+
+
+## Asks the host to play the theme.
+##
+## A method rather than subclasses emitting the signal themselves, for the same
+## compiler reason [method request_transition] is one.
+func request_music() -> void:
+	music_requested.emit()
+
+
+## Asks the host to fade the theme out over [param seconds].
+##
+## A method rather than subclasses emitting the signal themselves, for the same
+## compiler reason [method request_transition] is one.
+func stop_music(seconds: float = Bandstand.FADE_SECONDS) -> void:
+	music_stop_requested.emit(seconds)

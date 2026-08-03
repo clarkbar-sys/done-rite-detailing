@@ -410,6 +410,20 @@ Cost of the decision: no `SharedArrayBuffer`, so no threaded audio or physics
 in the browser, and WebAssembly SIMD is the only parallelism available.
 Accepted.
 
+**And one consequence of it that is easy to trip over, recorded here because it
+is invisible until it ships.** Because the export is single-threaded, Godot
+defaults `audio/general/default_playback_type.web` to *Sample*: sounds are
+handed to the Web Audio API as buffers rather than mixed by the engine, which is
+what stops audio garbling without threads. A sample keeps the volume it was
+given when it started — `volume_db` changes after `play()` are ignored — bus
+effects do not run, and an `AudioStreamPlayer`'s own looping flag is not read
+(a loop set on the `AudioStreamWAV` resource itself *is*). None of that touches
+the bell, which is played once at one volume. It is fatal to a fade, so
+`Bandstand` sets `playback_type = PLAYBACK_TYPE_STREAM` on that one player and
+`tests/integration/test_bandstand.gd` asserts it, at the cost of latency that a
+looping title theme cannot notice. Per-player, not project-wide: the default is
+right for everything that answers a button press.
+
 ### The loading screen: one vendored file, re-diffed on every Godot bump
 
 **Decided.** `html/custom_html_shell` points the web export at

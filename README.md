@@ -74,9 +74,22 @@ band of noise is are all numbers in
 [`src/core/tool_noise.gd`](./src/core/tool_noise.gd);
 [`src/world/tool_racket.gd`](./src/world/tool_racket.gd) is what plays them, and
 it fades every voice over a twentieth of a second so that pulling the trigger,
-letting go and swapping tools mid-press are none of them a click. The title
-screen stays silent through all of it — the demo behind the card is washing a
-car with the sound off, for the same reason it rings no bell.
+letting go and swapping tools mid-press are none of them a click. The demo
+behind the title card stays silent through all of it — it is washing a car with
+the tools muted, for the same reason it rings no bell.
+
+And the title screen has a theme now — eight bars of loud synth brass at 132 BPM
+over a gated snare, which is roughly what a network sports broadcast sounded
+like in about 1992. Touch the screen and it starts; press Start and it fades out
+over three seconds while the bell rings over the top of it and the game loads
+underneath. It is original, it is not a transcription of anything, and like the
+bells it is not a file: Godot cannot import a tracker module or a MIDI, so
+[`src/core/timbre.gd`](./src/core/timbre.gd) builds six synthetic instruments out
+of wavetables and seeded noise, and [`src/core/fanfare.gd`](./src/core/fanfare.gd)
+is the score — a tracker pattern written as an array of `step, note, length`.
+Retuning the theme, changing the tempo or rewriting a bar is a diff, the whole
+thing costs about 390 ms of arithmetic during a load that was happening anyway,
+and it adds nothing at all to the download.
 
 And you can now see it from across the room, because the dirt is drawn as an
 arcade game rather than as a photograph. Coverage is cut into bands instead of
@@ -209,7 +222,7 @@ assets/brand/          the logo the game shares with the business it is named af
 src/core/              cross-cutting code (shared helpers, game states, process-global facts)
 src/main/              the entry scene — owns the state machine and swaps screens
 src/screens/           one scene per game state, all of them a `GameScreen`
-src/ui/                what the screens draw and play — HUD pieces, and the bell
+src/ui/                what the screens draw and play — HUD pieces, the bell, the title theme
 src/world/             the places the game happens in, instanced by the screens that show them
 tests/unit/            tests for pure logic — no scene tree
 tests/integration/     tests that need a scene tree
