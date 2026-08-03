@@ -503,9 +503,9 @@ const NO_SIDE_TO_IT: float = 0.35
 ## bell already has — [signal Grime.patch_finished] is connected by the play screen
 ## and deliberately left dangling by the title screen — and it is switched on here
 ## for the same reason: the title screen runs this identical room with the game
-## playing itself behind the card, and it stays silent on purpose. A browser will not let a page make a
-## noise until somebody has pressed something — so a title card that ran a
-## pressure washer at a player who has not touched it yet would be an odd first
+## playing itself behind the card, and it stays silent on purpose. A browser will not
+## let a page make a noise until somebody has pressed something — so a title card that
+## ran a pressure washer at a player who has not touched it yet would be an odd first
 ## impression at a desk and impossible on the web, where Start is still the press
 ## that unlocks audio for everything. [Chime] has the whole argument.
 ##
