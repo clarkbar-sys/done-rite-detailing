@@ -14,7 +14,10 @@ grow_vertical = 2
 script = ExtResource("1_title")
 
 [node name="Garage" parent="." instance=ExtResource("2_garage")]
-start_angle_degrees = 20.0
+orbiting = false
+first_person = true
+walkaround = true
+attracting = true
 
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1

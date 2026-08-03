@@ -130,6 +130,10 @@ func test_the_room_orbits_unless_a_screen_says_otherwise() -> void:
 		_garage.first_person, "standing on the driveway is the game's idea, not the room's"
 	)
 	assert_false(_garage.walkaround, "and so is walking about in it")
+	# The play screen instances this same scene, and a demo working the car while
+	# somebody is standing in it holding their own wand would be two players in one
+	# bay. Playing itself is a thing a screen asks for, like everything else here.
+	assert_false(_garage.attracting, "and so is playing itself while nobody is playing")
 
 
 func test_steering_a_room_nobody_is_standing_in_is_ignored() -> void:

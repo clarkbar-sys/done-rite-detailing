@@ -80,8 +80,13 @@ func test_it_shows_the_garage_behind_the_title() -> void:
 	assert_not_null(_garage(), "the title screen is played over the real room, not a picture of it")
 
 
-func test_the_title_camera_circles_the_car() -> void:
-	assert_true(_garage().orbiting, "the title screen shows the car off before the player starts")
+func test_the_title_screen_plays_the_game_behind_the_card() -> void:
+	# It used to circle a clean car from outside, which showed the car off and could
+	# not show a tool working — there is nobody in that shot to hold one. What is
+	# behind the card now is the game playing itself. This is the switch; what it
+	# actually does is [code]tests/integration/test_title_screen_attract.gd[/code].
+	assert_true(_garage().attracting, "the title screen shows the job being done, not a still")
+	assert_true(_garage().first_person, "and somebody standing in the bay doing it")
 
 
 func test_title_shows_the_project_name() -> void:
