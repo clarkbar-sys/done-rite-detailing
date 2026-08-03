@@ -53,9 +53,10 @@ extends RefCounted
 ## What matters after that is only that they never change, because changing one
 ## replants that tree.
 ##
-## Seven and not five: the grove plants one of each by default (see
-## [code]src/world/grove.gd[/code]), so the count here is the number of trees a
-## player can tell apart before the wood starts repeating itself.
+## Seven and not five: the grove plants fourteen trees by default (see
+## [code]src/world/grove.gd[/code]), so this is the number of them a player can
+## tell apart — every shape stands twice, in two different corners of the lawn,
+## turned a different way.
 const SEEDS: Array[int] = [11, 13, 15, 19, 63, 121, 139]
 
 ## How far from the trunk's axis any part of any crown can be, in metres. The

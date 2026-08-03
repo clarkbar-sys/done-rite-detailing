@@ -1,14 +1,14 @@
-## Integration test for the [Grove] — the trees along the edge of the lawn, and
+## Integration test for the [Grove] — the trees around the edge of the lawn, and
 ## the promises the room makes about where they are allowed to be.
 ##
 ## Under tests/integration/ because a tree is only a tree once `_ready()` has run
 ## and turned a [TreeShape] into nodes. The roll itself is
-## [code]tests/unit/test_tree_shape.gd[/code] and the row is
+## [code]tests/unit/test_tree_shape.gd[/code] and a row is
 ## [code]tests/unit/test_grove_plan.gd[/code]; neither is repeated here.
 ##
 ## What is here is the join between the wood and the driveway, and it is checked
 ## against the driveway rather than against numbers copied out of it: the grass
-## says how wide the lawn is, the garage says how far the camera swings, and both
+## says how big the lawn is, the garage says how far the camera swings, and both
 ## halves of the arrangement go red if either one moves.
 extends GutTest
 
@@ -42,9 +42,15 @@ func _grass() -> Node3D:
 	return _garage.get_node("View/World/Ground/GrassRight") as Node3D
 
 
+## How many trees the grove was asked for: one row down each long side, and one
+## across each of the four ends.
+func _wanted() -> int:
+	return 2 * _grove().trees_per_edge + 4 * _grove().trees_per_end
+
+
 func test_the_driveway_has_a_wood_on_it() -> void:
 	assert_not_null(_grove(), "the garage needs a grove under its ground")
-	assert_eq(_grove().trees().size(), _grove().count, "one tree per tree asked for")
+	assert_eq(_grove().trees().size(), _wanted(), "one tree per tree asked for")
 
 
 func test_a_tree_is_a_trunk_and_a_pile_of_leaves() -> void:
@@ -70,7 +76,8 @@ func test_the_trunk_stands_on_the_grass() -> void:
 
 func test_every_tree_is_planted_on_grass() -> void:
 	# Read off the grass rather than written down again: the strip runs from its
-	# own middle out by half its width, and a trunk has to be inside that.
+	# own middle out by half its width, and a trunk has to be inside that. This
+	# is the test that fails if the lawn is narrowed without moving the rows in.
 	var grass: Node3D = _grass()
 	var inner: float = grass.position.x - grass.scale.x * 0.5
 	var outer: float = grass.position.x + grass.scale.x * 0.5
@@ -79,6 +86,47 @@ func test_every_tree_is_planted_on_grass() -> void:
 		var across: float = absf(tree.position.x)
 		assert_between(across, inner, outer, "a tree standing off the grass")
 		assert_between(tree.position.z, -along, along, "a tree past the end of the grass")
+
+
+func test_the_long_sides_are_planted_the_whole_way_down() -> void:
+	# The thing the wider lawn bought. When the grass stopped at 6.2 m the disc
+	# the camera sweeps ate the middle of both long edges and the trees could
+	# only go at the corners; now each side is a row from one end to the other,
+	# so a tree stands level with the car as well as behind and in front of it.
+	var abreast: int = 0
+	var behind: int = 0
+	var ahead: int = 0
+	for tree: Node3D in _grove().trees():
+		if absf(tree.position.x) < _grove().edge_x - 1.0:
+			continue  # an end row; this test is about the two long sides
+		if absf(tree.position.z) < 2.0:
+			abreast += 1
+		elif tree.position.z < 0.0:
+			behind += 1
+		else:
+			ahead += 1
+	assert_gt(abreast, 0, "nothing planted level with the car")
+	assert_gt(behind, 0, "nothing planted down the near end")
+	assert_gt(ahead, 0, "nothing planted down the far end")
+
+
+func test_the_ends_of_the_lawn_are_planted_too() -> void:
+	# The four short rows that close the boundary off. They are the ones the disc
+	# still bites into, so as well as being planted at all, the corner nearest
+	# the car has to be the bit left bare.
+	var ends: int = 0
+	for tree: Node3D in _grove().trees():
+		if absf(tree.position.x) >= _grove().edge_x - 1.0:
+			continue  # a long row
+		ends += 1
+		assert_almost_eq(
+			absf(tree.position.z),
+			_grove().z_limit,
+			GrovePlan.WOBBLE_ACROSS + TOLERANCE,
+			"an end row that wandered off its line"
+		)
+		assert_gt(absf(tree.position.x), _grove().inner_x, "a tree planted next to the tarmac")
+	assert_eq(ends, 4 * _grove().trees_per_end, "one row across each end of each lawn")
 
 
 func test_no_crown_can_reach_the_camera_as_it_orbits() -> void:
@@ -97,6 +145,18 @@ func test_no_crown_can_reach_the_camera_as_it_orbits() -> void:
 		var flat: float = Vector2(tree.position.x, tree.position.z).length()
 		var leaf: float = flat - TreeShape.MAX_REACH - _garage.orbit_radius
 		assert_gte(leaf, Grove.MARGIN, "a tree %.2f m into the camera's circle" % -leaf)
+
+
+func test_no_two_trees_are_planted_in_each_other() -> void:
+	# Spacing inside a row is GrovePlan's slots, and that is a unit test. What
+	# only exists once the whole wood is stood up is spacing *between* rows —
+	# specifically at the four corners, where a long side and an end run past
+	# each other and Grove.CORNER_GAP is what keeps them apart.
+	var standing: Array[Node3D] = _grove().trees()
+	for tree: int in standing.size():
+		for other: int in range(tree + 1, standing.size()):
+			var gap: float = standing[tree].position.distance_to(standing[other].position)
+			assert_gt(gap, 1.0, "two trees %.2f m apart, and a crown reaches 1 m" % gap)
 
 
 func test_nothing_in_the_wood_is_something_a_ray_can_hit() -> void:
@@ -132,17 +192,18 @@ func test_the_wood_is_the_same_wood_every_load() -> void:
 
 
 func test_replanting_a_bigger_wood_keeps_every_promise() -> void:
-	# The rules are meant to hold for the arrangement rather than for the seven
-	# trees that ship. Twelve is more than TreeShape.SEEDS has, so this also
-	# exercises the wrap that lets a shape be planted twice.
+	# The rules are meant to hold for the arrangement rather than for the
+	# fourteen trees that ship. Twenty-two is more than TreeShape.SEEDS has twice
+	# over, so this also exercises the wrap that lets a shape be planted again.
 	var grove: Grove = _grove()
-	grove.count = 12
+	grove.trees_per_edge = 9
+	grove.trees_per_end = 1
 	grove.plant()
 	# A frame, so the wood it replaced is actually gone rather than queued —
-	# without it the seven felled trees are still alive at the end of the test
-	# and GUT reports them as orphans.
+	# without it the felled trees are still alive at the end of the test and GUT
+	# reports them as orphans.
 	await wait_process_frames(1)
-	assert_eq(grove.trees().size(), 12, "twelve asked for, twelve planted")
+	assert_eq(grove.trees().size(), _wanted(), "twenty-two asked for, twenty-two planted")
 	for tree: Node3D in grove.trees():
 		var flat: float = Vector2(tree.position.x, tree.position.z).length()
 		var leaf: float = flat - TreeShape.MAX_REACH - _garage.orbit_radius
