@@ -57,8 +57,27 @@ bells built out of arithmetic at startup rather than recordings in the repo:
 the pitch, the length and the decay are numbers in
 [`src/core/bell.gd`](./src/core/bell.gd), so retuning the ding is a diff instead
 of a re-recording. The bell on Start is also the press a mobile browser unlocks
-audio on, which is why the game is deliberately silent until you touch it. The
-room is still
+audio on, which is why the game is deliberately silent until you touch it.
+
+And you can now see it from across the room, because the dirt is drawn as an
+arcade game rather than as a photograph. Coverage is cut into bands instead of
+fading smoothly — a smooth ramp is the honest description of mud thinning out
+and it is unreadable in motion, where quantised the jet carves visible terraces
+and you can tell a third-clean panel from a half-clean one at a glance. The
+leading edge of each band carries a lit line, so washing reads as taking
+territory. A patch that finishes throws a coloured square in the colour of the
+pass that finished it — water, then the panel's own cleaner, then gold — fed
+from the same list that rings the bell, so the light and the ding cannot come
+apart. And a buffed panel catches a highlight travelling across the whole car,
+which is the reward the wax itself could not be: the coat stays deliberately
+faint so it deepens the paint instead of greying it, and the fix for "the paint
+went slightly darker" is not a heavier coat but the one thing polish does that
+dirt cannot. None of it touches the mask, and none of it can disagree with one —
+the bands reach zero exactly where the mask does.
+[`src/world/grime.gdshader`](./src/world/grime.gdshader) has each argument where
+the uniform it settles is declared.
+
+The room is still
 boxes and the car is still a green one under all that; see the
 [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
 for what's queued.

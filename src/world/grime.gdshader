@@ -37,6 +37,16 @@
 // rather than stacking them, so they are blended by their relative amounts rather
 // than composited one over the other. Nothing here needs to know which is on top
 // because nothing is ever both.
+//
+// AND IT IS DRAWN AS AN ARCADE GAME RATHER THAN AS A PHOTOGRAPH, which is four
+// changes to the above and none to what any of it means. Coverage is cut into
+// bands instead of fading smoothly, each band's leading edge carries a lit line,
+// a patch that finishes throws a coloured square, and a buffed surface catches a
+// travelling highlight. Every one of them is a way of saying the same thing
+// louder: *this bit is further along than that bit*. None of them touches the
+// mask, and none of them can disagree with it — the bands reach zero exactly
+// where the mask does, and the squares are thrown by the same signal that rings
+// the bell.
 shader_type spatial;
 render_mode blend_mix, depth_draw_never, cull_back, diffuse_burley, specular_schlick_ggx;
 
@@ -122,6 +132,90 @@ uniform float sheen_sharpness : hint_range(1.0, 8.0) = 4.0;
 // meant to look like dirt sit at it.
 uniform float gloss_specular : hint_range(0.0, 1.0) = 0.9;
 
+// HOW MANY BANDS THE COVERAGE IS CUT INTO, and the single biggest reason this
+// reads as an arcade game.
+//
+// A smooth alpha ramp is the physically honest description of mud thinning out
+// and it is very nearly unreadable in motion: a player cannot tell a panel that
+// is a third clean from one that is half clean without stopping to look at it.
+// Quantised, the jet carves visible terraces and how far along a panel is can be
+// read across the room at a glance. Five is enough to show progress and few
+// enough that each step is an event; past about eight it goes back to being a
+// gradient.
+uniform int coverage_steps : hint_range(2, 16) = 5;
+
+// Each terrace a shade lighter than the one under it, so the bands read as depth
+// rather than as posterisation. Thick mud sits dark and the last band before bare
+// paint is a dusting. The pattern still does the mottling; this is strata on top
+// of it.
+uniform float band_relief : hint_range(0.0, 0.6) = 0.2;
+
+// The lit line along the leading edge of each band — the edge the jet is cutting
+// along, and the thing that makes washing feel like taking territory rather than
+// like rubbing out.
+uniform vec4 terrace_colour : source_color = vec4(0.62, 0.92, 1.0, 1.0);
+
+// How bright that line burns.
+uniform float terrace_glow : hint_range(0.0, 4.0) = 1.1;
+
+// How wide it is, as a fraction of one band. Wider spreads it until the bands
+// stop having edges at all and the whole layer just glows.
+uniform float terrace_width : hint_range(0.01, 0.5) = 0.22;
+
+// How much opacity the lit line adds where it fires. It is drawn as *more of the
+// layer it is an edge of* rather than as something floating above it, so the
+// fragment stays the colour of the thing it outlines — see `fragment()`.
+uniform float terrace_lip : hint_range(0.0, 1.0) = 0.45;
+
+// WHICH PATCHES HAVE JUST FINISHED SOMETHING, one pixel each: red is how lit, and
+// green is which of the three passes lit it. `PatchFlash` owns it and its class
+// docs carry the format.
+//
+// `hint_default_black` is load-bearing rather than tidy. An unassigned sampler in
+// Godot reads white, and white here is every patch of every panel flashing
+// permanently at full brightness — so a `Grime` that had not set this, or a
+// material built by anything that does not know to, would not degrade quietly.
+uniform sampler2D patch_flash : hint_default_black, filter_nearest, repeat_disable;
+
+// What a patch throws when the water finishes it. The rag's is below; the
+// cleaner's is the panel's own `product_colour`, which is already here — see
+// `flash_tint`.
+uniform vec4 wash_flash_colour : source_color = vec4(0.55, 0.90, 1.0, 1.0);
+
+// What a patch throws when the rag finishes it: the end of the job for that
+// square, and the only one of the three that is warm.
+uniform vec4 buff_flash_colour : source_color = vec4(1.0, 0.86, 0.42, 1.0);
+
+// How hard a flash burns at full brightness.
+uniform float flash_glow : hint_range(0.0, 6.0) = 2.6;
+
+// THE TRAVELLING HIGHLIGHT, and the payoff for finishing a panel.
+//
+// `gloss_strength` above is deliberately low so that wax deepens the paint
+// instead of greying it, and the measured result of that honesty was a reward
+// that reads as "the paint went slightly darker". The fix is not to raise the
+// coat — that argument was had and settled a few lines up. It is to add the one
+// thing a polished surface does that a dirty one cannot: catch a moving
+// highlight. It costs a `fract` and it only exists where there is shine to catch
+// it, so an unfinished panel is exactly as dull as it was.
+//
+// Measured in world space rather than panel space, which matters: the panels are
+// twelve separate CSG trees with their own transforms, so a wave in each one's
+// local space would break at every seam instead of crossing the car as one
+// sweep.
+uniform float sweep_scale : hint_range(0.05, 4.0) = 0.55;
+
+// How fast the highlight travels, in cycles a second.
+uniform float sweep_speed : hint_range(0.0, 3.0) = 0.45;
+
+// How much of one cycle the bright band occupies.
+uniform float sweep_width : hint_range(0.02, 1.0) = 0.18;
+
+// How fully the sweep lights the coat as it passes. It feeds the same `lit` term
+// the Fresnel sheen does, so a sweep and a grazing angle are two reasons for the
+// same thing to happen rather than two effects stacking.
+uniform float sweep_strength : hint_range(0.0, 1.0) = 0.85;
+
 // Lifts the overlay off the surface it is drawn over, in metres. The two passes
 // are the same geometry at the same depth, which is a coin-flip per fragment on
 // some drivers; a millimetre costs nothing anybody can see and settles it. Not a
@@ -131,6 +225,10 @@ uniform float lift : hint_range(0.0, 0.02) = 0.001;
 
 varying vec3 panel_position;
 varying vec3 panel_normal;
+
+// Where this fragment is in the room, which only the sweep wants — see
+// `sweep_scale` for why it cannot use `panel_position` like everything else does.
+varying vec3 world_position;
 
 const float COLUMNS = 3.0;
 const float ROWS = 2.0;
@@ -142,6 +240,7 @@ void vertex() {
 	// because `VERTEX` is already model space in this stage and is not there.
 	panel_position = VERTEX;
 	panel_normal = NORMAL;
+	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	VERTEX += NORMAL * lift;
 }
 
@@ -206,13 +305,94 @@ float triplanar_noise(vec3 at, vec3 normal) {
 // The bite is centred on 1.0 so a layer the mask calls full is still fully
 // opaque — the pattern breaks the *edge* of a wash up, it does not make a fresh
 // car look half-cleaned or a soaped panel look patchy.
+//
+// Returned unbanded, because two things want it and they want it at different
+// resolutions: `banded` draws the layer, and `terrace` needs to know where inside
+// a band this fragment sits — which is exactly the thing banding throws away.
 float coverage(float amount, float pattern, float bite) {
 	return clamp(amount * (1.0 + bite * (pattern - 0.5) * 2.0), 0.0, 1.0);
 }
 
+// Coverage cut into `coverage_steps` visible bands — see that uniform for why.
+//
+// `ceil` and not `floor`, and that is not a rounding preference. Flooring snaps
+// the last sliver of a layer to nothing, so the paint would look finished while
+// the mask still held mud and the ding had not rung — the picture would be lying
+// about the one thing the player is waiting for. Ceiling holds any remaining mud
+// at one band of coverage and reaches zero exactly when the mask does, which is
+// the same instant the bell is struck.
+float banded(float amount, float steps) {
+	return ceil(amount * steps) / steps;
+}
+
+// The lit line along the leading edge of a band.
+//
+// A band boundary is where `banded`'s ceiling jumped, so the fragments just
+// inside one sit near zero in the fractional position that ceiling rounded away
+// — that is the whole test on `shown`, and it costs a `fract`.
+//
+// [b]Gated on the mask and not on what is drawn, which took a screenshot to
+// work out.[/b] `coverage` swings a layer either side of what the mask says by
+// up to `pattern_bite`, so over a *fresh* panel — mask at a flat 1.0 — the drawn
+// value still wanders between about 0.55 and 1.0 and crosses a band boundary
+// wherever the noise does. Testing `shown` at both ends therefore lit up an
+// untouched car in scattered cyan speckle: a panel nobody had touched read as
+// though it were half washed, which is the exact opposite of what banding is
+// here to communicate. `amount` is the mask, it is flat 1.0 on fresh paint and
+// flat 0.0 on finished paint, and between them it is the brush's own falloff —
+// so gating on it means this fires in the ring the water is actually working
+// and nowhere else.
+//
+// Both ends are excluded rather than clamped, and neither is optional: at full
+// coverage the line would run bumper to bumper, and at none it would outline
+// clean paint. Excluding them also means this can never fire where the layer is
+// absent, which is what lets the caller add it straight onto that layer's own
+// opacity.
+float terrace(float amount, float shown, float steps, float width) {
+	float inside = 1.0 - smoothstep(0.0, width, fract(shown * steps));
+	return inside * step(0.001, amount) * step(amount, 0.999);
+}
+
+// A band of light crossing the room, as `0..1`. Used for the sweep across buffed
+// paint — see `sweep_scale`.
+//
+// The three axes are summed rather than one being picked, so the wave is a plane
+// travelling diagonally and every panel catches it whichever way it faces. A
+// single axis would leave the roof or the flanks permanently unlit depending on
+// which one was chosen.
+float travelling(vec3 at, float scale, float speed, float width) {
+	float along = fract((at.x + at.y + at.z) * scale - TIME * speed);
+	float across = min(abs(along - 0.5) / max(width * 0.5, FLATNESS), 1.0);
+	float band = 1.0 - across;
+	return band * band;
+}
+
+// Which colour a patch throws, from the stage `PatchFlash` stored in green: 0 for
+// the wash, 0.5 for the cleaner, 1 for the rag.
+//
+// Three colours rather than one because the three passes are the thing the player
+// has to keep in order, and a pop that says *which* step just landed teaches that
+// order faster than a bell that does not. The middle one is the panel's own
+// `product_colour`, which is already a uniform here and is already white on
+// paint, blue on glass and green on tyres.
+vec3 flash_tint(float stage) {
+	if (stage < 0.25) {
+		return wash_flash_colour.rgb;
+	}
+	if (stage < 0.75) {
+		return product_colour.rgb;
+	}
+	return buff_flash_colour.rgb;
+}
+
 void fragment() {
 	vec3 facing = normalize(panel_normal);
-	vec3 layers = texture(grime_mask, atlas_uv(panel_position, face_for(facing))).rgb;
+	// One set of atlas coordinates for both maps. The flash is a twelve-by-eight
+	// image of the same atlas, sampled nearest, so this lands in the pixel that
+	// stands for the patch this fragment belongs to — see `PatchFlash`.
+	vec2 mask_uv = atlas_uv(panel_position, face_for(facing));
+	vec3 layers = texture(grime_mask, mask_uv).rgb;
+	vec2 flash_cell = texture(patch_flash, mask_uv).rg;
 
 	// Two octaves for the mud: one that says where it is thick and one that gives
 	// its edge a grain. More than two is not visible under a blockout's lighting.
@@ -221,17 +401,36 @@ void fragment() {
 	float mud_pattern = mix(coarse, fine, 0.35);
 	float suds = triplanar_noise(panel_position * product_scale, facing);
 
-	float mud = coverage(layers.r, mud_pattern, pattern_bite);
-	float product = coverage(layers.g, suds, product_bite);
+	float steps = float(coverage_steps);
+	float mud_raw = coverage(layers.r, mud_pattern, pattern_bite);
+	float product_raw = coverage(layers.g, suds, product_bite);
+	float mud = banded(mud_raw, steps);
+	float product = banded(product_raw, steps);
 	// Never both on one texel, so this is a weighting rather than a composite —
 	// see the file header.
 	float dirt = mud + product;
+	// The strata: thin bands lift and thick ones sit down, on top of whatever the
+	// noise pattern is already doing to the same colour.
+	float mud_relief = 1.0 + band_relief * (1.0 - 2.0 * mud);
+	float product_relief = 1.0 + band_relief * (1.0 - 2.0 * product);
 	vec3 dirt_colour = (
-		mud_colour.rgb * mix(0.72, 1.24, mud_pattern) * mud
-		+ product_colour.rgb * mix(0.80, 1.22, suds) * product
+		mud_colour.rgb * mix(0.72, 1.24, mud_pattern) * mud_relief * mud
+		+ product_colour.rgb * mix(0.80, 1.22, suds) * product_relief * product
 	) / max(dirt, FLATNESS);
 	float dirt_roughness = (mud_roughness * mud + product_roughness * product) / max(dirt, FLATNESS);
-	dirt = min(dirt, 1.0);
+	// The lit edge, taken as the brighter of the two layers' rather than their sum:
+	// a texel is only ever one of them, so they cannot both be mid-band, and adding
+	// would only ever be a way of double-counting the one that is.
+	float rim = max(
+		terrace(layers.r, mud_raw, steps, terrace_width),
+		terrace(layers.g, product_raw, steps, terrace_width)
+	);
+	// Folded into the layer's own opacity rather than laid over it. A contour line
+	// on mud is *more mud, brighter* — not a separate thing floating above it — so
+	// the fragment keeps the colour and the roughness of what it is an edge of, and
+	// only the emission below says it is lit. `terrace` cannot fire where the layer
+	// is absent, so this can never thicken bare paint.
+	dirt = min(dirt + rim * terrace_lip, 1.0);
 
 	// The coat only shows through where nothing is lying on top of it, which is
 	// also the only place it exists: shine is buffed out of product, and a texel
@@ -241,22 +440,40 @@ void fragment() {
 	// `NORMAL` and `VIEW` are both view-space here, so this is 0 looking straight
 	// at the surface and 1 along its silhouette.
 	float sheen = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), sheen_sharpness);
-	float lit = gloss_sheen * sheen;
+	// Two reasons for a coat to be lit, taken as the stronger rather than summed:
+	// a grazing angle and a passing sweep are both "this surface is catching the
+	// light right now", and a panel that happened to be both would otherwise blow
+	// past white. Everything downstream reads `lit` rather than `sheen`, so the
+	// sweep gets the albedo, the alpha and the emission for free.
+	float sweep = travelling(world_position, sweep_scale, sweep_speed, sweep_width);
+	float lit = clamp(max(gloss_sheen * sheen, sweep * sweep_strength), 0.0, 1.0);
 	float gloss = coat * mix(gloss_strength, 1.0, lit);
-	float total = clamp(dirt + gloss, 0.0, 1.0);
+	// A finished patch's pop. It has to carry its own opacity or it would be
+	// invisible exactly when it fires: the patch that just came clean has no mud
+	// left and no shine yet, so without this the fragment is fully transparent and
+	// there is nothing for the emission below to show up on.
+	float flash = flash_cell.r;
+	vec3 tint = flash_tint(flash_cell.g);
+	float total = clamp(dirt + gloss + flash, 0.0, 1.0);
 	// How much of what this pass draws is dirt rather than coat. Divided by the
 	// total rather than used raw because the two are being mixed *within* one
 	// alpha — at half coverage and half gloss the fragment is half of each, not
 	// half dirt over a full coat.
 	float share = dirt / max(total, FLATNESS);
 
-	ALBEDO = mix(mix(gloss_colour.rgb, sheen_colour.rgb, sheen), dirt_colour, share);
+	vec3 surface = mix(mix(gloss_colour.rgb, sheen_colour.rgb, lit), dirt_colour, share);
+	ALBEDO = mix(surface, tint, flash);
 	ROUGHNESS = mix(gloss_roughness, dirt_roughness, share);
 	SPECULAR = mix(gloss_specular, 0.5, share);
 	// Carried as light of its own rather than as albedo alone: the rim has to be
 	// there on the shaded side of the car too, and a panel facing away from both
-	// omnis would otherwise buff to a dark edge instead of a bright one.
-	EMISSION = sheen_colour.rgb * sheen * coat * gloss_sheen;
+	// omnis would otherwise buff to a dark edge instead of a bright one. The
+	// terrace line and the patch flash are here for the same reason and one more —
+	// neither is a surface catching light, they are the game telling the player
+	// something, and the shaded flank is where that matters most.
+	EMISSION = sheen_colour.rgb * lit * coat
+		+ terrace_colour.rgb * rim * terrace_glow
+		+ tint * flash * flash_glow;
 	ALPHA = total;
 	METALLIC = 0.0;
 }

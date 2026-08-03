@@ -182,6 +182,19 @@ func patches() -> int:
 	return _patches_across * _patches_down
 
 
+## The shape of that dicing — how many patches across the atlas and how many
+## down.
+##
+## Public because a patch index is only meaningful against this grid, and
+## anything drawing patches rather than counting them needs both numbers.
+## [PatchFlash] sizes its image from this rather than working it out again from
+## [constant BoxProjection.COLUMNS] and the patches-per-tile it was built with:
+## two derivations of the same grid is two things that can disagree, and the
+## symptom would be a flash lighting the square next to the one that rang.
+func patch_grid() -> Vector2i:
+	return Vector2i(_patches_across, _patches_down)
+
+
 ## How much of this panel's mud is still on it, as [code]0..1[/code].
 func remaining() -> float:
 	return _fraction(_mud_total)

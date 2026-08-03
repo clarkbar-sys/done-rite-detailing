@@ -31,6 +31,15 @@
 ## and neither is the rule about which tool the player is holding, because
 ## [Garage] holds the trigger and this takes the instruction. What this class
 ## knows is a texture and the panel it is stretched over.
+##
+## [b]And it lights the patch it just rang for.[/b] Alongside every map is a
+## [PatchFlash] — a small decaying picture of which patches have finished
+## something and which pass finished it, sampled by the same overlay through the
+## same atlas coordinates. It is fed from exactly where [signal patch_finished] is
+## emitted, so the square that lights and the bell that rings can never be about
+## different patches, and it is dimmed in [method Node._process] because a fading
+## light is the one thing in this class that is about time rather than about the
+## last press.
 class_name Grime
 extends Node3D
 
@@ -69,7 +78,21 @@ const SHADER: String = "res://src/world/grime.gdshader"
 @export var patches_per_tile: int = 4
 
 var _maps: Array[GrimeMap] = []
+var _flashes: Array[PatchFlash] = []
 var _panels: Array[CSGShape3D] = []
+
+
+## Dims every panel's finished-patch flashes.
+##
+## [b]The one thing here that runs on a clock.[/b] Everything else in this class
+## happens because a tool was held; a flash happens because one was held a moment
+## ago, and something has to take it away again. It is a loop over twelve panels
+## doing a single integer comparison each while nothing is lit — [method
+## PatchFlash.fade] returns early and uploads nothing — so an untouched car costs
+## a dozen branches a frame rather than a dozen texture uploads.
+func _process(delta: float) -> void:
+	for flash: PatchFlash in _flashes:
+		flash.fade(delta)
 
 
 ## Puts mud on every panel of [param car].
@@ -80,11 +103,17 @@ var _panels: Array[CSGShape3D] = []
 func lay_on(car: Car) -> void:
 	_panels = car.panels()
 	_maps = []
+	_flashes = []
 	var shader: Shader = load(SHADER) as Shader
 	for panel: CSGShape3D in _panels:
 		var map: GrimeMap = GrimeMap.new(panel.get_aabb(), tile_pixels, patches_per_tile)
+		# Sized from the map rather than from `patches_per_tile` and
+		# `BoxProjection.COLUMNS`, which is the same arithmetic in a second place —
+		# see [method GrimeMap.patch_grid].
+		var flash: PatchFlash = PatchFlash.new(map.patch_grid())
 		_maps.append(map)
-		panel.material_overlay = _overlay(shader, map, panel.get_aabb(), car.kind_of(panel))
+		_flashes.append(flash)
+		panel.material_overlay = _overlay(shader, map, flash, panel.get_aabb(), car.kind_of(panel))
 
 
 ## Whether [method lay_on] has run. False on a room that never took up grime —
@@ -100,11 +129,32 @@ func panels() -> Array[CSGShape3D]:
 
 ## The map for one panel, or [code]null[/code] if that node is not a panel of the
 ## car this grime was laid on.
+## Cast on the way in rather than taken as given. [member _panels] is an
+## [code]Array[CSGShape3D][/code], and searching a typed array for something that
+## is not of its type is an engine error rather than a miss — so a stray hit on
+## the driveway, which is a normal thing for a player to produce, would print
+## rather than answer.
 func map_of(panel: Node) -> GrimeMap:
-	var index: int = _panels.find(panel)
+	var index: int = _panels.find(panel as CSGShape3D)
 	if index < 0:
 		return null
 	return _maps[index]
+
+
+## The finished-patch flashes for one panel, or [code]null[/code] for a node that
+## is not a panel of this car.
+##
+## Public alongside [method map_of] rather than kept private, because "did that
+## patch light up" is a question a test should be able to ask of the thing the
+## shader actually samples. Asserting on the mask instead would only prove the
+## patch finished, which is the half that was already covered.
+##
+## Cast on the way in for the reason [method map_of] is.
+func flash_of(panel: Node) -> PatchFlash:
+	var index: int = _panels.find(panel as CSGShape3D)
+	if index < 0:
+		return null
+	return _flashes[index]
 
 
 ## How much of the car's mud is still on it, as [code]0..1[/code], across every
@@ -206,9 +256,10 @@ func _work(
 	stage: GrimeMap.Stage
 ) -> int:
 	var shape: CSGShape3D = panel as CSGShape3D
-	var map: GrimeMap = map_of(shape)
-	if map == null:
+	var index: int = _panels.find(shape)
+	if index < 0:
 		return 0
+	var map: GrimeMap = _maps[index]
 	var into: Transform3D = shape.global_transform.affine_inverse()
 	# The normal is turned by the basis alone — it is a direction, and putting it
 	# through the full transform would add the panel's position to it and send
@@ -223,23 +274,36 @@ func _work(
 			finished = map.foam(at, facing, radius_metres, amount)
 		_:
 			finished = map.buff(at, facing, radius_metres, amount)
+	# Lit here rather than on the signal, so the square and the ding are two things
+	# done with the same list instead of two listeners that could come apart. A
+	# flash is not a reaction to the event; it is the event, drawn.
+	var flash: PatchFlash = _flashes[index]
 	for patch: int in finished:
+		flash.flare(patch, stage)
 		patch_finished.emit(String(shape.name), patch, stage)
 	return finished.size()
 
 
-## The overlay material for one panel: the shader, its mask, the box the
-## projection measures in, and what the cleaner for this kind of panel looks like.
+## The overlay material for one panel: the shader, its mask, its flashes, the box
+## the projection measures in, and what the cleaner for this kind of panel looks
+## like.
+##
+## The two textures are handed over once and never again — both are updated in
+## place by whoever owns them, so a material that has been given them stays
+## current without anything here watching.
 ##
 ## The product colour is set once, here, and never again — which is how one
 ## channel of the mask carries white suds on the paint, blue on the glass and
 ## green on the tyres without the mask having anywhere to record which. A panel
 ## does not change what it is made of. [method Surface.product_colour] has the
 ## argument at length.
-func _overlay(shader: Shader, map: GrimeMap, box: AABB, kind: Surface.Kind) -> ShaderMaterial:
+func _overlay(
+	shader: Shader, map: GrimeMap, flash: PatchFlash, box: AABB, kind: Surface.Kind
+) -> ShaderMaterial:
 	var paint: ShaderMaterial = ShaderMaterial.new()
 	paint.shader = shader
 	paint.set_shader_parameter("grime_mask", map.texture())
+	paint.set_shader_parameter("patch_flash", flash.texture())
 	paint.set_shader_parameter("box_origin", box.position)
 	paint.set_shader_parameter("box_size", box.size)
 	paint.set_shader_parameter("product_colour", Surface.product_colour(kind))
