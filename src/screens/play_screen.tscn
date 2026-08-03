@@ -19,6 +19,7 @@ script = ExtResource("1_play")
 orbiting = false
 first_person = true
 walkaround = true
+noisy = true
 
 [node name="ToolBelt" parent="." instance=ExtResource("3_hud")]
 layout_mode = 1
