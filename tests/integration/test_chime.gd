@@ -82,3 +82,45 @@ func test_the_pool_takes_the_oldest_player_back() -> void:
 		_chime.ring_at(Bell.Voice.PATCH, NOW + index * Chime.MIN_GAP_MSEC)
 	assert_eq(_chime.ringing(), Chime.VOICES)
 	assert_eq(_chime.get_child_count(), Chime.VOICES, "the pool grew rather than recycled")
+
+
+# ---- the patch bell climbs a run -----------------------------------------------
+
+
+func test_the_first_patch_of_a_run_is_the_first_step() -> void:
+	_chime.ring_at(Bell.Voice.PATCH, NOW)
+	assert_eq(_chime.patch_run(), 1, "the first patch of a run should read as the first")
+
+
+func test_consecutive_patches_climb_the_run() -> void:
+	# Well inside [constant Chime.RUN_RESET_MSEC] of each other, so this is a
+	# sweep rather than three separate runs.
+	_chime.ring_at(Bell.Voice.PATCH, NOW)
+	_chime.ring_at(Bell.Voice.PATCH, NOW + 200)
+	_chime.ring_at(Bell.Voice.PATCH, NOW + 400)
+	assert_eq(_chime.patch_run(), 3, "three patches in a row should be a run of three")
+
+
+func test_a_gap_resets_the_run() -> void:
+	# Hesitating starts the ladder over — the class docs on [Chime] have why.
+	_chime.ring_at(Bell.Voice.PATCH, NOW)
+	_chime.ring_at(Bell.Voice.PATCH, NOW + 200)
+	_chime.ring_at(Bell.Voice.PATCH, NOW + 200 + Chime.RUN_RESET_MSEC)
+	assert_eq(_chime.patch_run(), 1, "a gap past the reset window did not reset the run")
+
+
+func test_the_run_counts_patches_even_when_the_ding_is_dropped() -> void:
+	# A ding the rate limiter drops was still a real patch finishing — see the
+	# class docs — so a fast sweep still climbs the ladder even though some of
+	# its dings never sound.
+	_chime.ring_at(Bell.Voice.PATCH, NOW)
+	var rang: bool = _chime.ring_at(Bell.Voice.PATCH, NOW + Chime.MIN_GAP_MSEC - 1)
+	assert_false(rang, "this ding should have been inside the rate limit")
+	assert_eq(_chime.patch_run(), 2, "the dropped ding should still have counted as a patch")
+
+
+func test_ringing_the_counter_bell_does_not_touch_the_run() -> void:
+	_chime.ring_at(Bell.Voice.PATCH, NOW)
+	_chime.ring_at(Bell.Voice.PATCH, NOW + 200)
+	_chime.ring_at(Bell.Voice.START, NOW + 400)
+	assert_eq(_chime.patch_run(), 2, "ringing Start should not have advanced the patch run")
