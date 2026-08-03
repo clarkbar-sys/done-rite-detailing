@@ -7,10 +7,13 @@
 ## [code]tests/integration/test_view_model.gd[/code]'s job, and the geometry the
 ## power wash's own carry adds on top is [code]test_wand_carry.gd[/code]'s.
 ##
-## [b]What is actually being pinned here[/b] is that the default carry is inert.
-## Four of the five tools use it, and the whole promise of this refactor is that
-## none of them moved — so "no input changes the answer" is the assertion, swept
-## rather than sampled once.
+## [b]What is actually being pinned here[/b] is that the default carry is inert
+## and knows nothing about spraying. No tool on the belt uses it as it stands —
+## the wand carries a [WandCarry] and the other four carry a [ReachCarry] — which
+## makes it the base every one of those is measured against rather than a
+## behaviour anybody sees. "No input changes the answer" is the assertion, swept
+## rather than sampled once, because that is the promise a subclass overrides
+## piece by piece.
 extends GutTest
 
 ## A ten-thousandth of a metre, or of a component of a basis. These are lerps and
@@ -44,17 +47,21 @@ func test_it_is_built_holding_the_pose_it_was_given() -> void:
 
 
 func test_a_tool_at_rest_is_held_the_way_the_table_says() -> void:
-	assert_almost_eq(_carry.pose(Vector3.ZERO, 0.0).origin, HELD.origin, Vector3.ONE * TOLERANCE)
+	var posed: Transform3D = _carry.pose(Vector3.ZERO, Vector3.UP, 0.0)
+	assert_almost_eq(posed.origin, HELD.origin, Vector3.ONE * TOLERANCE)
 
 
 func test_nothing_anybody_aims_at_moves_it() -> void:
-	# The promise the four tools that are not the power wash are relying on: a
-	# sponge is held the way a sponge is held, whatever the player is pointing at
-	# and however far into aiming they are.
+	# The promise every subclass starts from: a tool with a fixed pose is held that
+	# way whatever the player is pointing at, whichever way that surface faces, and
+	# however far into aiming they are. Both directions are swept, because "ignores
+	# its arguments" is only worth asserting if all of them are passed something
+	# that would move a carry that did not.
 	for yaw: float in [-40.0, 0.0, 40.0]:
 		for range_metres: float in [1.0, 2.5, 30.0]:
 			for raise: float in [0.0, 0.5, 1.0]:
-				var posed: Transform3D = _carry.pose(_somewhere(yaw, range_metres), raise)
+				var toward: Vector3 = _somewhere(yaw, range_metres)
+				var posed: Transform3D = _carry.pose(toward, -toward.normalized(), raise)
 				assert_almost_eq(
 					posed.origin,
 					HELD.origin,
@@ -74,3 +81,15 @@ func test_it_does_not_ask_to_be_kept_up_to_date() -> void:
 	# still worth paying for. A carry that returns one pose forever and said yes
 	# here would cost a transform write every frame of every game for nothing.
 	assert_false(_carry.tracks_the_aim(), "a fixed pose has nothing new to say")
+
+
+func test_a_tool_has_no_ends_until_a_carry_says_it_does() -> void:
+	# The other default, and the safe direction to have it in: a tool nobody has
+	# said sprays gets no markers hung off it and no effect stood on it. The two
+	# ends still answer rather than refusing, so a caller that emits without asking
+	# gets the middle of the tool instead of a null it forgot to check — and the
+	# pair still describes one axis, which is the whole reason [method
+	# ToolCarry.butt] is derived from the nozzle rather than stated twice.
+	assert_false(_carry.has_ends(), "nothing sprays by default")
+	assert_almost_eq(_carry.nozzle(), Vector3.ZERO, Vector3.ONE * TOLERANCE)
+	assert_almost_eq(_carry.butt(), -_carry.nozzle(), Vector3.ONE * TOLERANCE)

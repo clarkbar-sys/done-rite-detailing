@@ -79,3 +79,26 @@ func test_an_unknown_kind_gets_the_sponge() -> void:
 	var unknown: Surface.Kind = KINDS.size() as Surface.Kind
 	assert_eq(Surface.cleaner_for(unknown), DetailingTool.Id.SPONGE)
 	assert_eq(Surface.product_colour(unknown), Surface.BODY_PRODUCT)
+
+
+func test_a_cleaner_sprays_the_product_it_leaves_behind() -> void:
+	# The pairing read the other way round, for [SprayMist]: what is in the air has
+	# to be what ends up on the panel. Derived from [method Surface.cleaner_for]
+	# rather than tabled beside it — see the class docs — so this is checking the
+	# round trip rather than checking one list against another.
+	for kind: Surface.Kind in KINDS:
+		assert_eq(
+			Surface.product_from(Surface.cleaner_for(kind)),
+			Surface.product_colour(kind),
+			"kind %d sprays something other than what it leaves" % kind
+		)
+
+
+func test_a_tool_that_is_not_a_cleaner_gets_the_body_product() -> void:
+	# The same defaulting [method cleaner_for] does, and for the same reason: it is
+	# not a meaningful question for the power wash or the rag — neither has a nozzle
+	# full of product — and paint is what a surface is when nobody has said
+	# otherwise. Answering rather than refusing, so a caller that asks anyway gets a
+	# colour instead of a crash.
+	assert_eq(Surface.product_from(DetailingTool.Id.POWER_WASH), Surface.BODY_PRODUCT)
+	assert_eq(Surface.product_from(DetailingTool.Id.DRYING_RAG), Surface.BODY_PRODUCT)

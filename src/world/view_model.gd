@@ -38,28 +38,37 @@
 ## hand is pointed, and the two compose because the swing is applied to the
 ## anchor and the poses hang off it.
 ##
-## [b]How a tool is held is now a thing tools can differ in.[/b] Four of them are
-## held the way the table below says and never move in the hand; the power wash
-## lies along the line from the hand to whatever is being aimed at, so that the
-## water can leave the nozzle and land on the crosshair without bending in
-## mid-air to get there. That difference is a [ToolCarry] per tool — the
-## default one hands back its pose and ignores everything, [WandCarry] is the
-## power wash's — and it is a class rather than an `if` in [method _process]
-## because it will not be the last tool that wants to know where the aim is, and
-## a viewmodel with five special cases in it is one function nobody can change
-## one tool inside of. The poses in [method _held_pose] are unchanged and are
-## still where every tool starts: a carry is handed its resting pose and decides
-## what to do about it.
+## [b]How a tool is held is a thing tools differ in, and now every one of them
+## differs.[/b] That difference is a [ToolCarry] per tool — [WandCarry] lays the
+## power wash along the line from the hand to the mark so the water can leave the
+## nozzle without bending in mid-air, and [ReachCarry] takes the other four out to
+## the paint, because a sponge that stays in the corner of the frame while mud
+## disappears two metres away is a game where the tool and the work are in
+## different places. It is a class per rule rather than an `if` per tool in
+## [method _process], because a viewmodel with five special cases in it is one
+## function nobody can change one tool inside of. The poses in
+## [method _held_pose] are unchanged and are still where every tool starts: a
+## carry is handed its resting pose and decides what to do about it.
 ##
-## [b]The wand has an end, and the end is a node.[/b] [code]Muzzle[/code] and
-## [code]Butt[/code] are [Marker3D]s at the two ends of the power wash proxy,
-## with their [code]-Z[/code] pointed out of the nozzle — which is the axis a
-## [GPUParticles3D] emits along, so [WashJet] is stood on the first one every tick
-## and throws water down it with no arithmetic of its own. They are also what a
-## test measures the alignment
-## with: the line between them is the wand, and asserting on two nodes is
-## honest in a way that re-deriving the wand's axis from the same [Basis] the
-## code posed it with is not.
+## [b]Which way the paint faces is an input now, not just where it is.[/b] A
+## point on a panel says nothing about which way the panel points, and the whole
+## difference between a sponge flat on a door and one flat on the roof is that.
+## So [method mark_at] takes the surface normal alongside the mark and
+## [method _facing] hands it to the carries in the hand's own frame, exactly the
+## way [method _pointed_at] already handed them the mark.
+##
+## [b]A tool that emits something has an end, and the end is a node.[/b]
+## [code]Muzzle[/code] and [code]Butt[/code] are [Marker3D]s at the two ends of
+## the proxy, with their [code]-Z[/code] pointed out of the nozzle — which is the
+## axis a [GPUParticles3D] emits along, so [WashJet] and [SprayMist] are stood on
+## the first one every tick and throw their contents down it with no arithmetic of
+## their own. They are also what a test measures the alignment with: the line
+## between them is the tool, and asserting on two nodes is honest in a way that
+## re-deriving the axis from the same [Basis] the code posed it with is not.
+##
+## Which tools get them is [method ToolCarry.has_ends] and not a list here: the
+## wand and the two spray bottles say yes and the sponge and the rag say no,
+## because a sponge has no business end — it has a face.
 ##
 ## [b]The drying rag is a plane, and a plane has one side.[/b] Two ways to lose
 ## it entirely, and it needs both fixed. Edge-on it is zero pixels, so the angle
@@ -73,6 +82,13 @@
 ## sometimes". A very flat [BoxMesh] would dodge both, and is rejected because
 ## the catalogue says [constant DetailingTool.Shape.PLANE] and a viewmodel that
 ## quietly renders something else is a viewmodel the roll-up will disagree with.
+##
+## [b]The plane the rag renders as is now woven rather than flat.[/b] [ClothRag]
+## is a [MeshInstance3D] that keeps the catalogue's size and its one-sidedness and
+## replaces the single quad inside it with a simulated sheet — the same rectangle,
+## diced, moving. Nothing above changes: it is still a [constant
+## DetailingTool.Shape.PLANE] of exactly the catalogue's extent, so the roll-up
+## icon and the thing in your hands still agree about what a rag is.
 ##
 ## [b]Silver is a material, not a colour.[/b] The power wash is the only metal on
 ## the belt, and the only metal in the scene at all, and it comes out of the
@@ -129,6 +145,54 @@ const OUT_OF_THE_NOZZLE: float = PI * 0.5
 ## rather than at its own hand.
 const REST_RANGE: float = 2.5
 
+## How far off the paint a spray bottle's nozzle hovers while it is spraying, in
+## metres.
+##
+## A quarter of a metre — the arm's length a detailer actually holds a bottle at,
+## and the "a few inches away from the spot" this whole behaviour was asked for.
+## Measured to the nozzle rather than to the middle of the bottle: see
+## [method ReachCarry.worked] for why that distinction is the one that keeps meaning
+## the same thing when a proxy is resized.
+##
+## [b]It shipped at ten centimetres for a day and that was too close to see.[/b]
+## Rendered, at the range the game is played from: the whole spray was a faint blob
+## about twenty pixels across, because the cone was a tenth of a metre long while
+## the patch it was covering is [member Garage.scrub_radius_metres] — nearly half a
+## metre wide. A fan wider across than it is long is not a fan, it is a ball around
+## the nozzle, and no amount of tuning the droplets fixes the proportion. At a
+## quarter of a metre the same patch is a fan of about fifty degrees, which reads
+## as a can spraying at a panel from where a hand would hold it. The lesson is
+## [member Garage.wash_radius_metres]'s, arriving again: a number like this means
+## nothing on its own, only against the size of the thing it is aimed at and the
+## size of that on the screen.
+const SPRAY_STANDOFF: float = 0.25
+
+## How far a spray bottle is leaned off pointing straight into the panel, in
+## degrees.
+##
+## [code]180°[/code] would be dead square at the paint, and dead square at the
+## paint is a cylinder seen end-on from where the player is standing — which is
+## the "no tool points down the barrel" rule this file already keeps for the
+## resting poses, arriving from a new direction. Thirty degrees off it is enough
+## that the bottle's length reads, and [ReachCarry] leans it upward, which is how
+## a hand holds a can it is spraying downward at something.
+const SPRAY_TILT: float = 150.0
+
+## The lean for a tool that lies on the paint rather than spraying at it: none at
+## all, so its own [code]+Y[/code] is the surface normal and its broad face is
+## flat on the panel.
+const ON_THE_PAINT: float = 0.0
+
+## How much clear air to leave under a tool pressed against the paint, in metres.
+## Half a centimetre — enough that a sponge sits on a door rather than z-fighting
+## it, and far too little to read as hovering.
+const CONTACT: float = 0.005
+
+## The nozzle length of a tool that has no nozzle. Named rather than written as a
+## bare zero at the two call sites, because "this tool does not spray" is the
+## thing being said and [code]0.0[/code] is only how it is spelled.
+const NO_NOZZLE: float = 0.0
+
 var _belt: ToolBelt = null
 var _proxies: Array[MeshInstance3D] = []
 var _carries: Array[ToolCarry] = []
@@ -141,6 +205,7 @@ var _rest: Vector3 = Vector3.ZERO
 ## on every resize.
 var _framed: Vector3 = Vector3.ZERO
 var _mark: Vector3 = Vector3.ZERO
+var _outward: Vector3 = Vector3.ZERO
 var _marked: bool = false
 
 
@@ -243,8 +308,14 @@ func aim_toward(direction: Vector3) -> void:
 ## why at length), so the wand that is going to be spraying it has to be pointed
 ## there too. A jet leaving a wand aimed at the sky while the mud comes off the
 ## roof is the same broken tool that paragraph is about.
-func mark_at(point: Vector3) -> void:
+##
+## [param outward] is which way the paint faces there — the panel's own surface
+## normal, from the same raycast that found the point. It is what lets a tool be
+## put [i]on[/i] the mark rather than merely at it: see [ReachCarry], which the
+## four tools that travel to the paint carry and the wand does not.
+func mark_at(point: Vector3, outward: Vector3) -> void:
 	_mark = point
+	_outward = outward
 	_marked = true
 
 
@@ -304,13 +375,25 @@ func proxy_for(id: DetailingTool.Id) -> MeshInstance3D:
 ## [code]-Z[/code] points down the jet, for the effect to hang off and for a test
 ## to measure the alignment from.
 func muzzle() -> Marker3D:
-	return _wand_end(MUZZLE)
+	return muzzle_of(DetailingTool.Id.POWER_WASH)
 
 
 ## The other end of it, where the hose goes. The pair is what makes the wand's
 ## axis something you can read off two nodes instead of re-deriving it.
 func butt() -> Marker3D:
-	return _wand_end(BUTT)
+	return _end_of(DetailingTool.Id.POWER_WASH, BUTT)
+
+
+## The nozzle of any tool that has one, or [code]null[/code] for one that does
+## not — which is how a caller asks "does this thing spray, and from where"
+## without a list of its own.
+##
+## The wand is no longer the only tool with a muzzle: the two spray bottles have
+## one each, and [SprayMist] is stood on whichever the player is holding. So the
+## general form is the one the room calls and [method muzzle] is the wand's name
+## for it, kept because the water has always come out of exactly that node.
+func muzzle_of(id: DetailingTool.Id) -> Marker3D:
+	return _end_of(id, MUZZLE)
 
 
 func _on_equipped_changed(tool: DetailingTool) -> void:
@@ -321,6 +404,12 @@ func _on_equipped_changed(tool: DetailingTool) -> void:
 	# swap made while the hand is settled — which is most swaps — does not show a
 	# frame of the old aim.
 	_carry_the_equipped()
+	# And a cloth that was last simulated several presses and half a lap ago is
+	# dropped onto the pose it has just been put in, rather than easing across the
+	# room to catch up with a swap the player has already finished making.
+	var rag: ClothRag = _proxies[_belt.equipped_index()] as ClothRag
+	if rag != null:
+		rag.settle()
 
 
 ## Shows the proxy at [param index] and hides the other four.
@@ -337,34 +426,65 @@ func _show_only(index: int) -> void:
 ## Assembles one tool's proxy: catalogue for what it is, [param carry] for how it
 ## is held.
 func _build(tool: DetailingTool, carry: ToolCarry) -> MeshInstance3D:
-	var proxy: MeshInstance3D = MeshInstance3D.new()
+	var proxy: MeshInstance3D = _instance_for(tool)
 	# "Tire & Engine Cleaner" -> "TireEngineCleaner". Named after the tool rather
 	# than numbered, so the remote scene tree during a debug session says which
 	# one is showing without anybody counting children.
 	proxy.name = tool.display_name.replace("&", "").replace(" ", "")
-	proxy.mesh = _mesh_for(tool)
 	proxy.material_override = _material_for(tool)
 	proxy.transform = carry.rest_pose()
-	var wand: WandCarry = carry as WandCarry
-	if wand != null:
-		proxy.add_child(_end_marker(MUZZLE, wand.nozzle()))
-		proxy.add_child(_end_marker(BUTT, wand.butt()))
+	# Asked of the carry rather than of the tool's id: which tools emit something
+	# is a fact about how they are used, and it is the carry that already holds
+	# every other fact of that kind.
+	if carry.has_ends():
+		proxy.add_child(_end_marker(MUZZLE, carry.nozzle()))
+		proxy.add_child(_end_marker(BUTT, carry.butt()))
 	return proxy
 
 
-## How [param tool] is carried: the default for four of them, and the aimed wand
-## for the power wash.
+## The node [param tool] is drawn by, with the primitive the catalogue asks for
+## already in it.
+##
+## One exception, and it is the rag: a [ClothRag] is a [MeshInstance3D] that
+## builds and re-builds its own mesh from a simulated sheet. Everything about it
+## that the catalogue has an opinion on — the size, the plane it starts as, the
+## material it wears — is unchanged, which is why the swap can be this small.
+func _instance_for(tool: DetailingTool) -> MeshInstance3D:
+	if tool.id == DetailingTool.Id.DRYING_RAG:
+		return ClothRag.new(Vector2(tool.extent.x, tool.extent.z))
+	var proxy: MeshInstance3D = MeshInstance3D.new()
+	proxy.mesh = _mesh_for(tool)
+	return proxy
+
+
+## How [param tool] is carried: the aimed wand for the power wash, and one of the
+## two [ReachCarry] settings for everything else.
 ##
 ## The one place a tool is singled out by id for something other than framing,
-## and deliberately a single line rather than a field on [DetailingTool] — see
+## and deliberately a short table rather than a field on [DetailingTool] — see
 ## [ToolCarry] for why the catalogue is the wrong home for it. Every carry is
-## built with the same [method _held_pose] the table has always given it, so the
-## four that ignore the aim are held exactly where they were before any of this
-## existed.
+## built with the same [method _held_pose] the table has always given it, so what
+## each tool looks like in the hand is untouched and only what it does with a
+## finger on the glass is new.
+##
+## [b]The two standoffs are arithmetic, not taste.[/b] A sponge placed by its own
+## origin would bury half its thickness in the door, so half of that thickness is
+## added here where [member DetailingTool.extent] is in scope. A rag has no
+## thickness to halve and instead has a cloth that billows up to
+## [constant Cloth.STRAY] off its own plane, so that is what it is lifted by —
+## read off the simulation rather than guessed at, so a livelier cloth cannot
+## start clipping through the paint without anybody noticing.
 func _carry_for(tool: DetailingTool) -> ToolCarry:
-	if tool.id == DetailingTool.Id.POWER_WASH:
-		return WandCarry.new(_held_pose(tool.id), tool.extent.y)
-	return ToolCarry.new(_held_pose(tool.id))
+	var held: Transform3D = _held_pose(tool.id)
+	match tool.id:
+		DetailingTool.Id.POWER_WASH:
+			return WandCarry.new(held, tool.extent.y)
+		DetailingTool.Id.SPONGE:
+			return ReachCarry.new(held, tool.extent.y * 0.5 + CONTACT, ON_THE_PAINT, NO_NOZZLE)
+		DetailingTool.Id.DRYING_RAG:
+			return ReachCarry.new(held, Cloth.STRAY, ON_THE_PAINT, NO_NOZZLE)
+	# The two bottles, which is the only pair on the belt that is carried alike.
+	return ReachCarry.new(held, SPRAY_STANDOFF, SPRAY_TILT, tool.extent.y)
 
 
 ## One of the wand's two ends: a [Marker3D] at [param at] in the proxy's own
@@ -376,12 +496,12 @@ func _end_marker(named: String, at: Vector3) -> Marker3D:
 	return marker
 
 
-## The named end of the power wash proxy, or [code]null[/code] on a belt that
-## does not carry one. Through [method proxy_for] rather than by node path, for
-## the reason that method exists: a caller should not have to know what the mesh
-## ended up being called.
-func _wand_end(named: String) -> Marker3D:
-	var proxy: MeshInstance3D = proxy_for(DetailingTool.Id.POWER_WASH)
+## The named end of [param id]'s proxy, or [code]null[/code] for a tool that has
+## no ends and for a belt that does not carry that tool at all. Through
+## [method proxy_for] rather than by node path, for the reason that method exists:
+## a caller should not have to know what the mesh ended up being called.
+func _end_of(id: DetailingTool.Id, named: String) -> Marker3D:
+	var proxy: MeshInstance3D = proxy_for(id)
 	if proxy == null:
 		return null
 	return proxy.get_node_or_null(NodePath(named)) as Marker3D
@@ -401,7 +521,7 @@ func _carry_the_equipped() -> void:
 	if _aim == null:
 		return
 	var index: int = _belt.equipped_index()
-	_proxies[index].transform = _carries[index].pose(_pointed_at(), _aim.raise_amount())
+	_proxies[index].transform = _carries[index].pose(_pointed_at(), _facing(), _aim.raise_amount())
 
 
 ## The point the hand is aimed at, in the hand's own space — which is what a
@@ -424,6 +544,27 @@ func _pointed_at() -> Vector3:
 	if _marked:
 		return to_local(_mark)
 	return _aim.orientation().inverse() * (_aim.pointing() * REST_RANGE - _rest)
+
+
+## Which way the paint faces at the mark, in the hand's own space — the other
+## half of [method _pointed_at], and what a [ReachCarry] lies its tool flat
+## against or stands it off.
+##
+## [b]Turned by the basis alone[/b], because it is a direction: putting a normal
+## through the full transform would add the hand's position to it and lay every
+## sponge flat against whichever way the player happens to be standing. The same
+## trap [method Grime._work] documents, on the other side of the same raycast.
+##
+## [b]Until a ray has said otherwise, the paint faces the hand.[/b] That is the
+## honest guess for a tool brought up on the first frame of a press: it is what
+## [method Garage._nearest_on_the_car] invents for a mark it could not measure a
+## normal for, it is never wrong by more than the angle the panel is turned away
+## at, and — like [method _pointed_at]'s own guess — it is only ever read while
+## the raise is still near zero and the pose it feeds is still the resting one.
+func _facing() -> Vector3:
+	if _marked:
+		return (global_transform.basis.inverse() * _outward).normalized()
+	return -_pointed_at().normalized()
 
 
 ## The primitive [param tool] renders as, at the size the catalogue gives it.

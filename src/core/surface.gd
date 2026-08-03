@@ -81,6 +81,28 @@ static func cleaner_for(kind: Kind) -> DetailingTool.Id:
 	return DetailingTool.Id.SPONGE
 
 
+## What [param cleaner] sprays, as a colour — the same product [method product_colour]
+## draws once it has landed, wanted here while it is still in the air.
+##
+## [b]Derived from [method cleaner_for] rather than tabled again.[/b] The class
+## docs above are about exactly this: a second table from tool to product is a
+## second place for the pairing to be written down, and the two would agree right
+## up until somebody repainted one of them. So this asks the one direction that
+## exists — "which cleaner treats glass?" — and hands back the product of the kind
+## whose answer matches.
+##
+## Anything that is not one of the three cleaners gets the body product, which is
+## the same defaulting [method cleaner_for] does and is right for the same reason:
+## paint is what a surface is when nobody has said otherwise. It is not a
+## meaningful question for the power wash or the rag, and neither asks it.
+static func product_from(cleaner: DetailingTool.Id) -> Color:
+	if cleaner == cleaner_for(Kind.GLASS):
+		return product_colour(Kind.GLASS)
+	if cleaner == cleaner_for(Kind.WHEEL):
+		return product_colour(Kind.WHEEL)
+	return product_colour(Kind.BODY)
+
+
 ## What the product for [param kind] looks like sitting on the panel — the colour
 ## [code]grime.gdshader[/code] draws the green channel in.
 ##
