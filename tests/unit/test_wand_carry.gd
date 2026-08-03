@@ -27,6 +27,15 @@ const TOLERANCE: float = 0.0001
 ## carry of a given length, not about which tool happens to have it.
 const LENGTH: float = 0.72
 
+## The surface normal every call below passes and none of them reads.
+##
+## A wand is aimed at a place and has no opinion about which way the paint there
+## faces — that is the whole difference between it and [ReachCarry], and it is why
+## [method WandCarry.pose] takes the argument and ignores it. Deliberately a
+## direction with no relationship to anything else in this file: if it ever starts
+## mattering, every assertion here is the thing that should notice.
+const UNREAD: Vector3 = Vector3(0.0, 0.0, 1.0)
+
 ## A resting pose that is nowhere near the aimed one — across the frame and slid
 ## down its own axis, the way the table in [ViewModel] holds a wand.
 const HELD: Transform3D = Transform3D(
@@ -55,7 +64,7 @@ func _target(yaw: float, pitch: float, range_metres: float) -> Vector3:
 ## Where the nozzle ends up, in the hand's space, for a wand aimed at
 ## [param target] and fully brought up.
 func _nozzle_at(target: Vector3) -> Vector3:
-	return _carry.pose(target, 1.0) * _carry.nozzle()
+	return _carry.pose(target, UNREAD, 1.0) * _carry.nozzle()
 
 
 ## How far [param point] is off the segment from the hand to [param target].
@@ -82,7 +91,7 @@ func test_the_wand_lies_along_the_line_to_what_it_is_aimed_at() -> void:
 	for yaw: float in [-32.0, -9.0, 0.0, 15.0, 32.0]:
 		for pitch: float in [-24.0, 0.0, 24.0]:
 			var target: Vector3 = _target(yaw, pitch, 2.4)
-			var axis: Vector3 = _carry.pose(target, 1.0).basis.y
+			var axis: Vector3 = _carry.pose(target, UNREAD, 1.0).basis.y
 			assert_almost_eq(
 				axis,
 				target.normalized(),
@@ -113,7 +122,7 @@ func test_the_nozzle_points_at_the_mark_from_wherever_it_ended_up() -> void:
 	# of the nozzle and the direction from the nozzle to the mark are one direction.
 	var target: Vector3 = _target(18.0, -11.0, 2.6)
 	var nozzle: Vector3 = _nozzle_at(target)
-	var out: Vector3 = _carry.pose(target, 1.0).basis.y
+	var out: Vector3 = _carry.pose(target, UNREAD, 1.0).basis.y
 	assert_almost_eq(out.dot(nozzle.direction_to(target)), 1.0, TOLERANCE)
 
 
@@ -121,7 +130,7 @@ func test_the_nozzle_is_the_end_of_the_wand_nearest_the_mark() -> void:
 	# Which way round it is aimed. Both ends of a cylinder are on its axis, so an
 	# alignment that pointed the butt at the car would satisfy every angle above.
 	var target: Vector3 = _target(0.0, 0.0, 2.4)
-	var posed: Transform3D = _carry.pose(target, 1.0)
+	var posed: Transform3D = _carry.pose(target, UNREAD, 1.0)
 	assert_lt(
 		(posed * _carry.nozzle()).distance_to(target),
 		(posed * _carry.butt()).distance_to(target),
@@ -132,6 +141,14 @@ func test_the_nozzle_is_the_end_of_the_wand_nearest_the_mark() -> void:
 func test_the_two_ends_are_a_wand_apart_along_its_own_axis() -> void:
 	assert_almost_eq(_carry.nozzle().distance_to(_carry.butt()), LENGTH, TOLERANCE)
 	assert_almost_eq(_carry.nozzle(), WandCarry.AXIS * LENGTH * 0.5, Vector3.ONE * TOLERANCE)
+
+
+func test_it_says_it_has_ends_worth_marking() -> void:
+	# What [method ViewModel._build] reads to decide whether to hang a pair of
+	# markers off the proxy. The wand is the tool they were invented for, and a
+	# carry that had the geometry above and quietly answered no here would leave the
+	# water with nowhere to come out of.
+	assert_true(_carry.has_ends(), "the wand has a nozzle")
 
 
 # ---- and it stays inside the shot --------------------------------------------
@@ -145,7 +162,7 @@ func test_an_aimed_wand_turns_about_the_hand_rather_than_reaching_past_it() -> v
 	# put the nozzle 0.66 m out and re-open a question the garage's docs closed.
 	for yaw: float in [-32.0, 0.0, 32.0]:
 		var target: Vector3 = _target(yaw, 0.0, 2.4)
-		var posed: Transform3D = _carry.pose(target, 1.0)
+		var posed: Transform3D = _carry.pose(target, UNREAD, 1.0)
 		for end: Vector3 in [_carry.nozzle(), _carry.butt()]:
 			assert_almost_eq((posed * end).length(), LENGTH * 0.5, TOLERANCE, "at yaw %.0f" % yaw)
 
@@ -157,7 +174,7 @@ func test_a_wand_nobody_is_aiming_is_held_the_way_the_table_says() -> void:
 	# The reason the "no cylinder points down the barrel" rule still holds for the
 	# power wash: at rest it is back across the frame, and the alignment is
 	# something that only happens while a finger is on the glass.
-	var posed: Transform3D = _carry.pose(_target(0.0, 0.0, 2.4), 0.0)
+	var posed: Transform3D = _carry.pose(_target(0.0, 0.0, 2.4), UNREAD, 0.0)
 	assert_almost_eq(posed.basis.y, HELD.basis.y, Vector3.ONE * TOLERANCE)
 	assert_almost_eq(posed.origin, HELD.origin, Vector3.ONE * TOLERANCE)
 
@@ -168,8 +185,8 @@ func test_coming_up_is_a_movement_rather_than_a_jump() -> void:
 	# every other test in this file.
 	var target: Vector3 = _target(0.0, 0.0, 2.4)
 	var rest: Vector3 = HELD.basis.y
-	var aimed: Vector3 = _carry.pose(target, 1.0).basis.y
-	var halfway: Vector3 = _carry.pose(target, 0.5).basis.y
+	var aimed: Vector3 = _carry.pose(target, UNREAD, 1.0).basis.y
+	var halfway: Vector3 = _carry.pose(target, UNREAD, 0.5).basis.y
 	assert_lt(halfway.angle_to(rest), rest.angle_to(aimed), "it has left the resting pose")
 	assert_lt(halfway.angle_to(aimed), rest.angle_to(aimed), "and has not arrived yet")
 
@@ -179,13 +196,13 @@ func test_the_raise_is_read_as_a_fraction_of_the_way_up() -> void:
 	# rather than a wand rotated past the aim into the car.
 	var target: Vector3 = _target(0.0, 0.0, 2.4)
 	assert_almost_eq(
-		_carry.pose(target, 4.0).basis.y,
-		_carry.pose(target, 1.0).basis.y,
+		_carry.pose(target, UNREAD, 4.0).basis.y,
+		_carry.pose(target, UNREAD, 1.0).basis.y,
 		Vector3.ONE * TOLERANCE,
 		"over the top is fully aimed"
 	)
 	assert_almost_eq(
-		_carry.pose(target, -4.0).basis.y,
+		_carry.pose(target, UNREAD, -4.0).basis.y,
 		HELD.basis.y,
 		Vector3.ONE * TOLERANCE,
 		"and under it is at rest"
@@ -199,14 +216,15 @@ func test_a_target_of_nothing_leaves_the_wand_at_rest() -> void:
 	# `normalized()` of a zero vector is a zero vector, and the shortest arc to one
 	# is a NaN quaternion — which is a transform with no finite parts and a proxy
 	# that vanishes rather than a tool held wrong.
-	assert_almost_eq(_carry.pose(Vector3.ZERO, 1.0).basis.y, HELD.basis.y, Vector3.ONE * TOLERANCE)
+	var posed: Transform3D = _carry.pose(Vector3.ZERO, UNREAD, 1.0)
+	assert_almost_eq(posed.basis.y, HELD.basis.y, Vector3.ONE * TOLERANCE)
 
 
 func test_a_target_straight_back_down_the_wand_leaves_it_at_rest() -> void:
 	# The other undefined arc: every rotation from +Y to -Y is equally short. The
 	# pitch fence means the aim never asks for it, so this is about a caller with no
 	# fence rather than about the game.
-	var posed: Transform3D = _carry.pose(-WandCarry.AXIS * 2.0, 1.0)
+	var posed: Transform3D = _carry.pose(-WandCarry.AXIS * 2.0, UNREAD, 1.0)
 	assert_almost_eq(posed.basis.y, HELD.basis.y, Vector3.ONE * TOLERANCE)
 	assert_true(posed.basis.y.is_finite(), "and emphatically not a NaN")
 

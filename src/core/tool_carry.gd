@@ -9,13 +9,13 @@
 ## everything else, and the power wash carries a [WandCarry], which points itself
 ## down the line to whatever the player is aiming at.
 ##
-## [b]Why a class and not a branch in [ViewModel].[/b] The power wash is the
-## first tool that needs to know where the aim is, and it will not be the last —
-## a sponge that wants to lie flat against the panel it is dragged along, a
-## bottle that tips as it sprays. Each of those is a different rule about the
-## same three inputs, and a viewmodel that grew an `if` per tool would be a
-## single function nobody can change one tool inside of. A carry is that rule,
-## alone, with a name.
+## [b]Why a class and not a branch in [ViewModel].[/b] The power wash was the
+## first tool that needed to know where the aim is, and it was not the last: the
+## sponge that wants to lie flat against the panel it is dragged along and the
+## bottle that tips as it sprays are both here now, as [ReachCarry]. Each is a
+## different rule about the same three inputs, and a viewmodel that grew an `if`
+## per tool would be a single function nobody can change one tool inside of. A
+## carry is that rule, alone, with a name.
 ##
 ## [b]Why not a flag on [DetailingTool].[/b] The catalogue is data the roll-up
 ## icons read as well, and an icon is not held by anybody — the same reason the
@@ -45,12 +45,19 @@ func rest_pose() -> Transform3D:
 
 ## Where the tool sits this frame, in the hand's own space.
 ##
-## [param toward] is the point the aim is on, read in the hand's own space, and
-## [param raise] is how far into aiming the player is — 0 with the finger off the
-## glass, 1 with the tool fully brought up. Both are ignored here, because a
-## sponge is held the way a sponge is held whatever anybody is pointing at, and
-## both are the whole of [WandCarry].
-func pose(_toward: Vector3, _raise: float) -> Transform3D:
+## [param toward] is the point the aim is on, read in the hand's own space;
+## [param outward] is the surface normal of the paint under it, read in the same
+## space; and [param raise] is how far into aiming the player is — 0 with the
+## finger off the glass, 1 with the tool fully brought up. All three are ignored
+## here, because a tool held at a fixed angle is held that way whatever anybody
+## is pointing at.
+##
+## [b]The normal is a separate argument rather than something a carry could work
+## out.[/b] A point on the paint says nothing about which way the paint faces,
+## and the difference between a sponge lying flat on a door and one lying flat on
+## the roof is exactly that. It comes from the same raycast the mark does — see
+## [method ViewModel.mark_at] — so a carry never has to guess it.
+func pose(_toward: Vector3, _outward: Vector3, _raise: float) -> Transform3D:
 	return _rest
 
 
@@ -63,3 +70,31 @@ func pose(_toward: Vector3, _raise: float) -> Transform3D:
 ## even when the two angles have stopped.
 func tracks_the_aim() -> bool:
 	return false
+
+
+## Whether this tool has ends worth marking: a nozzle something is emitted from,
+## and the other end of the same axis.
+##
+## No by default, which is most of the belt — a sponge has no business end, it
+## has a face. The tools that say yes get a [Marker3D] at each end from
+## [method ViewModel._build], and those markers are what an effect is stood on
+## and what a test measures the alignment from.
+func has_ends() -> bool:
+	return false
+
+
+## Where the nozzle sits in the tool's own space — the point water or mist leaves
+## from.
+##
+## The middle of the tool unless a carry says otherwise, which is the honest
+## answer for something with no nozzle: a caller that emits from here without
+## asking [method has_ends] first gets the middle of the sponge rather than a
+## null it has to check.
+func nozzle() -> Vector3:
+	return Vector3.ZERO
+
+
+## The other end of the same axis. Derived from [method nozzle] rather than
+## stated again, so the two cannot end up describing different tools.
+func butt() -> Vector3:
+	return -nozzle()

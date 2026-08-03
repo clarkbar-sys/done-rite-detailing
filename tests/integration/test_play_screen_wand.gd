@@ -360,27 +360,27 @@ func test_an_aimed_wand_stays_out_of_the_paint_and_inside_the_shot() -> void:
 		await _lift()
 
 
-func test_the_other_four_tools_are_held_exactly_where_they_always_were() -> void:
-	# The instruction this refactor was given, asserted rather than reviewed: only
-	# the power wash is aimed. Each tool is measured at rest, then again with a
-	# finger on the glass and the same tool in hand — a carry that had grown an
-	# opinion about the aim would move one of them.
+func test_the_wand_is_the_only_tool_that_stays_in_the_hand() -> void:
+	# What tells the power wash apart from the rest of the belt, restated now that
+	# the other four leave the hand for the paint ([ReachCarry]). The wand turns
+	# about the anchor with half of itself either side and never gets further from
+	# it than a held thing may, which is the budget the clearance test above spends;
+	# everything else is two metres away on a panel by the time the raise finishes.
+	#
+	# Asserted as a reach rather than as a place, so this file does not have to know
+	# where a sponge ends up — that is
+	# [code]tests/integration/test_play_screen_reach.gd[/code]'s.
 	await _settle()
-	var before: Dictionary = {}
-	for tool: DetailingTool in DetailingTool.catalogue():
-		_view_model().belt().equip(tool.id)
-		await wait_process_frames(1)
-		before[tool.id] = _view_model().proxy_for(tool.id).transform
 	await _press(_at_the_car())
 	for tool: DetailingTool in DetailingTool.catalogue():
-		if tool.id == DetailingTool.Id.POWER_WASH:
-			continue
 		_view_model().belt().equip(tool.id)
 		await wait_process_frames(SWING_FRAMES)
-		var held: Transform3D = _view_model().proxy_for(tool.id).transform
-		var was: Transform3D = before[tool.id]
-		assert_almost_eq(held.origin, was.origin, Vector3.ONE * TOLERANCE, tool.display_name)
-		assert_almost_eq(held.basis.y, was.basis.y, Vector3.ONE * TOLERANCE, tool.display_name)
+		var anchor: Vector3 = _view_model().global_position
+		var reach: float = anchor.distance_to(_view_model().proxy_for(tool.id).global_position)
+		if tool.id == DetailingTool.Id.POWER_WASH:
+			assert_lt(reach, HELD_REACH, "the wand is still a thing in a hand")
+		else:
+			assert_gt(reach, HELD_REACH, "%s should have gone to the paint" % tool.display_name)
 
 
 func test_the_wand_is_the_one_that_moved() -> void:

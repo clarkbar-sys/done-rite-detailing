@@ -189,12 +189,15 @@ func test_every_proxy_is_the_shape_and_size_the_catalogue_gives_it() -> void:
 					box.size.distance_to(tool.extent), 0.0, TOLERANCE, "all three axes"
 				)
 			DetailingTool.Shape.PLANE:
-				var plane: PlaneMesh = proxy.mesh as PlaneMesh
-				assert_not_null(plane, "%s is a plane" % tool.display_name)
-				if plane == null:
-					continue
-				var flat: Vector2 = Vector2(tool.extent.x, tool.extent.z)
-				assert_almost_eq(plane.size.distance_to(flat), 0.0, TOLERANCE, "x and z, not y")
+				# Measured off the mesh's own box rather than off a [PlaneMesh]'s own
+				# `size`, because the rag is a [ClothRag] and builds its geometry point
+				# by point — see that class on why it is still exactly the rectangle
+				# the catalogue asked for. A box is the honest question to ask of a
+				# mesh that could have been built any shape at all.
+				var flat: AABB = proxy.get_aabb()
+				assert_almost_eq(flat.size.x, tool.extent.x, TOLERANCE, "x is a width")
+				assert_almost_eq(flat.size.z, tool.extent.z, TOLERANCE, "z is a depth")
+				assert_almost_eq(flat.size.y, 0.0, TOLERANCE, "and a cloth at rest is flat")
 
 
 func test_every_proxy_wears_the_catalogues_surface() -> void:
@@ -309,16 +312,50 @@ func test_the_muzzle_faces_out_of_the_nozzle() -> void:
 	assert_almost_eq(-muzzle.global_basis.z.normalized().dot(along), 1.0, TOLERANCE)
 
 
-func test_nothing_else_on_the_belt_has_grown_ends() -> void:
-	# The instruction this refactor was given: the power wash gets the new
-	# behaviour and the other four are left exactly as they were. A sponge with a
-	# muzzle would be the first sign that "just the wand" had quietly become "all
-	# of them".
+func test_only_the_tools_that_spray_have_grown_ends() -> void:
+	# Ends are for emitting something out of, so the three tools that emit have
+	# them and the two that are pressed against the paint do not. A sponge with a
+	# muzzle would be the first sign that "the tools that spray" had quietly become
+	# "all of them", and the room would then be spraying suds out of the middle of
+	# a block of foam.
 	for tool: DetailingTool in DetailingTool.catalogue():
-		if tool.id == DetailingTool.Id.POWER_WASH:
+		var proxy: MeshInstance3D = _view_model().proxy_for(tool.id)
+		var sprays: bool = tool.shape == DetailingTool.Shape.CYLINDER
+		assert_eq(
+			proxy.get_child_count(),
+			2 if sprays else 0,
+			"%s has the wrong number of ends" % tool.display_name
+		)
+		assert_eq(
+			_view_model().muzzle_of(tool.id) != null,
+			sprays,
+			"%s: a nozzle the room can stand an effect on" % tool.display_name
+		)
+
+
+func test_every_nozzle_sits_at_the_far_end_of_its_own_tool() -> void:
+	# The same rule the wand's own markers keep, now that two more tools carry
+	# them: half a bottle from its middle, measured off the mesh's box rather than
+	# off the catalogue, so a marker parked at the centre would fail rather than
+	# quietly emit product out of the side of the can.
+	for tool: DetailingTool in DetailingTool.catalogue():
+		if tool.shape != DetailingTool.Shape.CYLINDER:
 			continue
 		var proxy: MeshInstance3D = _view_model().proxy_for(tool.id)
-		assert_eq(proxy.get_child_count(), 0, "%s has ends it should not" % tool.display_name)
+		var half: float = proxy.get_aabb().size.y * 0.5
+		var nozzle: Marker3D = _view_model().muzzle_of(tool.id)
+		assert_almost_eq(
+			nozzle.position.distance_to(Vector3.ZERO), half, TOLERANCE, tool.display_name
+		)
+		# A [GPUParticles3D] emits down its own -Z and a [CylinderMesh] is built along
+		# +Y, so a marker that inherited the mesh's rotation unturned would spray out
+		# of the side. Asserted per tool now rather than for the wand alone.
+		assert_almost_eq(
+			-nozzle.global_basis.z.normalized().dot(proxy.global_basis.y.normalized()),
+			1.0,
+			TOLERANCE,
+			"%s: the nozzle faces out of the tool" % tool.display_name
+		)
 
 
 # ---- the clipping decision, per proxy ----------------------------------------

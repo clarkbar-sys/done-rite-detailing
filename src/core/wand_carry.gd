@@ -73,7 +73,12 @@ func _init(held: Transform3D, length: float) -> void:
 ## because the resting pose is a rotation and an offset and the aimed one is a
 ## rotation about the hand — interpolating the transforms takes the shortest path
 ## through both at once, which is the arc a wrist actually travels.
-func pose(toward: Vector3, raise: float) -> Transform3D:
+##
+## [param _outward] is ignored, and that is the whole difference between this and
+## [ReachCarry]: the water is thrown from a step back, so which way the paint
+## faces changes nothing about how the wand is held. A tool that arrives at the
+## panel has to care; one that shoots at it does not.
+func pose(toward: Vector3, _outward: Vector3, raise: float) -> Transform3D:
 	var lifted: float = clampf(raise, 0.0, 1.0)
 	if lifted <= 0.0:
 		return _rest
@@ -97,6 +102,11 @@ func aligned(toward: Vector3) -> Transform3D:
 	if along.is_zero_approx() or along.dot(AXIS) <= FLIPPED:
 		return _rest
 	return Transform3D(Basis(Quaternion(AXIS, along)), Vector3.ZERO)
+
+
+## Yes: the wand is the tool the whole marker pair was invented for.
+func has_ends() -> bool:
+	return true
 
 
 ## Where the nozzle sits in the wand's own space — the end the water leaves, and
