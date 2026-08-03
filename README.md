@@ -60,6 +60,19 @@ the pitch, the length and the decay are numbers in
 of a re-recording. The bell on Start is also the press a mobile browser unlocks
 audio on, which is why the game is deliberately silent until you touch it.
 
+And the title screen has a theme now — eight bars of loud synth brass at 132 BPM
+over a gated snare, which is roughly what a network sports broadcast sounded
+like in about 1992. Touch the screen and it starts; press Start and it fades out
+over three seconds while the bell rings over the top of it and the game loads
+underneath. It is original, it is not a transcription of anything, and like the
+bells it is not a file: Godot cannot import a tracker module or a MIDI, so
+[`src/core/timbre.gd`](./src/core/timbre.gd) builds six synthetic instruments out
+of wavetables and seeded noise, and [`src/core/fanfare.gd`](./src/core/fanfare.gd)
+is the score — a tracker pattern written as an array of `step, note, length`.
+Retuning the theme, changing the tempo or rewriting a bar is a diff, the whole
+thing costs about 390 ms of arithmetic during a load that was happening anyway,
+and it adds nothing at all to the download.
+
 And you can now see it from across the room, because the dirt is drawn as an
 arcade game rather than as a photograph. Coverage is cut into bands instead of
 fading smoothly — a smooth ramp is the honest description of mud thinning out
@@ -191,7 +204,7 @@ assets/brand/          the logo the game shares with the business it is named af
 src/core/              cross-cutting code (shared helpers, game states, process-global facts)
 src/main/              the entry scene — owns the state machine and swaps screens
 src/screens/           one scene per game state, all of them a `GameScreen`
-src/ui/                what the screens draw and play — HUD pieces, and the bell
+src/ui/                what the screens draw and play — HUD pieces, the bell, the title theme
 src/world/             the places the game happens in, instanced by the screens that show them
 tests/unit/            tests for pure logic — no scene tree
 tests/integration/     tests that need a scene tree

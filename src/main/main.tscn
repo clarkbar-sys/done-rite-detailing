@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://src/main/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/chime.gd" id="2_chime"]
+[ext_resource type="Script" path="res://src/ui/bandstand.gd" id="3_bandstand"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -33,3 +34,7 @@ grow_vertical = 2
 [node name="Bell" type="Node" parent="."]
 unique_name_in_owner = true
 script = ExtResource("2_chime")
+
+[node name="Music" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("3_bandstand")
