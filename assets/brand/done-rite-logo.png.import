@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://djrphel4nj6k"
-path="res://.godot/imported/done-rite-logo.jpg-9960aa286e1c4ce93877d51b0ea1467a.ctex"
+uid="uid://dwyhwxdhtunwl"
+path="res://.godot/imported/done-rite-logo.png-aa42e92624d3c9a350b080281fae2df1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/brand/done-rite-logo.jpg"
-dest_files=["res://.godot/imported/done-rite-logo.jpg-9960aa286e1c4ce93877d51b0ea1467a.ctex"]
+source_file="res://assets/brand/done-rite-logo.png"
+dest_files=["res://.godot/imported/done-rite-logo.png-aa42e92624d3c9a350b080281fae2df1.ctex"]
 
 [params]
 

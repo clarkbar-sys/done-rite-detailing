@@ -410,6 +410,38 @@ Cost of the decision: no `SharedArrayBuffer`, so no threaded audio or physics
 in the browser, and WebAssembly SIMD is the only parallelism available.
 Accepted.
 
+### The loading screen: one vendored file, re-diffed on every Godot bump
+
+**Decided.** `html/custom_html_shell` points the web export at
+[`web/shell.html`](./web/shell.html) — Godot's `misc/dist/html/full-size.html`
+with the start menu's lockup on it and a red progress bar where the Start pill
+goes. The logo reaches it through `application/boot_splash/image`, which the
+exporter writes out as `index.png` and substitutes into `$GODOT_SPLASH`, so
+`assets/brand/` stays the one home of the artwork.
+
+**This is the project's only vendored upstream source file**, and it is
+vendored because there is no alternative: the exporter reads one HTML file and
+substitutes its placeholders, so there is nothing to hook and nothing to patch.
+Everything else third-party is fetched and pinned instead (see
+`scripts/fetch-godot.sh`), which is why this earns a rule of its own:
+
+- **Bumping Godot means diffing the shell.** `scripts/fetch-godot.sh --update`
+  tells you to re-run `make check build` after changing the pins; add
+  `diff`ing the new release's `misc/dist/html/full-size.html` against
+  `web/shell.html` to that list. The `<script>` block in ours is byte-identical
+  to upstream's on purpose, so an engine-side change to the loader shows up as
+  a clean conflict rather than as a page that silently stops booting.
+- **The gate is a unit test, not a build.** A missing `$GODOT_*` placeholder
+  cannot fail a type check, a smoke run or an export — it fails in a browser,
+  which nothing in CI opens. `tests/unit/test_web_shell.gd` reads the file and
+  asserts the placeholders and the scripted element ids are still there.
+- **Emptying the setting is a silent downgrade,** not an error: the export
+  falls back to the stock grey shell and says nothing.
+
+Cost of the decision: one file that can drift from upstream, and a step on
+every engine bump. Accepted, because the alternative is the first thing every
+player sees being the engine's branding rather than the business's.
+
 ### Windows and macOS: not now
 
 **Not built.** The trigger to revisit is somebody asking — a real report of

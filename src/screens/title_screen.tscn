@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://src/screens/title_screen.gd" id="1_title"]
 [ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
-[ext_resource type="Texture2D" path="res://assets/brand/done-rite-logo.jpg" id="3_logo"]
+[ext_resource type="Texture2D" path="res://assets/brand/done-rite-logo.png" id="3_logo"]
 
 [node name="TitleScreen" type="Control"]
 layout_mode = 3
