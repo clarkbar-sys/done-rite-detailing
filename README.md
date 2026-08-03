@@ -158,6 +158,7 @@ top of that script, then re-run `make test build` before pushing.
 ```
 project.godot          engine + project settings (typed-GDScript gates live here)
 export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make build-web`
+assets/brand/          the logo the game shares with the business it is named after
 src/core/              cross-cutting code (shared helpers, game states, process-global facts)
 src/main/              the entry scene — owns the state machine and swaps screens
 src/screens/           one scene per game state, all of them a `GameScreen`

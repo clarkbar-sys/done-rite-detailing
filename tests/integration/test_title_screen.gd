@@ -100,6 +100,72 @@ func test_it_offers_a_start_button() -> void:
 	assert_not_null(_start_button(), "the title screen must have a Start button")
 
 
+# ---- the brand: the logo, and the pill under it ------------------------------
+
+
+func test_it_shows_the_business_logo() -> void:
+	# The picture is the first thing anyone sees of Done Rite, in the game and on
+	# the site both. A texture lost to a moved file or a dropped .import leaves a
+	# blank card and nothing else complaining.
+	var logo: TextureRect = _screen.get_node("%Logo") as TextureRect
+	assert_not_null(logo, "the title screen must show the logo")
+	if logo == null:
+		return
+	assert_not_null(logo.texture, "the logo's texture must have imported")
+	assert_gt(logo.size.x, 0.0, "and must be laid out, not collapsed to nothing")
+
+
+func test_the_logo_is_framed_rather_than_pasted_on() -> void:
+	# The artwork carries its own black background, so without the card it reads
+	# as a hole cut in the garage behind it. [Brand.card] has that argument.
+	var card: PanelContainer = _screen.get_node("%LogoCard") as PanelContainer
+	var box: StyleBoxFlat = card.get_theme_stylebox("panel") as StyleBoxFlat
+	assert_not_null(box, "the logo must sit in a brand card")
+	if box == null:
+		return
+	assert_eq(box.bg_color, Brand.PANEL, "the card must be the site's panel colour")
+
+
+func test_the_name_under_the_logo_survives_the_room_behind_it() -> void:
+	# The site can demote this line to grey because it sits on a near-black page.
+	# Here it sits on a lit garage, a yellow truck and a green verge, and without
+	# the shadow it is grey-on-daylight — legible in the web build and not much
+	# more than that, which is what put this assertion here.
+	var title: Label = _screen.get_node("%Title") as Label
+	assert_eq(title.get_theme_color("font_color"), Brand.MUTED, "the name is secondary type")
+	assert_gt(
+		title.get_theme_color("font_shadow_color").a, 0.0, "...and secondary type needs a shadow"
+	)
+	assert_gt(title.get_theme_constant("shadow_outline_size"), 0, "...with enough spread to read")
+
+
+func test_start_wears_the_brand_pill() -> void:
+	# The styling is applied in `_ready()` from [Brand], so this is where a
+	# dropped override shows up — the scene alone would still lay out a
+	# default-grey button and pass every other test in this file.
+	var normal: StyleBoxFlat = _start_button().get_theme_stylebox("normal") as StyleBoxFlat
+	assert_not_null(normal, "Start must be a brand pill, not the theme's button")
+	if normal == null:
+		return
+	assert_eq(normal.bg_color, Brand.RED, "Start is the one red thing on the screen")
+	assert_eq(
+		normal.corner_radius_top_left,
+		roundi(_start_button().size.y / 2.0),
+		"Start must be round-ended at the size it is actually drawn"
+	)
+
+
+func test_every_face_of_start_is_dressed() -> void:
+	# Hover and pressed fall back to the theme's grey if they are not overridden,
+	# which would strand the default button at the one moment it is being used.
+	var start: Button = _start_button()
+	for state: String in ["normal", "hover", "pressed", "focus"]:
+		assert_true(
+			start.has_theme_stylebox_override(state),
+			"Start's `%s` box must come from Brand" % state
+		)
+
+
 func test_start_asks_for_the_play_state() -> void:
 	# Through the button's own signal rather than by calling the handler, so a
 	# connection dropped in `_ready()` fails here rather than in the browser.
