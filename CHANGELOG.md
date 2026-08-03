@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.6.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.5.0...v1.6.0) (2026-08-03)
+
+
+### Features
+
+* climb the patch bell's pitch on consecutive patches ([#85](https://github.com/clarkbar-sys/done-rite-detailing/issues/85)) ([b2675a3](https://github.com/clarkbar-sys/done-rite-detailing/commit/b2675a3d4d83c019d09040941628325c667f7e8f))
+* **world:** draw the grime as an arcade game rather than a photograph ([#79](https://github.com/clarkbar-sys/done-rite-detailing/issues/79)) ([5c9c2cf](https://github.com/clarkbar-sys/done-rite-detailing/commit/5c9c2cf3d89102a3ec0b364cbb2dcfcd00e1effc))
+* **world:** put the other four tools on the car instead of in the corner of the frame ([#86](https://github.com/clarkbar-sys/done-rite-detailing/issues/86)) ([f5c6511](https://github.com/clarkbar-sys/done-rite-detailing/commit/f5c6511d979c681362e669aadc920cfafb175113))
+* **world:** retire the crosshair now every tool draws its own sight ([#92](https://github.com/clarkbar-sys/done-rite-detailing/issues/92)) ([95438b2](https://github.com/clarkbar-sys/done-rite-detailing/commit/95438b2f998c76588297ed27f01151a73032b97c)), closes [#88](https://github.com/clarkbar-sys/done-rite-detailing/issues/88)
+* **world:** squeeze white suds out around the sponge ([#90](https://github.com/clarkbar-sys/done-rite-detailing/issues/90)) ([8cdf403](https://github.com/clarkbar-sys/done-rite-detailing/commit/8cdf40349639387401a149ca79ce7ae34ad98659)), closes [#87](https://github.com/clarkbar-sys/done-rite-detailing/issues/87)
+
+
+### Bug Fixes
+
+* **world:** keep a portrait phone from turning the lens into a fisheye ([#77](https://github.com/clarkbar-sys/done-rite-detailing/issues/77)) ([36d3f1d](https://github.com/clarkbar-sys/done-rite-detailing/commit/36d3f1d0b2f4b2e178de8e35ef7d9d9e8368ffa3))
+
 ## [1.5.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.4.0...v1.5.0) (2026-08-02)
 
 
