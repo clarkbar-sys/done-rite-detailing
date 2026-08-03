@@ -60,6 +60,24 @@ the pitch, the length and the decay are numbers in
 of a re-recording. The bell on Start is also the press a mobile browser unlocks
 audio on, which is why the game is deliberately silent until you touch it.
 
+And the tools can be heard as well as seen. Hold the trigger and the power wash
+runs — a band of water noise with a pump buzzing underneath it — and letting go
+stops it; either bottle hisses like the aerosol it is, the drying rag squeaks
+once per pass of your hand, and the sponge squelches as it is pressed. Four
+sounds for five tools, because the two bottles are the same spray with different
+liquid in them. They are generated the same way the bells are and for the same
+reasons, with one extra: a loop recorded as a file has to be cut at a zero
+crossing by hand and clicks for ever after if it was cut a sample out, where
+here the seam is a property of how the sound is built and a test measures it.
+The pitch of the squeak, how often the sponge squishes and how wide the jet's
+band of noise is are all numbers in
+[`src/core/tool_noise.gd`](./src/core/tool_noise.gd);
+[`src/world/tool_racket.gd`](./src/world/tool_racket.gd) is what plays them, and
+it fades every voice over a twentieth of a second so that pulling the trigger,
+letting go and swapping tools mid-press are none of them a click. The demo
+behind the title card stays silent through all of it — it is washing a car with
+the tools muted, for the same reason it rings no bell.
+
 And the title screen has a theme now — eight bars of loud synth brass at 132 BPM
 over a gated snare, which is roughly what a network sports broadcast sounded
 like in about 1992. Touch the screen and it starts; press Start and it fades out

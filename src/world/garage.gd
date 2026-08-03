@@ -495,6 +495,24 @@ const NO_SIDE_TO_IT: float = 0.35
 ## is meant to be the reward rather than a third round of work.
 @export var buff_per_second: float = 4.5
 
+## Whether a tool running in this room can be heard — the water and the pump, the
+## bottles' hiss, the rag's squeak, the sponge's squelch. [ToolRacket] is what
+## makes them and [ToolNoise] is what they are made of.
+##
+## Off by default and switched on by the play screen alone, which is the split the
+## bell already has — [signal Grime.patch_finished] is connected by the play screen
+## and deliberately left dangling by the title screen — and it is switched on here
+## for the same reason: the title screen runs this identical room with the game
+## playing itself behind the card, and it stays silent on purpose. A browser will not
+## let a page make a noise until somebody has pressed something — so a title card that
+## ran a pressure washer at a player who has not touched it yet would be an odd first
+## impression at a desk and impossible on the web, where Start is still the press
+## that unlocks audio for everything. [Chime] has the whole argument.
+##
+## Read once, in [method _take_up_aiming]: this decides whether the room has
+## anything to make a noise with at all, rather than muting one it built anyway.
+@export var noisy: bool = false
+
 ## Whether every tool wears the plain crosshair instead of the effect it draws for
 ## itself. Off by default, so what ships is the water, the product and the foam:
 ## they are the things a player is meant to be looking at. Switched on —
@@ -518,6 +536,7 @@ var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
 var _standoff: Standoff = null
 var _sight: ToolSight = null
+var _racket: ToolRacket = null
 var _grime: Grime = null
 var _routine: AttractRoutine = null
 var _running_order: Array[CSGShape3D] = []
@@ -699,6 +718,19 @@ func spray_mist() -> SprayMist:
 	return null if _sight == null else _sight.spray_mist()
 
 
+## What the running tool sounds like, or [code]null[/code] in a room that is not
+## [member noisy] — which is every room but the one the game is played in.
+##
+## Not a fourth forward through [ToolSight], which the three above deliberately
+## stop at: the racket is not part of the sight and is not reached through it. It
+## is public for the same reason they are, though — a test asking "does holding
+## the trigger make a noise" has to be able to ask the thing making it, and a
+## signal saying a noise was requested would be a test of this file's intentions
+## rather than of the game's audio.
+func tool_racket() -> ToolRacket:
+	return _racket
+
+
 ## The mud on the car, or [code]null[/code] on a screen that never took up
 ## aiming. Not laid on the panels until [signal grimed] has been emitted.
 ##
@@ -743,6 +775,18 @@ func _stand() -> void:
 ## wide each tool reaches, because those are the patches the trigger works on; the
 ## sight is what draws them at that size. Handing them over at construction is what
 ## keeps the picture and the work one number rather than two.
+##
+## [b]The racket is built here too, and only when this room is [member noisy].[/b]
+## It is the sight's opposite number — what the tool sounds like against what it
+## looks like — so it is made alongside it, out of the same "there is somebody
+## standing here holding something" that the whole function is about. A silent
+## room simply never has one, which is what the null checks below are reading; a
+## racket built and then muted would be a set of players mixing silence for the
+## life of the title screen.
+##
+## Not a child of the car's parent, unlike the sight: it is not drawn anywhere and
+## has no place in the world. It hangs off the room itself, which is the thing
+## whose lifetime it should share.
 func _take_up_aiming() -> void:
 	_view_model.take_up_aiming(
 		ToolAim.new(aim_yaw_degrees, aim_pitch_degrees, aim_swing_degrees_per_second)
@@ -750,6 +794,10 @@ func _take_up_aiming() -> void:
 	_sight = ToolSight.new(wash_radius_metres, scrub_radius_metres)
 	_sight.name = "ToolSight"
 	_car.get_parent().add_child(_sight)
+	if noisy:
+		_racket = ToolRacket.new()
+		_racket.name = "ToolRacket"
+		add_child(_racket)
 	_grime = Grime.new()
 	_grime.name = "Grime"
 	_car.get_parent().add_child(_grime)
@@ -807,7 +855,11 @@ func _resolve_aim(delta: float) -> void:
 		_view_model.lower()
 		# Unconditionally, and before the early return below: both effects stop when
 		# the finger comes off the glass, whether or not the panel under it changed.
+		# The noise stops on the same line for the same reason — what a tool sounds
+		# like and what it looks like are one statement, made in one place.
 		_sight.hold_fire()
+		if _racket != null:
+			_racket.hush()
 		if _marked.is_empty():
 			return
 		_marked = ""
@@ -863,6 +915,12 @@ func _resolve_aim(delta: float) -> void:
 func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 	var held: DetailingTool = _view_model.belt().equipped()
 	_sight.sight(surface, outward, held, _view_model.muzzle_of(held.id), debug_tools)
+	# The same tool, on the same tick, said out loud. Deliberately not under
+	# [member debug_tools]: that switch trades what a tool draws for a crosshair so
+	# a bug in the drawing can be seen past, and a developer looking at where the
+	# aim landed has no reason to be working in silence.
+	if _racket != null:
+		_racket.run(held.id)
 
 
 ## What the tool in the player's hand does to the paint the press landed on.
