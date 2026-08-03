@@ -118,25 +118,32 @@ mesh = SubResource("BoxMesh_unit")
 material_override = SubResource("StandardMaterial3D_floor")
 
 [node name="GrassLeft" type="MeshInstance3D" parent="View/World/Ground"]
-transform = Transform3D(4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, -4.2, -0.1, 0)
+transform = Transform3D(5.6, 0, 0, 0, 0.2, 0, 0, 0, 13.4, -5, -0.1, 0)
 mesh = SubResource("BoxMesh_unit")
 material_override = SubResource("StandardMaterial3D_grass")
 
+; The two lawns are 5.6 m of grass either side of the drive rather than the 4 m
+; they were first laid at, and the extra 1.6 is load-bearing rather than
+; decorative: it is what puts the whole length of each outer edge outside the
+; disc the camera sweeps, so the trees below can be planted end to end instead
+; of huddling at the corners. src/world/grove.gd carries the arithmetic. It also
+; stands the edge of the world further from the eye, which is free.
 [node name="GrassRight" type="MeshInstance3D" parent="View/World/Ground"]
-transform = Transform3D(4, 0, 0, 0, 0.2, 0, 0, 0, 13.4, 4.2, -0.1, 0)
+transform = Transform3D(5.6, 0, 0, 0, 0.2, 0, 0, 0, 13.4, 5, -0.1, 0)
 mesh = SubResource("BoxMesh_unit")
 material_override = SubResource("StandardMaterial3D_grass")
 
-; The trees, rolled from fixed seeds at _ready() and stood along the outer edge
-; of the two strips of grass above — src/world/grove.gd has the argument for
-; all of it, including why the middle of each edge is left empty (the camera
-; orbits through there) and why nothing out here has a collider.
+; The trees, rolled from fixed seeds at _ready() and stood around the boundary
+; of the two strips of grass above — both long sides and all four short ends,
+; with the side against the tarmac left bare. src/world/grove.gd has the
+; argument for all of it, including why nothing out here has a collider.
 ;
 ; Its defaults are the driveway's numbers, so there is nothing to override: the
-; rows stand at x = ±5.9 on grass that runs to ±6.2, stop at z = ±6.4 on grass
-; that runs to ±6.7, and keep 7.2 m clear of the middle, which is the Camera's
-; own orbit plus a crown plus a margin. tests/integration/test_grove.gd does all
-; three sums against the grass and the camera rather than repeating them.
+; long rows stand at x = ±7.5 on grass that runs to ±7.8, the end rows at
+; z = ±6.4 on grass that runs to ±6.7, and everything keeps 7.2 m clear of the
+; middle, which is the Camera's own orbit plus a crown plus a margin.
+; tests/integration/test_grove.gd does all three sums against the grass and the
+; camera rather than repeating them.
 [node name="Grove" parent="View/World/Ground" instance=ExtResource("6_grove")]
 
 [node name="Car" parent="View/World" instance=ExtResource("3_car")]

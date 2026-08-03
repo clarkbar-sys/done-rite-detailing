@@ -1,6 +1,6 @@
-## The trees along the edge of the lawn: a brown cylinder with a pile of green
-## spheres on top of it, seven of them, in the same places every time the level
-## loads.
+## The trees around the edge of the lawn: a brown cylinder with a pile of green
+## spheres on top of it, fourteen of them, in the same places every time the
+## level loads.
 ##
 ## [b]It is the ground's argument, one step further.[/b] The driveway and the
 ## grass are unit boxes scaled into place because the shapes and their sizes are
@@ -12,16 +12,19 @@
 ## [GrovePlan]; this is the part that turns both into nodes.
 ##
 ## [b]Fixed seeds, so the driveway is a place.[/b] [constant TreeShape.SEEDS] is
-## seven frozen numbers and [constant PLAN_LEFT] / [constant PLAN_RIGHT] are two
-## more, which is the difference between a level that is generated and a level
-## that is [i]built[/i]: a player closing the tab and coming back finds the same
-## tree by the same corner, and a screenshot still matches the game. Nothing here
-## calls [method Object.new] on a clock or on [method randi].
+## seven frozen numbers and [constant ROW_SEEDS] is six more, which is the
+## difference between a level that is generated and a level that is [i]built[/i]:
+## a player closing the tab and coming back finds the same tree by the same
+## corner, and a screenshot still matches the game. Nothing here calls
+## [method Object.new] on a clock or on [method randi].
 ##
-## [b]Two rows, one for each strip of grass[/b], because the lawn is two strips
-## with a driveway down the middle. The count is split between them with the odd
-## tree going left, so the default seven is four and three rather than a
-## symmetry the eye would catch.
+## [b]Six rows, which is the boundary of the grass with the driveway left out.[/b]
+## The lawn is two strips either side of the drive, so what a fence would follow
+## is each strip's long outer side and the two short ends that close it — the
+## fourth side is the tarmac the car is parked on, and a tree there would be a
+## tree in the middle of the job. [constant TreeShape.SEEDS] wraps across the
+## fourteen, so every shape is planted exactly twice and the turn [GrovePlan]
+## gives each one is what keeps the pair from reading as a copy.
 ##
 ## [b]They are drawn and nothing else.[/b] Every mesh here is a plain
 ## [MeshInstance3D] with no collider, deliberately: the room casts rays for the
@@ -37,11 +40,13 @@
 ## numbers in [code]tests/integration/test_grove.gd[/code] rather than written
 ## down here as one that could quietly stop being true.
 ##
-## [i]That leaves the lawn with a hole in the middle of it[/i], which is why the
-## rows come out as a pair of trees at each corner rather than an even line —
-## [GrovePlan] deals them into the two stretches that are left. It is also the
-## thing to notice first if the driveway is ever made bigger: widen the grass and
-## the same rule spreads the same trees out.
+## [i]Which is the number the lawn is sized around.[/i] The grass runs out to
+## 7.8 m so that a row down [member edge_x] clears that disc along its whole
+## length and can be planted end to end — an earlier, narrower lawn put the
+## forbidden middle across most of both long sides and left the trees huddled at
+## the corners. The short ends still cross it, at the corner nearest the car, and
+## there the row simply starts further out: [GrovePlan] takes the hole out of
+## whatever run it is given, so neither case is special-cased here.
 ##
 ## [b]The look lives in the scene file.[/b] The two meshes and the shades of bark
 ## and leaf are [code]@export[/code]s carried by
@@ -55,13 +60,21 @@ extends Node3D
 ## than counting children.
 const TRUNK: String = "Trunk"
 
-## The seed the left-hand row's spacing is dealt from, and the right-hand row's.
-## Two numbers rather than one, because a single seed would deal both rows the
-## same wobble and the two sides would mirror each other down the drive.
-const PLAN_LEFT: int = 2029
+## A spacing seed per row, in planting order: the two long sides, then the four
+## ends. Six numbers rather than one, because a single seed would deal every row
+## the same wobble and the lawn would come out mirrored about both axes — which
+## is exactly the regularity the wobble exists to break.
+const ROW_SEEDS: Array[int] = [2029, 4177, 5261, 6301, 7333, 8419]
 
-## See [constant PLAN_LEFT].
-const PLAN_RIGHT: int = 4177
+## The two directions everything out here comes in pairs of: -1 is the left of
+## the drive or the near end of the lawn, +1 the right or the far end.
+const SIDES: Array[int] = [-1, 1]
+
+## How far short of the corner an end row stops, in metres, so that the last tree
+## down a long side and the outermost tree across an end are not planted in each
+## other. Measured rather than picked: at 1.2 the closest a pair from two
+## different rows can come is 1.3 m, and a crown reaches 1.0.
+const CORNER_GAP: float = 1.2
 
 ## How much clear air is kept between the camera's own circle and the nearest
 ## leaf, in metres, on top of the crown's reach.
@@ -91,18 +104,32 @@ const MARGIN: float = 0.6
 ## three greens and reads as depth rather than as a solid lump.
 @export var leaves: Array[StandardMaterial3D] = []
 
-## How many trees to plant. Seven by default, which is one of each of
-## [constant TreeShape.SEEDS]; ask for more and the shapes start repeating.
-@export var count: int = 7
+## How many trees go down each long side of the lawn. Five over 12.8 m is a tree
+## every two and a half metres, which is boundary planting rather than a hedge:
+## the crowns are two metres across, so they read as separate trees with grass
+## between them.
+@export var trees_per_edge: int = 5
 
-## How far out from the middle of the driveway each row stands, in metres. Just
-## inside the outer edge of the grass, so a trunk is on the lawn and the crown
-## overhangs the edge of the modeled ground rather than floating over it.
-@export var edge_x: float = 5.9
+## How many trees go across each short end of the lawn. One, because the disc
+## the camera sweeps eats the half of that run nearest the drive and what is
+## left is under three metres of it.
+@export var trees_per_end: int = 1
 
-## How far down the lawn a tree may stand, in metres either way. Slightly inside
+## How far out from the middle of the driveway each long row stands, in metres.
+## Just inside the outer edge of the grass, so a trunk is on the lawn and the
+## crown overhangs the edge of the modeled ground rather than floating over it.
+@export var edge_x: float = 7.5
+
+## How far down the lawn a tree may stand, in metres either way — where the long
+## rows stop, and the line the two end rows are planted along. Slightly inside
 ## the ends of the grass, for the same reason as [member edge_x].
 @export var z_limit: float = 6.4
+
+## Where an end row starts, in metres out from the middle of the driveway: just
+## clear of the tarmac. How much of it is actually planted is another matter —
+## the corner nearest the car is inside [member keep_clear], and [GrovePlan]
+## takes that out.
+@export var inner_x: float = 2.6
 
 ## The disc in the middle of the driveway no trunk may stand in, as a radius in
 ## metres from the car. See the class docs: 5.6 of camera, 1.0 of crown and
@@ -115,7 +142,7 @@ func _ready() -> void:
 	plant()
 
 
-## Stands the whole wood up: the rows, the shapes, the meshes.
+## Stands the whole wood up: the six rows, the shapes, the meshes.
 ##
 ## Public and separate from [method _ready] so a test can replant after changing
 ## a count or an edge, which is the only way to check a layout rule holds for
@@ -127,19 +154,21 @@ func plant() -> void:
 	var variants: Array[TreeShape] = TreeShape.variants()
 	if variants.is_empty():
 		return
-	var left: int = (count + 1) / 2
-	var stands: Array[Transform3D] = GrovePlan.down_the_edge(
-		-edge_x, z_limit, left, keep_clear, PLAN_LEFT
-	)
-	stands.append_array(
-		GrovePlan.down_the_edge(edge_x, z_limit, count - left, keep_clear, PLAN_RIGHT)
-	)
+	var stands: Array[Transform3D] = []
+	var row: int = 0
+	for side: int in SIDES:
+		stands.append_array(_down_the_side(side, row))
+		row += 1
+	for side: int in SIDES:
+		for end: int in SIDES:
+			stands.append_array(_across_the_end(side, end, row))
+			row += 1
 	for tree: int in stands.size():
 		_raise(variants[tree % variants.size()], stands[tree], tree)
 
 
-## Every tree in the wood, in the order they were planted — the left-hand row
-## first, then the right.
+## Every tree in the wood, in the order they were planted — both long sides
+## first, then the four ends.
 func trees() -> Array[Node3D]:
 	var standing: Array[Node3D] = []
 	for grown: Node in get_children():
@@ -147,6 +176,27 @@ func trees() -> Array[Node3D]:
 		if tree != null:
 			standing.append(tree)
 	return standing
+
+
+## The long row down one side of the drive: [param side] is -1 for the left-hand
+## strip of grass and +1 for the right.
+func _down_the_side(side: int, row: int) -> Array[Transform3D]:
+	return GrovePlan.down_the_edge(
+		float(side) * edge_x, z_limit, trees_per_edge, keep_clear, ROW_SEEDS[row]
+	)
+
+
+## The short row across one end of one strip of grass, running out from the
+## tarmac toward the corner and stopping [constant CORNER_GAP] short of it.
+func _across_the_end(side: int, end: int, row: int) -> Array[Transform3D]:
+	var across: float = float(end) * z_limit
+	return GrovePlan.along(
+		Vector3(float(side) * inner_x, 0.0, across),
+		Vector3(float(side) * (edge_x - CORNER_GAP), 0.0, across),
+		trees_per_end,
+		keep_clear,
+		ROW_SEEDS[row]
+	)
 
 
 ## One tree: the trunk, then a [MeshInstance3D] per sphere of the crown.

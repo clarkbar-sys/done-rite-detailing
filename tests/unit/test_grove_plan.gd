@@ -30,20 +30,59 @@ func _row(count: int) -> Array[Transform3D]:
 	return GrovePlan.down_the_edge(EDGE, LIMIT, count, CLEAR, SEED)
 
 
-# ---- the forbidden stretch in the middle --------------------------------------
+# ---- the stretch of a run the camera's disc eats -------------------------------
 
 
-func test_an_edge_inside_the_gap_has_to_start_further_down() -> void:
-	# Pythagoras: a tree 3 m out across has to be 4 m down the lawn to be 5 m
-	# from the car.
-	assert_almost_eq(GrovePlan.clear_of(3.0, 5.0), 4.0, TOLERANCE)
+func test_a_run_through_the_gap_is_blocked_where_it_crosses() -> void:
+	# A line 3 m out across, walked up the lawn from 8 m back: it enters the 5 m
+	# disc 4 m short of the nearest point and leaves it 4 m past, so the blocked
+	# stretch is the 8 m in the middle of the run. Pythagoras, as a span.
+	var blocked: Vector2 = GrovePlan.blocked_span(Vector3(3.0, 0.0, -8.0), Vector3.BACK, 16.0, 5.0)
+	assert_almost_eq(blocked, Vector2(4.0, 12.0), Vector2.ONE * TOLERANCE)
 
 
-func test_an_edge_already_clear_of_the_gap_may_start_anywhere() -> void:
-	# The branch that stops a square root being asked for a negative number, and
-	# the answer a lawn further out than the gap should get: no forbidden stretch
-	# at all.
-	assert_almost_eq(GrovePlan.clear_of(9.0, 5.0), 0.0, TOLERANCE)
+func test_a_run_that_never_comes_near_is_not_blocked_at_all() -> void:
+	# The answer both outer edges of the driveway get, and the branch that stops
+	# a square root being asked for a negative number. Zero span, not zero
+	# trees — this is what lets a row be planted end to end.
+	var blocked: Vector2 = GrovePlan.blocked_span(Vector3(9.0, 0.0, -8.0), Vector3.BACK, 16.0, 5.0)
+	assert_almost_eq(blocked, Vector2.ZERO, Vector2.ONE * TOLERANCE)
+
+
+func test_a_run_grazing_the_gap_is_not_blocked_either() -> void:
+	# Exactly tangent. Worth pinning as its own case: it is the boundary between
+	# the two above, and a `< 0` where the code has `<= 0` would return a span of
+	# zero width here and take a slot out of the row for nothing.
+	var blocked: Vector2 = GrovePlan.blocked_span(Vector3(5.0, 0.0, -8.0), Vector3.BACK, 16.0, 5.0)
+	assert_almost_eq(blocked, Vector2.ZERO, Vector2.ONE * TOLERANCE)
+
+
+# ---- a run in any direction ----------------------------------------------------
+
+
+func test_a_run_across_the_end_of_the_lawn_is_planted_too() -> void:
+	# What the ends of the grass need, and the reason `along` takes two points
+	# rather than an edge and a limit: this run goes across the lawn rather than
+	# down it, and the disc eats the end of it nearest the car instead of its
+	# middle.
+	var row: Array[Transform3D] = GrovePlan.along(
+		Vector3(2.0, 0.0, 6.0), Vector3(7.0, 0.0, 6.0), 3, CLEAR, SEED
+	)
+	assert_eq(row.size(), 3)
+	var last: float = 0.0
+	for stand: Transform3D in row:
+		assert_almost_eq(stand.origin.z, 6.0, GrovePlan.WOBBLE_ACROSS + TOLERANCE, "off its line")
+		assert_gte(Vector2(stand.origin.x, stand.origin.z).length(), CLEAR - TOLERANCE)
+		assert_gt(stand.origin.x, last, "the run doubled back on itself")
+		last = stand.origin.x
+	assert_lte(row[row.size() - 1].origin.x, 7.0 + TOLERANCE, "past the end of the run")
+
+
+func test_a_run_of_no_length_plants_nothing_rather_than_dividing_by_it() -> void:
+	var nowhere: Array[Transform3D] = GrovePlan.along(
+		Vector3(4.0, 0.0, 9.0), Vector3(4.0, 0.0, 9.0), 3, CLEAR, SEED
+	)
+	assert_eq(nowhere.size(), 0)
 
 
 # ---- the row itself -----------------------------------------------------------
@@ -51,6 +90,15 @@ func test_an_edge_already_clear_of_the_gap_may_start_anywhere() -> void:
 
 func test_it_plants_what_it_was_asked_for() -> void:
 	assert_eq(_row(4).size(), 4)
+
+
+func test_a_run_clear_of_the_gap_is_planted_end_to_end() -> void:
+	# The shape both long edges of the driveway now have: nothing forbidden, so
+	# the row uses the whole run rather than huddling at the two ends of it. The
+	# outermost slots reach within a slot's width of each end.
+	var row: Array[Transform3D] = GrovePlan.down_the_edge(9.0, LIMIT, 4, CLEAR, SEED)
+	assert_lt(row[0].origin.z, -LIMIT * 0.5, "nothing planted down the near half")
+	assert_gt(row[3].origin.z, LIMIT * 0.5, "nothing planted down the far half")
 
 
 func test_none_of_them_stand_in_the_gap() -> void:
