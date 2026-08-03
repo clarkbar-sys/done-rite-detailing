@@ -107,7 +107,7 @@ const MOUSE_FINGER: int = -2
 ## [b]The target is bigger than the picture[/b], the way a tap target always is.
 ## The ring is a drawing of where full deflection lives; the thing a finger has to
 ## hit is the control, and a player reaching for the edge of the stick and landing
-## a few pixels outside it should get the stick rather than a crosshair on the car
+## a few pixels outside it should get the stick rather than a mark on the car
 ## behind it. The slack also keeps the boundary off the one place a caller is most
 ## likely to aim at — [method point_for] hands out points exactly on the ring, and
 ## a grab area that ended exactly there would be a coin toss decided by float

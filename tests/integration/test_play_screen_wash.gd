@@ -486,10 +486,60 @@ func test_the_masks_do_not_eat_the_press_underneath_them() -> void:
 # ---- the crosshair, behind the same panel ------------------------------------
 
 
+## Puts [param id] in the player's hands and presses in the middle of the car,
+## holding for just long enough that the room has resolved the press into a mark
+## and drawn a sight for it. [method _lift] lets go.
+##
+## Deliberately shorter than [method _press], which holds for a second because
+## the rest of this suite is measuring what a second of trigger does to the mud.
+## Which sight is showing needs none of that: it is decided in the same physics
+## tick the mark is, by [method Garage._resolve_aim].
+func _aim_with(id: DetailingTool.Id) -> void:
+	_belt().equip(id)
+	_touch(_at_the_car(), true)
+	await wait_physics_frames(RESOLVE_FRAMES)
+
+
+func test_no_tool_draws_the_ring_during_normal_play() -> void:
+	# The whole of retiring the crosshair, in one assertion. Walked over
+	# [method DetailingTool.catalogue] rather than over a list written out here,
+	# so a sixth tool is in this test the day it is on the belt — which is the
+	# case that would quietly reintroduce the ring, since not asking for it is
+	# what draws it (see [method AimMarker.draw_crosshair]).
+	#
+	# [method AimMarker.is_marking] beside every one of them on purpose. Taking
+	# the ring off is a change to what is drawn and to nothing else; a mark that
+	# stopped being made would take the panel readout, the wand's alignment and
+	# the trigger with it, and would sail through an assertion that only looked
+	# at the ring.
+	await _settle()
+	assert_false(_garage().debug_tools, "debug tools was on without being asked for")
+	for tool: DetailingTool in DetailingTool.catalogue():
+		await _aim_with(tool.id)
+		assert_true(_marker().is_marking(), "%d: the press marked nothing at all" % tool.id)
+		assert_false(_marker().is_crosshair_drawn(), "%d: and drew the ring on it" % tool.id)
+		await _lift()
+
+
+func test_debug_tools_puts_the_bare_crosshair_under_every_tool() -> void:
+	# The other half of the same rule, and what the ring is still built for: with
+	# the switch on it is the only sight in the game, under all five tools rather
+	# than under the four that used to wear it. Bare is the point — an effect and
+	# the mud disagreeing is a question nothing else in the game can be asked, and
+	# it cannot be asked with the effect still drawn over the answer.
+	await _settle()
+	_garage().debug_tools = true
+	for tool: DetailingTool in DetailingTool.catalogue():
+		await _aim_with(tool.id)
+		assert_true(_marker().is_crosshair_drawn(), "%d: the ring did not come back" % tool.id)
+		assert_false(_jet().is_spraying(), "%d: and water was drawn over it" % tool.id)
+		await _lift()
+
+
 func test_the_water_is_what_a_player_gets_until_debug_tools_is_switched_on() -> void:
 	# [member Garage.debug_tools] is the flag, and this is the default a player
 	# who has never opened the "~" panel gets: [WashJet]'s water, not the bare
-	# crosshair the other four tools wear.
+	# crosshair the switch puts back.
 	await _settle()
 	assert_false(_garage().debug_tools, "debug tools was on without being asked for")
 	# `_press`, not `_hold`: the jet only sprays while the finger is still down,

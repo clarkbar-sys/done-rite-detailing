@@ -1,12 +1,13 @@
-## Integration test for what the power wash draws instead of a crosshair: the
-## water it throws from its nozzle at the paint.
+## Integration test for what the power wash draws: the water it throws from its
+## nozzle at the paint.
 ##
 ## [b]Why a suite of its own.[/b] [code]test_play_screen_aim.gd[/code] is about
 ## where the mark lands and [code]test_play_screen_wand.gd[/code] is about the
 ## line the wand lies on — both true of every press with any tool. This is about
-## the one tool that answers "where am I pointed" with a jet rather than with a
-## ring, and about the swap between the two sights, which is a rule no other
-## suite has a reason to know exists.
+## the one tool that answers "where am I pointed" with a jet, and it was the first
+## one to answer it with anything at all: the whole belt draws its own sight now,
+## and [code]test_play_screen_wash.gd[/code] is where "no tool draws the ring" is
+## asserted across all five.
 ##
 ## [b]What is measured and what deliberately is not.[/b] Where the water starts,
 ## where it gets to and how wide it is when it arrives are asserted through
@@ -356,17 +357,23 @@ func test_the_water_follows_the_mark_across_a_drag() -> void:
 	assert_lt(_jet().landing().distance_to(_crosshair()), ON_THE_MARK, "and reaches it")
 
 
-func test_another_tool_puts_the_crosshair_back_and_the_water_away() -> void:
-	# The other four tools are put on the car at a point, and a ring is the right
-	# shape for that. Swapped mid-press on purpose: the sight is chosen from the
-	# belt every tick, so it has to change without the finger being lifted first.
+func test_another_tool_puts_the_water_away_without_putting_a_ring_back() -> void:
+	# Swapped mid-press on purpose: the sight is chosen from the belt every tick,
+	# so it has to change without the finger being lifted first.
+	#
+	# The second half is what the swap no longer does. It used to hand the ring
+	# back, because the other four tools had nothing else to say; they all draw
+	# their own sight now — the sponge trailing foam here — so the water stops and
+	# nothing red replaces it. The mark is still made, which is the thing the ring
+	# was never the same as.
 	await _settle()
 	await _press(_at_the_car())
 	assert_true(_jet().is_spraying(), "the washer was spraying to begin with")
 	_view_model().belt().equip(DetailingTool.Id.SPONGE)
 	await wait_physics_frames(RESOLVE_FRAMES)
 	assert_false(_jet().is_spraying(), "a sponge does not spray")
-	assert_true(_marker().is_crosshair_drawn(), "and gets the crosshair back")
+	assert_false(_marker().is_crosshair_drawn(), "and does not bring the ring back with it")
+	assert_true(_marker().is_marking(), "while the mark itself is still made")
 
 
 func test_letting_go_shuts_the_water_off_and_lets_the_last_of_it_land() -> void:

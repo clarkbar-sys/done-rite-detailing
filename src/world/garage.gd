@@ -113,9 +113,9 @@
 ##
 ## [b]And the hand can now be pointed at the car.[/b] A finger on the glass is an
 ## aim: the tool swings toward wherever it landed ([ToolAim], applied by
-## [ViewModel]) and a red crosshair goes on the nearest bodywork to it
-## ([AimMarker]). Holding is aiming and letting go is not, so
-## [method release_aim] puts the mark away and lets the hand fall back to rest —
+## [ViewModel]) and the mark goes on the nearest bodywork to it ([AimMarker]).
+## Holding is aiming and letting go is not, so [method release_aim] puts the mark
+## away and lets the hand fall back to rest —
 ## which is the shape the trigger will keep when there is something for it to
 ## spray.
 ##
@@ -123,22 +123,22 @@
 ##
 ## [i]The tool follows the finger; the mark follows the car.[/i] They are
 ## deliberately not the same point. Press the sky above the roof and the hand
-## swings at the sky, because that is where you pointed, while the crosshair
-## snaps to the nearest paint — because "nothing" is not a useful thing to mark
+## swings at the sky, because that is where you pointed, while the mark snaps to
+## the nearest paint — because "nothing" is not a useful thing to mark
 ## and the player is plainly asking about the roof. On the car, which is nearly
 ## every press, the two coincide and the distinction never comes up.
 ##
-## [i]And the room hands the mark to the hand as well as to the crosshair[/i],
+## [i]And the room hands the mark to the hand as well as to the sight[/i],
 ## which is the one thing the paragraph above has an exception for. The hand
 ## hangs half a metre in front of the lens and off to one side of it, so a tool
-## turned merely parallel to the aim points past the crosshair by that offset —
-## near enough to look right, far enough that a jet would visibly miss. So
+## turned merely parallel to the aim points past the mark by that offset — near
+## enough to look right, far enough that a jet would visibly miss. So
 ## [ViewModel] is told where the mark actually is — and which way the paint faces
 ## there, which is what lets a tool be put [i]on[/i] it rather than merely at it.
 ## The power wash lays itself along the line to it ([WandCarry]) and the other
 ## four travel to it ([ReachCarry]). [method ViewModel.mark_at] carries the
-## argument for why a tool follows the crosshair rather than the finger even where
-## the two disagree.
+## argument for why a tool follows the mark rather than the finger even where the
+## two disagree.
 ##
 ## [i]It resolves on the physics clock[/i], for the same reason the walk does:
 ## it casts a ray, and a space state may only be queried while physics is
@@ -151,10 +151,11 @@
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
 ## grime work needs and the reason [signal aimed] carries a name at all.
 ##
-## [b]And the tools that work the paint draw their own sight.[/b] The crosshair, the
-## water the power wash throws, the product the two bottles spray and the suds the
-## sponge squeezes out are one decision and live in one place — [ToolSight], which
-## has the argument for each of them. What the room owns is the two numbers those
+## [b]And the tools that work the paint draw their own sight.[/b] The water the
+## power wash throws, the product the two bottles spray, the suds the sponge
+## squeezes out and the crosshair all three retired are one decision and live in
+## one place — [ToolSight], which has the argument for each of them and for why
+## the ring is now debug-only. What the room owns is the two numbers those
 ## effects are drawn at ([member wash_radius_metres] and
 ## [member scrub_radius_metres], which are the patches [method _spend_the_trigger]
 ## is about to work on) and the switch that takes them away ([member debug_tools]).
@@ -165,7 +166,7 @@
 class_name Garage
 extends SubViewportContainer
 
-## The panel the crosshair is on, or [code]""[/code] when nothing is marked —
+## The panel the mark is on, or [code]""[/code] when nothing is marked —
 ## emitted only when the answer changes, so a finger held still on one door is
 ## one signal rather than sixty a second.
 ##
@@ -412,12 +413,19 @@ const PAST_THE_POST: float = 1.1
 ## is meant to be the reward rather than a third round of work.
 @export var buff_per_second: float = 4.5
 
-## Whether the power wash wears the plain crosshair instead of spraying
-## [WashJet]'s water. Off by default, so what ships is the water: it is the thing
-## a player is meant to be looking at. Switched on —
+## Whether every tool wears the plain crosshair instead of the effect it draws for
+## itself. Off by default, so what ships is the water, the product and the foam:
+## they are the things a player is meant to be looking at. Switched on —
 ## [code]src/screens/play_screen.gd[/code] wires this to the "~" panel's "Debug
-## Tools" button — the jet is stowed and the bare crosshair shows through, which
-## is the developer's view of where the aim landed with nothing drawn over it.
+## Tools" button — all three are stowed and the bare crosshair shows through under
+## every tool, which is the developer's view of where the aim landed with nothing
+## drawn over it.
+##
+## [b]This is the only place the ring is drawn now[/b], which makes it more useful
+## rather than less. Every tool shows where it is working by working there, so the
+## question "is the effect in the wrong place, or is the mud" has no other way of
+## being asked — see [method ToolSight.sight], which has the argument for retiring
+## it from play.
 ##
 ## Only the sight changes. [method _spend_the_trigger] still spends the same
 ## water on the same patch either way, so a bug chased with this on is the same
@@ -561,8 +569,8 @@ func aim_at(where: Vector2) -> void:
 	_aiming = true
 
 
-## The player has lifted their finger. The crosshair comes off the car and the
-## hand falls back to rest.
+## The player has lifted their finger. The mark comes off the car and the hand
+## falls back to rest.
 ##
 ## Holding the glass is firing and letting go is not — so this is the release
 ## half of the trigger, and the thing that will one day also stop the water.
@@ -576,8 +584,8 @@ func release_aim() -> void:
 ## Public, along with the three forwards below, so a test can ask where the mark
 ## actually landed and where the water and the product actually went, rather than
 ## trusting a signal to have meant it. The forwards are kept rather than replaced
-## by [code]sight().marker()[/code] because where the crosshair is has been a
-## question about the room since long before there was a [ToolSight] to keep it in
+## by [code]sight().marker()[/code] because where the mark is has been a question
+## about the room since long before there was a [ToolSight] to keep it in
 ## — and they stop at three, because a fourth would be this file growing an
 ## accessor per effect all over again. The sponge's foam is reached through
 ## [method ToolSight.sponge_suds], which is where it lives.
@@ -585,7 +593,8 @@ func tool_sight() -> ToolSight:
 	return _sight
 
 
-## The crosshair on the paint.
+## Where the aim landed on the paint — and, under [member debug_tools], the
+## crosshair drawn there.
 func aim_marker() -> AimMarker:
 	return null if _sight == null else _sight.marker()
 
@@ -630,9 +639,9 @@ func _stand() -> void:
 	_face_car()
 
 
-## Gives the hand something to swing on and the room something to draw a
-## crosshair with. Both only exist in first person, which is the only mode with
-## a player in it.
+## Gives the hand something to swing on and the room something to draw the aim
+## with. Both only exist in first person, which is the only mode with a player
+## in it.
 ##
 ## [b]The sight is a sibling of the car, not a child of it.[/b] It is UI that
 ## happens to be drawn in world space, and hanging it inside the car would put it
@@ -693,8 +702,8 @@ func _lay_on_the_grime() -> void:
 ## in hand takes [member wash_per_second] of mud a second off wherever it landed
 ## — [method _spend_the_trigger] below is that, and it is deliberately the last
 ## thing this does. The mark goes on the paint whether or not any tool would do
-## anything there, because the crosshair is a statement about where you are
-## pointing rather than about what you are achieving.
+## anything there, because the mark is a statement about where you are pointing
+## rather than about what you are achieving.
 func _resolve_aim(delta: float) -> void:
 	if _sight == null:
 		return
@@ -737,7 +746,8 @@ func _resolve_aim(delta: float) -> void:
 
 
 ## Draws the aim the way the tool in hand wants it drawn: water for the power
-## wash, the crosshair for the other four.
+## wash, product for the two bottles, foam for the sponge, and — for the rag,
+## which puts nothing back on the paint — the rag itself, sitting on the spot.
 ##
 ## [b]The mark is made first and always[/b], whichever sight is showing. It is
 ## what the panel readout names, what the wand lines itself up with, and what the
@@ -761,11 +771,11 @@ func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 
 ## What the tool in the player's hand does to the paint the press landed on.
 ##
-## [b]The water goes where the crosshair is.[/b] Wherever the mark is sitting on
-## real bodywork — whether the ray landed there or the aim snapped there — that is
-## where the tool is pointed, and the game has just said so — in red for the four
-## tools that wear the crosshair, and with the water itself for the one that
-## sprays.
+## [b]The water goes where the mark is.[/b] Wherever the mark is sitting on real
+## bodywork — whether the ray landed there or the aim snapped there — that is
+## where the tool is pointed, and the game has just said so with the tool itself:
+## water thrown at the spot, product sprayed at it, or a sponge or rag put down on
+## it.
 ##
 ## This shipped the other way round for a day and it was wrong. The first rule was
 ## "only a ray that actually hit", reasoned about a player at a desk pointing at
@@ -773,10 +783,10 @@ func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 ## wrong on a touchscreen, which is the platform this game is actually played on:
 ## the aim is taken a thumb's width above the finger ([ThumbLift] has why), so a
 ## thumb on the flank of a low, wide car routinely sends the ray just over the
-## roof. The crosshair snaps back onto the paint and shows the player exactly
-## where their tool is aimed — and the old rule then declined to spend any water
-## there. A mark on the paint that does nothing is not a fair rule the player has
-## to learn, it is a broken tool.
+## roof. The mark snaps back onto the paint and the tool goes there with it, which
+## shows the player exactly where they are aimed — and the old rule then declined
+## to spend any water there. A mark on the paint that does nothing is not a fair
+## rule the player has to learn, it is a broken tool.
 ##
 ## What is still refused is [code]surface[/code] being false: a point clamped onto
 ## a bounding box, which is not on the mesh and whose normal is invented facing

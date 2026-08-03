@@ -289,12 +289,12 @@ func aim_toward(direction: Vector3) -> void:
 	_aim.aim_toward(direction)
 
 
-## Tells the hand where the crosshair actually landed, as a point in the world.
+## Tells the hand where the aim actually landed, as a point in the world.
 ##
 ## [b]A place and not a direction, and that is the entire difference between a
 ## jet that lands on the mark and one that lands near it.[/b] The hand is not the
 ## eye — it hangs 0.45 m in front of the lens and off to one side — so a tool
-## turned merely parallel to the aim points past the crosshair by that offset,
+## turned merely parallel to the aim points past the mark by that offset,
 ## which is a fifth of a metre at the range a car is washed from. Only
 ## [WandCarry] reads it; the four tools that are held at a fixed angle neither
 ## know nor care.
@@ -304,7 +304,7 @@ func aim_toward(direction: Vector3) -> void:
 ## player pressed, and marks the nearest bodywork to it — normally the same
 ## point, and not the same point at all when a thumb on a low car sends the ray
 ## over the roof, which [ThumbLift] makes routine rather than rare. The water
-## goes to the crosshair in that case ([method Garage._spend_the_trigger] records
+## goes to the mark in that case ([method Garage._spend_the_trigger] records
 ## why at length), so the wand that is going to be spraying it has to be pointed
 ## there too. A jet leaving a wand aimed at the sky while the mud comes off the
 ## roof is the same broken tool that paragraph is about.
@@ -528,7 +528,7 @@ func _carry_the_equipped() -> void:
 ## [ToolCarry] is handed, and the only form of the aim that is any use for
 ## pointing something [i]at[/i] the mark rather than along the ray to it.
 ##
-## The crosshair once there is one, read back into the hand's frame every frame
+## The mark once there is one, read back into the hand's frame every frame
 ## rather than converted once: the eye walks, so a point that is 20° to the left
 ## of the hand now is somewhere else in a second's time, and the wand has to
 ## follow it there without the room saying anything further.
