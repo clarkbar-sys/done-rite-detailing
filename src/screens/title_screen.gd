@@ -3,6 +3,29 @@
 ## rather than a blank background, so the car is the first thing a player sees
 ## instead of something they wait a screen for.
 ##
+## [b]And the bay is being worked while you read it.[/b] What is behind the card is
+## the game playing itself — a filthy car, a power wash taking the mud off a panel,
+## a bottle of the right cleaner going onto the paint it left, a rag buffing that
+## out to a shine, and the eye walking round to whatever is being worked on. Twelve
+## seconds a panel, and when the last one is done the mud goes back on and it starts
+## again. It is a cabinet's attract mode, and it is the honest kind: not a recording
+## of the game but the game, driven through [method Garage.steer],
+## [method Garage.aim_at] and the [ToolBelt] — the three controls a player has.
+## [member Garage.attracting] is the switch and [AttractRoutine] is what it decides.
+##
+## [b]Which is why this screen is now first person.[/b] The showcase circuit it used
+## to run — a camera orbiting a clean car from outside — could not show a tool
+## working, because there is nobody in that shot to hold one. The scene file
+## therefore sets the same three exports the play screen sets, plus the demo, and
+## the difference between the title card and the game is once again nothing but what
+## is switched on in one [Garage] instance.
+##
+## [b]It stays silent.[/b] [signal Grime.patch_finished] is left unconnected here
+## deliberately — the play screen rings a bell on it, and a title screen that dinged
+## its way through a car wash before anybody had touched it would be both annoying
+## and, in a browser, impossible: audio is locked until the first press. [Chime] has
+## that argument, and Start is still the press it is unlocked by.
+##
 ## Start leads straight into [PlayGameState] — there is no menu screen between
 ## the title card and the game, on purpose. A player who has already seen the
 ## title has nothing left to decide before the room they're about to work in.
