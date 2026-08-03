@@ -6,6 +6,11 @@
 ## of the car comes clean. What rings them is [Chime]; where they are rung from
 ## is [code]src/screens/[/code]. This class only knows how to make a sound.
 ##
+## The patch bell is not one pitch: [constant PATCH_RUN_RATIOS] is a short
+## ladder above [constant PATCH_HZ], and [Chime] steps up it while the player is
+## on a run of consecutive patches, so a clean sweep up a door climbs instead of
+## repeating the same note.
+##
 ## [b]Why it is generated and not a .wav in the repo.[/b] The same argument the
 ## car is a CSG blockout for and the tools are primitives for: the decision is
 ## the numbers, and the numbers are readable here. A recorded ding would be a
@@ -82,7 +87,19 @@ const START_LEVEL: float = 0.75
 
 ## The fundamental of the patch bell — a fifth above the counter bell, so a game
 ## in progress is recognisably the same instrument as the one that started it.
+## Also the base of [constant PATCH_RUN_RATIOS]: the first patch of a run always
+## rings here.
 const PATCH_HZ: float = 1568.0
+
+## How the patch bell's pitch climbs on a run of consecutive patches, each entry
+## a multiple of [constant PATCH_HZ]. A major triad up to the octave — root,
+## third, fifth, octave — rather than a chromatic run up: a plain triad has no
+## step that clashes against the ones before it, which a semitone-by-semitone
+## climb starts to after four or five steps. The last entry is also the cap —
+## [Chime] holds a long sweep here rather than climbing past it, because an
+## unbounded ladder eventually leaves the audible range and a capped one reads
+## as "as high as this bell goes" instead.
+const PATCH_RUN_RATIOS: PackedFloat32Array = [1.0, 1.25, 1.5, 2.0]
 
 ## How long the patch bell rings for. A third of the counter bell: these arrive
 ## in bursts, and the point is to be able to count them.
@@ -99,12 +116,19 @@ const FULL_SCALE: float = 32767.0
 
 ## The stream for [param which] bell, ready to hand to an [AudioStreamPlayer].
 ##
+## [param run] only matters for [constant Voice.PATCH]: it is how many
+## consecutive patches have rung before this one, and it picks the rung of
+## [constant PATCH_RUN_RATIOS] this strike lands on, clamped to the last one
+## rather than erroring on a long sweep. Ignored for [constant Voice.START] —
+## the counter bell does not climb.
+##
 ## Built fresh on every call rather than cached in a `static var`: a shared
 ## [AudioStreamWAV] is a mutable global, and the caller that wants one kept is
 ## [Chime], which keeps it for the life of the game and knows it.
-static func voice(which: Voice) -> AudioStreamWAV:
+static func voice(which: Voice, run: int = 0) -> AudioStreamWAV:
 	if which == Voice.PATCH:
-		return strike(PATCH_HZ, PATCH_SECONDS, PATCH_LEVEL)
+		var step: int = clampi(run, 0, PATCH_RUN_RATIOS.size() - 1)
+		return strike(PATCH_HZ * PATCH_RUN_RATIOS[step], PATCH_SECONDS, PATCH_LEVEL)
 	return strike(START_HZ, START_SECONDS, START_LEVEL)
 
 
