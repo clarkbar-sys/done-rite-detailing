@@ -99,6 +99,17 @@ download, no `chmod`, nothing to install. It needs WebGL 2 and about 40 MB on
 the first load; there is no service worker, so a refresh always gets the newest
 build rather than a cached one.
 
+Those 40 MB are the first thing the game asks of anybody, so they are spent
+looking at the business rather than at the engine. The page you wait on is the
+start menu's own lockup — the logo in its dark card, the name under it, and a
+red bar filling where the Start button will be — instead of Godot's grey
+default, and it is printed on the same black the boot splash and the title card
+are. The bar is real: it counts the bytes of `index.wasm` and `index.pck` as
+they arrive, and falls back to a swept band if the engine ever reports a total
+it cannot work out. [`web/shell.html`](./web/shell.html) is that page, and it is
+Godot's own template with the brand put on it — its header says what was
+changed and what to diff against when the engine is bumped.
+
 Prefer a local copy? Every CI run on `main` and on every pull request uploads
 both a Linux binary and the web bundle — grab them from the run's **Artifacts**
 section on the

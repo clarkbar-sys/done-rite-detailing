@@ -14,6 +14,44 @@ run/main_scene="res://src/main/main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
+; The picture on the loading screen, and the two settings that put it there.
+;
+; These are read by more than the engine's own boot splash. Godot's web
+; exporter writes this image out as `index.png` beside `index.html` and
+; substitutes the filename into the shell's `$GODOT_SPLASH` — verified in
+; platform/web/export/export_plugin.cpp, where `$GODOT_SPLASH` is literally
+; `p_name + ".png"` and `_get_project_splash()` is what gets saved there. So
+; naming the logo here is what makes it appear on the page a player waits on
+; while the bundle downloads (web/shell.html), with no second copy of the
+; asset for that page to point at. That is the whole reason this is set:
+; assets/brand/ stays the one home of the artwork.
+;
+; The native boot splash gets it too, which is a consequence and a wanted one
+; — it is the flash between the browser's loading screen and the title screen,
+; and the alternative is Godot's own logo appearing in the middle of ours.
+;
+; AND IT IS WHY assets/brand/ HOLDS A .png RATHER THAN THE .jpg IT USED TO.
+; The engine's boot splash loader is PNG-only — main/main.cpp's
+; setup_boot_logo() rejects anything else with "The only supported format is
+; PNG. Loading default splash." The web *exporter* is not so fussy and loaded
+; the jpg happily, so the loading screen looked right while the native splash
+; had quietly fallen back to Godot's logo. `make smoke` is what caught it: the
+; message is an ERROR, and a headless boot that logs one fails the gate.
+;
+; So the source was converted once, by the pinned engine itself, and the jpg
+; deleted rather than kept alongside — two files of the same artwork is the
+; drift this whole comment exists to avoid. The cost is honest and small: 67 KB
+; of jpg became 248 KB of png in the pack, against a 39 MB web bundle, and the
+; export was re-encoding it to exactly this png every build anyway.
+;
+; bg_color is Brand.INK (#09090b) rather than the engine's default grey, so all
+; three screens a player meets in the first few seconds — the download, the
+; boot splash, the title card — are printed on the same black. Kept as a
+; Color() literal because that is what the engine stores; the hex is in
+; src/core/brand.gd, which is the source of truth for it.
+boot_splash/image="res://assets/brand/done-rite-logo.png"
+boot_splash/bg_color=Color(0.035294, 0.035294, 0.043137, 1)
+
 ; No autoloads on purpose. `godot --check-only` (what `make check` gates on)
 ; resolves global `class_name` identifiers but not autoload names, so anything
 ; reached through an autoload drops out of the type check. Prefer a class with

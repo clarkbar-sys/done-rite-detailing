@@ -73,6 +73,11 @@ If this differs from the pins in this script, update GODOT_VERSION,
 GODOT_SHA256 and TEMPLATES_SHA256 (and the version comment at the top),
 then commit. Re-run \`make check build\` before pushing: a Godot bump can
 change GDScript warnings and the export layout.
+
+Also diff the new release's misc/dist/html/full-size.html against
+web/shell.html — that file is a vendored copy of it with the brand on top,
+and it is the one thing here that upstream can change underneath us without
+anything going red. STANDARDS.md "Distribution" has the rule.
 EOF
   exit 0
 fi
