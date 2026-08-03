@@ -50,6 +50,22 @@
 ## working on is what a detailer physically does anyway, so the rail is close to
 ## free.
 ##
+## [b]And when nobody is walking it, the room walks it itself.[/b] [member attracting]
+## is the arcade cabinet's demo: the car goes under mud, a tool works it panel by
+## panel through all three passes, the eye walks round to whatever is being worked,
+## and when the last panel is buffed the mud goes back on and it starts again. It is
+## what the title screen shows instead of a car nobody is touching.
+##
+## The rule it is built on is that it gets no privileges. [AttractRoutine] decides
+## what a person would do next and [AttractWalk] decides how hard they would push
+## the stick, and both answers go in through [method steer], [method aim_at] and the
+## [ToolBelt] — the three doors a player has, and the only three. So there is no
+## demo branch in the trigger, the aim, the standoff or the grime, the attract mode
+## cannot show a wash the game would not have given, and the day one of those breaks
+## the title screen breaks with it rather than papering over it. The single
+## exception is putting the mud back at the end of a lap ([method _on_lapped]),
+## which is a cabinet restarting rather than something a player does.
+##
 ## [b]The rail is not a circle, though, and that is the interesting half.[/b] The
 ## car is 4.3 m long and 1.9 m wide, so one fixed radius is either scraping the
 ## doors or standing a metre and a half off the bumper. What is held instead is
@@ -190,6 +206,22 @@ signal grimed
 ## whose box is loose, which is all of them.
 const PAST_THE_POST: float = 1.1
 
+## How far off the middle of the car a panel has to sit, in metres, before the
+## demo walks the eye round to it.
+##
+## The tub, the cabin and the roof are all centred on the car, and the angle of a
+## point that is nearly at the middle of a circle is nearly meaningless — it flips
+## from one side of the car to the other over a centimetre. So a panel with no side
+## to it does not move the eye at all, which is the right answer as well as the
+## stable one: a roof is in shot from everywhere, and the alternative is a camera
+## that lurches off to the nose the moment the demo reaches the one panel it never
+## needed to walk to.
+##
+## The eye's height is not gated by this. Every panel has a height whether or not
+## it has a side, and a wheel and a roof are the two the demo most obviously has to
+## look at from different levels.
+const NO_SIDE_TO_IT: float = 0.35
+
 ## Whether the camera circles the car. The title screen leaves it on to show
 ## the car off; the play screen turns it off and stands still instead.
 ##
@@ -317,6 +349,56 @@ const PAST_THE_POST: float = 1.1
 ## mechanism exists for.
 @export var standoff_radius_min: float = 1.6
 
+## Whether the room plays itself when nobody is holding the controls: mud goes on
+## the car, a tool works it panel by panel through all three passes, the eye walks
+## round to whatever is being worked, and when the last panel is buffed the mud
+## goes back on and it starts again. The title screen turns it on; the game turns
+## it off, because the game has a player.
+##
+## Ignored unless [member first_person] and [member walkaround] are both set, and
+## for the same reason the second is ignored without the first: there has to be
+## somebody standing in the room before there is anything for a script to stand in
+## for, and there has to be a walk before anything can be walked. Off by default,
+## like every other difference between the two screens.
+##
+## [b]It drives the room through the player's own controls[/b] — [method steer] for
+## the walk, [method aim_at] and [method release_aim] for the trigger, and
+## [ToolBelt] for the swaps — rather than through a mode of its own. So there is no
+## second answer anywhere below to "what does the power wash do to a muddy door",
+## and an attract mode that looked wrong would be the game looking wrong.
+## [AttractRoutine] is what it decides to do; [AttractWalk] is how hard it pushes.
+@export var attracting: bool = false
+
+## How long the demo spends on one pass over one panel, in seconds.
+##
+## Four, so a panel is washed, cleaned and buffed in twelve — short enough that
+## somebody who glances at the screen sees a whole panel change, long enough that
+## the jet visibly takes territory rather than flicking over. A full lap of a
+## twelve-panel car is a little over two minutes, which is the loop nobody is
+## expected to sit through and everybody is welcome to.
+@export var attract_seconds_per_pass: float = 4.0
+
+## How close the eye has to be to the work, in degrees around the car, before the
+## walk starts easing off instead of pushing flat out. See [AttractWalk] for why
+## there is a band at all rather than a camera that walks until it arrives.
+##
+## Forty is about a second of walking at [member turn_degrees_per_second], which
+## is the arrival a car being circled looks right slowing into.
+@export var attract_turn_ease_degrees: float = 40.0
+
+## The same band for the eye's height, in metres. Smaller than the turn's in the
+## sense that matters — the whole vertical range is 1.3 m — so the eye settles onto
+## a wheel or a roof rather than creeping the last of the way.
+@export var attract_lift_ease_metres: float = 0.6
+
+## How far above the work the demo stands its eye, in metres.
+##
+## Above rather than level with it, because the camera looks at the middle of the
+## car whatever height it is at ([method _face_car]): an eye level with a roof sees
+## the roof edge on and an eye level with a wheel is lying on the tarmac. Half a
+## metre up is the angle somebody working on a panel actually looks down it at.
+@export var attract_eye_rise_metres: float = 0.5
+
 ## How far left or right of straight ahead the held tool may be swung, in
 ## degrees. A backstop rather than a frame edge: it was picked to sit inside the
 ## 75° design lens's half-angle, but [Lens] narrows that on a tall window, and
@@ -437,6 +519,8 @@ var _drive: OrbitDrive = null
 var _standoff: Standoff = null
 var _sight: ToolSight = null
 var _grime: Grime = null
+var _routine: AttractRoutine = null
+var _running_order: Array[CSGShape3D] = []
 var _aiming: bool = false
 var _aim_at: Vector2 = Vector2.ZERO
 var _marked: String = ""
@@ -509,7 +593,13 @@ func _process(delta: float) -> void:
 ## Ahead of the `_drive` test on purpose: a room can be aimed in without being
 ## one you can walk around, and a screen that set [member first_person] without
 ## [member walkaround] would otherwise have a tool that never moves.
+##
+## The demo goes first of all, because it is standing in for the player and the
+## player's presses arrive before the tick rather than during it. What it does is
+## press the glass and push the stick, so everything below reads them the same way
+## it reads a real one's.
 func _physics_process(delta: float) -> void:
+	_run_the_demo(delta)
 	_resolve_aim(delta)
 	if _drive == null:
 		return
@@ -682,6 +772,12 @@ func _lay_on_the_grime() -> void:
 	if not is_instance_valid(_grime) or not is_instance_valid(_car):
 		return
 	_grime.lay_on(_car)
+	# Here rather than in `_ready()` for the reason the grime itself is: the running
+	# order is sorted by how big each panel is, and a panel asked before its CSG has
+	# been built reports a zero box — so a demo set up a frame earlier would work the
+	# car in whatever order the scene tree happened to list it.
+	if attracting and _drive != null:
+		_take_up_the_demo()
 	grimed.emit()
 
 
@@ -957,6 +1053,138 @@ func _take_up_the_walk() -> void:
 	_standoff = Standoff.new(
 		standoff_metres, standoff_radius_min, orbit_radius, standoff_correction_speed
 	)
+
+
+## Works out the order the demo goes round the car in and hands it to an
+## [AttractRoutine], along with a [ToolBelt] swap and a walk it will drive through
+## the player's own controls.
+##
+## [b]Biggest panel first, and measured rather than listed.[/b] The whole point of
+## an attract mode is what somebody sees from across a room, and what they see is
+## the tub, the cabin and the bonnet changing colour — not a wing mirror being
+## detailed for twelve seconds. So the running order is [method Car.panels] sorted
+## by how much car is in each one. A list of panel names in the right order would
+## be the same thing written down, and it would be wrong the first time somebody
+## added a window — which is the argument [method Car.kind_of] already makes about
+## reading a group instead of a name.
+##
+## A lap ends with the mud going back on, which is [method _on_lapped] and is the
+## one thing here a player could not do.
+func _take_up_the_demo() -> void:
+	_running_order = _car.panels()
+	_running_order.sort_custom(_bigger_first)
+	var kinds: Array[Surface.Kind] = []
+	for panel: CSGShape3D in _running_order:
+		kinds.append(_car.kind_of(panel))
+	_routine = AttractRoutine.new(kinds, attract_seconds_per_pass)
+	_routine.lapped.connect(_on_lapped)
+
+
+## Whether [param first] is more car than [param second], by the volume of the box
+## around it. Local rather than global on purpose: a comparison between two panels
+## of the same car needs no transform, and the boxes are the same either way for a
+## car nobody has scaled — which [code]tests/integration/test_garage.gd[/code]
+## already holds.
+func _bigger_first(first: CSGShape3D, second: CSGShape3D) -> bool:
+	return first.get_aabb().get_volume() > second.get_aabb().get_volume()
+
+
+## One tick of the demo: hold whatever the pass calls for, walk the eye round to
+## the work, and point at it.
+##
+## Does nothing at all on a room that never took the demo up, which is every room
+## the game is actually played in — the null check is the mode test, the same way
+## it is for the orbit and the walk.
+func _run_the_demo(delta: float) -> void:
+	if _routine == null:
+		return
+	_routine.advance(delta)
+	var panel: CSGShape3D = _running_order[_routine.stop()]
+	var box: AABB = panel.global_transform * panel.get_aabb()
+	# Asked of the belt every tick rather than wired to a swap, for the reason
+	# [method _sight_the_aim] reads the belt every tick: `equip` refuses the tool
+	# already in hand, so this is a comparison and not a swap, and there is no
+	# second copy of "which tool should the demo be holding" to fall out of step.
+	_view_model.belt().equip(_routine.tool())
+	_lead_the_eye(box.get_center())
+	_press_the_glass(_routine.aim_over(box))
+
+
+## Pushes the walk toward the panel at [param panel], in the two numbers a thumb
+## would have pushed it with.
+##
+## [b]To the panel, not to the sweep.[/b] The eye is led to the middle of the thing
+## being worked and left there for all three passes, while the tool does the
+## wandering — which is both what a person does and the only version that holds
+## still. Following the aim instead means following a point that runs the length of
+## the car three times a pass, and the tub's box is the whole car: the eye would
+## spend every pass chasing the nose and the tail and arriving at neither.
+##
+## [code]atan2(x, z)[/code] and not the usual [code](y, x)[/code], for
+## [method _take_up_the_walk]'s reason: this orbit measures its angle from
+## [code]+Z[/code] toward [code]+X[/code], so the arguments swap.
+##
+## The height goes over as a height above the [i]car[/i], because that is what
+## [member CameraOrbit.height] is and what [AttractWalk] therefore steers. The
+## floor is this file's business and does not need to be anybody else's.
+func _lead_the_eye(panel: Vector3) -> void:
+	var offset: Vector3 = panel - _car.global_position
+	var turn: float = 0.0
+	if Vector2(offset.x, offset.z).length() > NO_SIDE_TO_IT:
+		turn = AttractWalk.turn_toward(
+			_orbit.angle_degrees, rad_to_deg(atan2(offset.x, offset.z)), attract_turn_ease_degrees
+		)
+	steer(
+		turn,
+		AttractWalk.lift_toward(
+			_orbit.height, offset.y + attract_eye_rise_metres, attract_lift_ease_metres
+		)
+	)
+
+
+## Puts the demo's finger on the picture of [param work], or takes it off when
+## there is no picture of it to put a finger on.
+##
+## [b]It really does press the glass.[/b] The obvious shortcut is a second
+## entry point that takes a point in the world and skips the projection, and it is
+## the thing worth not building: [method aim_at] is where a press becomes a ray, a
+## mark, a swung tool and a spent trigger, and a demo that entered the game
+## anywhere else would be a second path through all of it — the one that still
+## worked on the day the first one broke. So the work is projected onto the glass
+## and handed back in through the door a thumb uses.
+##
+## [b]Off the glass is a release and not a clamp.[/b] Behind the lens, or past the
+## edge of the frame, the projection has no answer — [method Camera3D.unproject_position]
+## on a point behind the camera returns a mirrored one, which would aim the tool at
+## the opposite side of the room — so the demo lets go instead, exactly the way a
+## player who could not see what they were aiming at would. It happens while the eye
+## is still walking round to a panel on the far side of the car, and what it looks
+## like is somebody lowering the wand as they walk.
+##
+## In this container's own coordinates, which is what [method aim_at] takes:
+## [method Camera3D.unproject_position] answers in the sub-viewport's pixels, and
+## [method _picture_scale] is the ratio between the two.
+func _press_the_glass(work: Vector3) -> void:
+	if _camera.is_position_behind(work):
+		release_aim()
+		return
+	var at: Vector2 = _camera.unproject_position(work) / _picture_scale()
+	if not Rect2(Vector2.ZERO, size).has_point(at):
+		release_aim()
+		return
+	aim_at(at)
+
+
+## The demo has washed, cleaned and buffed every panel, so the car gets dirty
+## again and it starts over.
+##
+## [b]The one thing in the demo a player cannot do[/b], and it is deliberately not
+## dressed up as one. A cabinet's demo restarts; it does not drive a second car in.
+## [method Grime.lay_on] says calling it twice replaces what was there, which is
+## exactly this, and it is the only line of the attract mode that reaches past the
+## controls a player has.
+func _on_lapped() -> void:
+	_grime.lay_on(_car)
 
 
 ## Measures how far the car actually is and lets [Standoff] close the gap.

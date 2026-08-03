@@ -9,8 +9,9 @@
 
 Done Rite Detailing is an in-development game: a Godot 4 project that
 type-checks, boots headlessly, and exports a playable build — in your browser,
-or as a Linux binary — from CI. It opens on a title screen played over the
-detailing bay itself, with the camera circling the car; Start drops you
+or as a Linux binary — from CI. It opens on a title screen with the game
+already being played behind the card — a filthy car being washed, cleaned and
+buffed by nobody, in the bay you are about to stand in — and Start drops you
 straight into that same room, standing beside the car with a tool in your
 hand. A thumb stick in the bottom-right corner walks you around it and raises
 and lowers your eye — push it and you move, at whatever speed you push it, in
@@ -76,6 +77,23 @@ dirt cannot. None of it touches the mask, and none of it can disagree with one �
 the bands reach zero exactly where the mask does.
 [`src/world/grime.gdshader`](./src/world/grime.gdshader) has each argument where
 the uniform it settles is declared.
+
+And the title screen now plays it, which is what an arcade cabinet does with a
+machine nobody is standing at. Behind the logo the car is under mud and
+somebody is working it: the power wash takes a panel back to bare paint, the
+right bottle for that surface goes onto it, the drying rag buffs that out to a
+shine, and the eye walks round the car to whatever is being worked on next — a
+panel every twelve seconds, biggest first, and when the last one is finished
+the mud goes back on and it starts again. What makes it worth having is that
+it is not a recording. [`AttractRoutine`](./src/core/attract_routine.gd)
+decides what a person would do next and
+[`AttractWalk`](./src/core/attract_walk.gd) decides how hard they would push
+the stick, and both answers go into the room through the same three doors a
+player has — the walk, a press on the glass, and the tool belt. There is no
+demo branch in the trigger, the aim, the standoff or the grime, so the attract
+mode cannot show a wash the game would not have given you, and the day one of
+those breaks the title screen breaks with it. The one thing it does that you
+cannot is put the mud back at the end of a lap.
 
 The room is still
 boxes and the car is still a green one under all that; see the
