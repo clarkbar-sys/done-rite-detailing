@@ -306,9 +306,9 @@ float triplanar_noise(vec3 at, vec3 normal) {
 // opaque — the pattern breaks the *edge* of a wash up, it does not make a fresh
 // car look half-cleaned or a soaped panel look patchy.
 //
-// Returned unbanded, because two things want it and they want it at different
-// resolutions: `banded` draws the layer, and `terrace` needs to know where inside
-// a band this fragment sits — which is exactly the thing banding throws away.
+// This is what gets *drawn*, and nothing else reads it. In particular `terrace`
+// does not: a value with noise in it has band boundaries wherever the noise has
+// them, and that is a very different thing from where the wash is — see there.
 float coverage(float amount, float pattern, float bite) {
 	return clamp(amount * (1.0 + bite * (pattern - 0.5) * 2.0), 0.0, 1.0);
 }
@@ -329,27 +329,36 @@ float banded(float amount, float steps) {
 //
 // A band boundary is where `banded`'s ceiling jumped, so the fragments just
 // inside one sit near zero in the fractional position that ceiling rounded away
-// — that is the whole test on `shown`, and it costs a `fract`.
+// — that is the whole test, and it costs a `fract`.
 //
-// [b]Gated on the mask and not on what is drawn, which took a screenshot to
-// work out.[/b] `coverage` swings a layer either side of what the mask says by
-// up to `pattern_bite`, so over a *fresh* panel — mask at a flat 1.0 — the drawn
-// value still wanders between about 0.55 and 1.0 and crosses a band boundary
-// wherever the noise does. Testing `shown` at both ends therefore lit up an
-// untouched car in scattered cyan speckle: a panel nobody had touched read as
-// though it were half washed, which is the exact opposite of what banding is
-// here to communicate. `amount` is the mask, it is flat 1.0 on fresh paint and
-// flat 0.0 on finished paint, and between them it is the brush's own falloff —
-// so gating on it means this fires in the ring the water is actually working
-// and nowhere else.
+// [b]Measured on the mask, not on what is drawn, and that is the whole of
+// whether this reads as a wash or as a circuit board.[/b] The obvious thing is
+// to band the same value the layer is drawn from, so the line lands exactly on
+// the visible step. That value is `coverage`'s, and `coverage` has
+// `pattern_bite` of triplanar noise in it — so `fract` of it is testing the
+// fractional part of a *noise field*, and lighting up where that is near zero
+// draws the field's iso-contours. Level sets of smooth 2D noise are closed
+// squiggling loops, which is exactly what it looked like: nested cyan
+// tracery over every panel the jet had half finished. Worse, the ±45% swing
+// spans up to four band boundaries at once, so several contour families stacked
+// in the same place — better than half the fragments at a mask of 0.95 lit,
+// which is a fill and not a rim.
+//
+// The mask has none of that. It is flat 1.0 on fresh paint, flat 0.0 on
+// finished paint, and in between it is the brush's own falloff — smooth and
+// roughly radial — so banding it puts one clean contour per step around the
+// spot the water is working, which is the terrace this was always meant to be.
+// The line no longer sits exactly on the drawn step, because the drawn one still
+// carries the bite; that disagreement is less than one band and invisible.
 //
 // Both ends are excluded rather than clamped, and neither is optional: at full
 // coverage the line would run bumper to bumper, and at none it would outline
 // clean paint. Excluding them also means this can never fire where the layer is
 // absent, which is what lets the caller add it straight onto that layer's own
-// opacity.
-float terrace(float amount, float shown, float steps, float width) {
-	float inside = 1.0 - smoothstep(0.0, width, fract(shown * steps));
+// opacity. Note that they are a gate and were never a fix for the above — a mask
+// of 0.999 is untouched to look at and speckled just as hard.
+float terrace(float amount, float steps, float width) {
+	float inside = 1.0 - smoothstep(0.0, width, fract(amount * steps));
 	return inside * step(0.001, amount) * step(amount, 0.999);
 }
 
@@ -422,8 +431,8 @@ void fragment() {
 	// a texel is only ever one of them, so they cannot both be mid-band, and adding
 	// would only ever be a way of double-counting the one that is.
 	float rim = max(
-		terrace(layers.r, mud_raw, steps, terrace_width),
-		terrace(layers.g, product_raw, steps, terrace_width)
+		terrace(layers.r, steps, terrace_width),
+		terrace(layers.g, steps, terrace_width)
 	);
 	// Folded into the layer's own opacity rather than laid over it. A contour line
 	// on mud is *more mud, brighter* — not a separate thing floating above it — so
