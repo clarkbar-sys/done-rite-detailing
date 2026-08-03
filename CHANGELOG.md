@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.6.0...v1.7.0) (2026-08-03)
+
+
+### Features
+
+* **title:** put the business's logo and its red pill on the start menu ([#94](https://github.com/clarkbar-sys/done-rite-detailing/issues/94)) ([d21117b](https://github.com/clarkbar-sys/done-rite-detailing/commit/d21117ba609bce000224e97c1b6d88885dbae4d6)), closes [#93](https://github.com/clarkbar-sys/done-rite-detailing/issues/93)
+* **world:** line the edge of the lawn with procedural trees ([#96](https://github.com/clarkbar-sys/done-rite-detailing/issues/96)) ([e91cb11](https://github.com/clarkbar-sys/done-rite-detailing/commit/e91cb1117c11839a7e1415180edc84f6b54420e7))
+* **world:** plant the whole boundary of the lawn, not just its corners ([#97](https://github.com/clarkbar-sys/done-rite-detailing/issues/97)) ([9817f8f](https://github.com/clarkbar-sys/done-rite-detailing/commit/9817f8f14d6adb23dda5080426c7536d7636096e))
+
 ## [1.6.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.5.0...v1.6.0) (2026-08-03)
 
 
