@@ -153,6 +153,37 @@ func test_the_patch_bell_is_the_higher_of_the_two() -> void:
 	assert_gt(patch_rate, start_rate * 1.2, "the two bells are the same pitch")
 
 
+# ---- the patch bell climbs a run ---------------------------------------------
+
+
+func test_the_patch_bell_defaults_to_the_bottom_of_the_run() -> void:
+	# No run argument at all is how every existing caller of `voice()` spells
+	# "first patch of a run" — this is the case the two tests above already rely
+	# on, made explicit.
+	assert_eq(Bell.voice(Bell.Voice.PATCH).data, Bell.voice(Bell.Voice.PATCH, 0).data)
+
+
+func test_the_patch_bell_climbs_with_the_run() -> void:
+	# Each rung of the ladder should be a higher pitch than the last, all the way
+	# up — measured the same zero-crossing way the fixed pitch test above is.
+	var last_rate: float = 0.0
+	for step: int in Bell.PATCH_RUN_RATIOS.size():
+		var samples: PackedFloat32Array = _samples(Bell.voice(Bell.Voice.PATCH, step))
+		var rate: float = float(_crossings(samples)) / Bell.PATCH_SECONDS
+		assert_gt(rate, last_rate, "step %d was not higher than the one before it" % step)
+		last_rate = rate
+
+
+func test_the_patch_bell_run_is_capped() -> void:
+	# An unbounded ladder eventually leaves the audible range on a long sweep —
+	# the class docs on [constant Bell.PATCH_RUN_RATIOS] have why it stops
+	# instead. A step past the end of the ladder holds at the top rather than
+	# erroring or wrapping back around.
+	var top: AudioStreamWAV = Bell.voice(Bell.Voice.PATCH, Bell.PATCH_RUN_RATIOS.size() - 1)
+	var past: AudioStreamWAV = Bell.voice(Bell.Voice.PATCH, Bell.PATCH_RUN_RATIOS.size() + 5)
+	assert_eq(top.data, past.data, "a run longer than the ladder should hold at the top")
+
+
 func test_a_bell_can_be_struck_at_any_pitch_and_length() -> void:
 	# The knob under both voices. A tuning change is a number here rather than a
 	# re-recording, which is the entire argument for generating the sound.

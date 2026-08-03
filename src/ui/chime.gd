@@ -1,4 +1,4 @@
-## The thing that actually rings: a small pool of players, the two [Bell] voices
+## The thing that actually rings: a small pool of players, every [Bell] voice
 ## built once, and a rule about how often a ding is allowed.
 ##
 ## It hangs off [code]src/main/main.tscn[/code] rather than off a screen, and
@@ -37,6 +37,17 @@
 ## shadow, so what comes out is a bell per audible event rather than a bell per
 ## texel.
 ##
+## [b]The patch bell climbs on a run.[/b] Consecutive calls to
+## [method ring_at] with [constant Bell.Voice.PATCH] step up
+## [constant Bell.PATCH_RUN_RATIOS]; a gap longer than [constant RUN_RESET_MSEC]
+## resets to the bottom. That step is counted on every call, not only the ones
+## that get past [constant MIN_GAP_MSEC] — a ding dropped by the rate limit was
+## still a patch finishing, and a run that only advanced on the dings that made
+## a sound would fall out of step with what actually happened the moment a
+## sweep finished two patches faster than [constant MIN_GAP_MSEC] apart.
+## [method patch_run] hands back the count itself, for anything downstream —
+## scoring, most likely — that wants the same number the pitch is reading.
+##
 ## [b]The browser's rule about sound, which is the reason Start dings at all.[/b]
 ## A page may not make a noise until the person on it has touched it — every
 ## mobile browser enforces this, and Godot's web export answers it by resuming
@@ -63,20 +74,34 @@ const VOICES: int = 4
 ## enough that a single tick finishing several patches is one bell.
 const MIN_GAP_MSEC: int = 70
 
+## How long a gap between two patches, in milliseconds, resets the run back to
+## the bottom of [constant Bell.PATCH_RUN_RATIOS] rather than continuing to
+## climb it. A taste knob, the same way [constant Bell.PATCH_SECONDS] is: long
+## enough that the run survives the player swinging the jet from one panel to
+## the next, short enough that stopping to think really does start the ladder
+## over rather than picking up where it left off a few seconds later.
+const RUN_RESET_MSEC: int = 1500
+
 var _players: Array[AudioStreamPlayer] = []
 var _streams: Dictionary[Bell.Voice, AudioStreamWAV] = {}
+var _patch_streams: Array[AudioStreamWAV] = []
 var _next: int = 0
 var _last_msec: int = -MIN_GAP_MSEC
 var _rung: int = 0
+var _run: int = 0
+var _last_patch_msec: int = -RUN_RESET_MSEC
 
 
 func _ready() -> void:
-	# Both voices built here and kept for the life of the game: the arithmetic is
+	# Every voice built here and kept for the life of the game: the arithmetic is
 	# a loop over tens of thousands of samples (see [Bell]), and a game that built
 	# one on the press that plays it would hitch on exactly the frame the player
-	# is waiting for a response to.
+	# is waiting for a response to. The ladder is [constant Bell.PATCH_RUN_RATIOS]
+	# long, which [Bell]'s own docs cap for exactly this reason: small enough to
+	# build eagerly without a thought.
 	_streams[Bell.Voice.START] = Bell.voice(Bell.Voice.START)
-	_streams[Bell.Voice.PATCH] = Bell.voice(Bell.Voice.PATCH)
+	for step: int in Bell.PATCH_RUN_RATIOS.size():
+		_patch_streams.append(Bell.voice(Bell.Voice.PATCH, step))
 	for index: int in VOICES:
 		var player: AudioStreamPlayer = AudioStreamPlayer.new()
 		player.name = "Voice%d" % index
@@ -96,12 +121,16 @@ func ring(which: Bell.Voice) -> void:
 
 ## Rings [param which] bell as at [param now_msec]. Returns whether it actually
 ## rang — false means it landed inside [constant MIN_GAP_MSEC] of the last one.
+##
+## For [constant Bell.Voice.PATCH], the run is stepped before that gap is
+## checked — see the class docs on why a ding the rate limit drops still has to
+## count.
 func ring_at(which: Bell.Voice, now_msec: int) -> bool:
+	var stream: AudioStreamWAV = _stream_for(which, now_msec)
+	if stream == null:
+		return false
 	if now_msec - _last_msec < MIN_GAP_MSEC:
 		return false
-	if not _streams.has(which):
-		return false
-	var stream: AudioStreamWAV = _streams[which]
 	_last_msec = now_msec
 	_rung += 1
 	var player: AudioStreamPlayer = _players[_next]
@@ -109,6 +138,28 @@ func ring_at(which: Bell.Voice, now_msec: int) -> bool:
 	player.stream = stream
 	player.play()
 	return true
+
+
+## How many consecutive patches have rung, counting the one about to ring —
+## so the first patch of a run reads 1. The same number [method ring_at] just
+## picked [constant Bell.PATCH_RUN_RATIOS]'s step from, for anything downstream
+## that wants a run's length rather than its pitch.
+func patch_run() -> int:
+	return _run + 1
+
+
+## The stream for [param which] bell at [param now_msec], stepping the patch run
+## first when [param which] is [constant Bell.Voice.PATCH]. `null` for a voice
+## nothing was built for.
+func _stream_for(which: Bell.Voice, now_msec: int) -> AudioStreamWAV:
+	if which != Bell.Voice.PATCH:
+		return _streams[which] if _streams.has(which) else null
+	if now_msec - _last_patch_msec >= RUN_RESET_MSEC:
+		_run = 0
+	else:
+		_run += 1
+	_last_patch_msec = now_msec
+	return _patch_streams[mini(_run, _patch_streams.size() - 1)]
 
 
 ## How many bells this has rung since the game started, counting only the ones
