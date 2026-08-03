@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/tool_belt_hud.tscn" id="3_hud"]
 [ext_resource type="PackedScene" path="res://src/ui/motion_pad.tscn" id="4_pad"]
 [ext_resource type="PackedScene" path="res://src/ui/grime_debug.tscn" id="5_grimedebug"]
+[ext_resource type="PackedScene" path="res://src/ui/done_map.tscn" id="6_donemap"]
 
 [node name="PlayScreen" type="Control"]
 layout_mode = 3
@@ -26,23 +27,33 @@ layout_mode = 1
 [node name="MotionPad" parent="." instance=ExtResource("4_pad")]
 layout_mode = 1
 
-; Which panel the crosshair is on, in the one corner of the screen neither the
+; Which panel the crosshair is on, along the top of the screen where neither the
 ; belt nor the pad reaches. Debug scaffolding — see `_on_aimed` in
 ; play_screen.gd — so it is a plain Label with a font big enough to read at the
 ; third-scale a phone renders this design at, and an outline because the thing
 ; behind it is sometimes sky and sometimes tarmac.
-; Shifted clear of the grime board's toggle, which now sits in this corner at a
-; full tap target's width. It used to start at x=12 and the two would overlap.
+; Shifted right of the done map, which owns this corner now: the board is 254
+; design px wide (four tiles of a third of a tap target, plus its padding), so
+; this starts a margin clear of its right edge. It has been moved once before,
+; off x=12, when the grime board's toggle took the corner and then gave it up.
 [node name="PanelReadout" type="Label" parent="."]
 layout_mode = 1
-offset_left = 188.0
+offset_left = 278.0
 offset_top = 12.0
-offset_right = 536.0
+offset_right = 626.0
 offset_bottom = 56.0
 theme_override_colors/font_color = Color(0.95, 0.13, 0.16, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 32
+
+; How much of each panel is finished, in the corner the belt, the pad and the
+; grime board all leave alone. On screen for the whole game, unlike the board
+; below it — this is the player's view of the job and that one is a diagnostic.
+; Above the readout and below the masks in the tree, so a board somebody opened
+; draws over it rather than under it.
+[node name="DoneMap" parent="." instance=ExtResource("6_donemap")]
+layout_mode = 1
 
 ; Every panel's grime mask, drawn flat. Hidden until the key is pressed — see
 ; `GRIME_DEBUG_ACTION` in play_screen.gd — and last in the tree so it draws over

@@ -168,6 +168,7 @@ var _finger: int = NO_FINGER
 @onready var _pad: MotionPad = $MotionPad
 @onready var _readout: Label = $PanelReadout
 @onready var _masks: GrimeDebug = $GrimeDebug
+@onready var _done: DoneMap = $DoneMap
 
 
 func _ready() -> void:
@@ -198,9 +199,14 @@ func _process(_delta: float) -> void:
 	var turn: float = _pad.turn() + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
 	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
 	_garage.steer(turn, lift)
-	# Only while the masks are up. The number costs a walk over twelve panels and
-	# nothing is reading it otherwise, so a game nobody has pressed the key in
-	# does not pay for the readout.
+	# The done map is up all game, so it is asked every frame — a division per
+	# panel, and it redraws only when one of the twelve numbers actually moved.
+	# [method DoneMap.refresh] has why this is polled rather than driven off
+	# [signal Grime.patch_finished].
+	_done.refresh()
+	# The masks' heading, only while the masks are up. The two numbers cost a walk
+	# over twelve panels each and nothing is reading them otherwise, so a game
+	# nobody has pressed the key in does not pay for the readout.
 	var grime: Grime = _garage.grime()
 	if _masks.is_shown() and grime != null:
 		_masks.report(grime.remaining(), grime.shine())
@@ -373,6 +379,11 @@ func _on_aimed(panel: String) -> void:
 func _on_grimed() -> void:
 	var grime: Grime = _garage.grime()
 	_masks.bind(grime)
+	# Both views of the same maps, bound in the same breath: the diagnostic one
+	# behind the "~" toggle and the player's one in the opposite corner. Neither
+	# has heard of the other — see [DoneMap] on why that is two classes rather
+	# than one with a switch on it.
+	_done.bind(grime)
 	# Bound here rather than in `_ready()` for the same reason the masks are: the
 	# grime does not exist until this fires, so there is nothing to listen to
 	# before it.

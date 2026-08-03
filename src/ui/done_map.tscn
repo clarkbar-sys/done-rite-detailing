@@ -1,0 +1,34 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/done_map.gd" id="1_donemap"]
+
+; Full-rect and `mouse_filter = 2` (ignore), like every other piece of the HUD:
+; this scene sits above the garage's SubViewportContainer, so a root at the
+; default `stop` filter would swallow every press on the screen. It matters more
+; here than anywhere else in the HUD — this board is on screen for the whole
+; game, and it owns no buttons at all, so nothing in this scene is ever the thing
+; a finger is reaching for.
+;
+; Nothing is positioned here. The heading is placed by `_ready` and the tiles are
+; drawn by `_draw`, both against `TouchTarget.min_design_size()` — see
+; `done_map.gd`.
+[node name="DoneMap" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_donemap")
+
+; The car's progress, over the tiles it is the total of. No outline, unlike
+; `PanelReadout` — that label is drawn straight onto whatever the room happens to
+; be showing, and this one is on the board's own backdrop. The font size is set
+; in `_ready` rather than here, because the layout underneath it is measured from
+; the same number.
+[node name="Title" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.95, 0.85, 0.55, 1)

@@ -77,6 +77,18 @@ the bands reach zero exactly where the mask does.
 [`src/world/grime.gdshader`](./src/world/grime.gdshader) has each argument where
 the uniform it settles is declared.
 
+And the corner of the screen now says how far along you are. Twelve tiles, one
+per panel, filling from the bottom as each one is buffed, with the car's own
+percentage over them — so "which bits are left" is a glance rather than a lap of
+the car. It reads shine and nothing else, because that is the only one of the
+three layers that just goes up: mud hits zero a third of the way through the job
+and product goes back down under the rag, so a board driven by either would call
+a soaking-wet unpolished car finished.
+[`src/ui/done_map.gd`](./src/ui/done_map.gd) is the whole of it, and the twelve
+masks behind **G** are untouched — that view shows raw texels on purpose,
+because it is how you tell a projection bug from a raycast one, and a smoothed
+version of it would stop answering the question it exists for.
+
 The room is still
 boxes and the car is still a green one under all that; see the
 [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)
