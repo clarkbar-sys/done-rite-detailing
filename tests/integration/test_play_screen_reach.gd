@@ -15,10 +15,11 @@
 ## finger goes down for the length of each test and [method after_each] lifts it.
 ##
 ## [b]What is measured and what deliberately is not.[/b] Where each tool ends up
-## relative to the crosshair, and where the mist starts, stops and what colour it
-## is — all read back off the things that actually draw. What no test here can say
-## is whether a sponge on a door [i]looks[/i] like a sponge on a door; that is what
-## the thing is for.
+## relative to the crosshair, where the mist starts, stops and what colour it is,
+## and where the sponge's foam is born and how far it creeps — all read back off the
+## things that actually draw. What no test here can say is whether a sponge on a
+## door [i]looks[/i] like a sponge on a door, or whether the suds read as suds; that
+## is what the thing is for.
 extends GutTest
 
 const PLAY_SCREEN: String = "res://src/screens/play_screen.tscn"
@@ -128,13 +129,22 @@ func _mist() -> SprayMist:
 	return _sight().spray_mist()
 
 
+func _suds() -> SpongeSuds:
+	return _sight().sponge_suds()
+
+
 ## The emitter the product actually comes out of, reached by the name [SprayMist]
 ## gives it rather than by counting children.
 func _spray() -> GPUParticles3D:
 	return _mist().get_node(NodePath(SprayMist.MIST)) as GPUParticles3D
 
 
-## The three sights, which are children of one node rather than three loose ones
+## The emitter the foam actually comes out of, reached the same way.
+func _foam() -> GPUParticles3D:
+	return _suds().get_node(NodePath(SpongeSuds.SUDS)) as GPUParticles3D
+
+
+## The four sights, which are children of one node rather than four loose ones
 ## beside the car. Asserted once here because it is the arrangement everything
 ## below reads through, and a room that had built them anywhere else would fail
 ## with a null rather than with a reason.
@@ -143,7 +153,18 @@ func _sights_are_together() -> bool:
 		_sight().marker().get_parent() == _sight()
 		and _sight().wash_jet().get_parent() == _sight()
 		and _sight().spray_mist().get_parent() == _sight()
+		and _sight().sponge_suds().get_parent() == _sight()
 	)
+
+
+## How wide the sponge lies on the paint, as a radius in metres, worked out here
+## from the catalogue rather than read off the sight — so a footprint that stopped
+## being the sponge's own size fails rather than agreeing with itself.
+func _sponge_footprint() -> float:
+	for tool: DetailingTool in DetailingTool.catalogue():
+		if tool.id == DetailingTool.Id.SPONGE:
+			return (tool.extent.x + tool.extent.z) * 0.25
+	return 0.0
 
 
 func _crosshair() -> Vector3:
@@ -202,13 +223,13 @@ func _off_tint(tint: Color, wanted: Color) -> float:
 # ---- the two that go onto the paint ------------------------------------------
 
 
-func test_the_room_keeps_its_three_sights_in_one_place() -> void:
-	# [ToolSight] exists because the crosshair, the water and the product are
-	# mutually exclusive answers to one question. If the room ever goes back to
+func test_the_room_keeps_its_four_sights_in_one_place() -> void:
+	# [ToolSight] exists because the crosshair, the water, the product and the foam
+	# are mutually exclusive answers to one question. If the room ever goes back to
 	# building them loose beside the car, the rule for choosing between them goes
 	# back to being spread across a file about a camera.
 	assert_not_null(_sight(), "a first-person room has something to draw the aim with")
-	assert_true(_sights_are_together(), "and all three of them live in it")
+	assert_true(_sights_are_together(), "and all four of them live in it")
 
 
 func test_a_scrubbing_tool_ends_up_on_the_panel_it_is_pointed_at() -> void:
@@ -361,3 +382,95 @@ func test_letting_go_shuts_the_can_off_and_lets_the_last_of_it_land() -> void:
 	assert_false(_mist().is_spraying(), "and not once it is up")
 	assert_true(_spray().visible, "with what is in the air still drawn")
 	assert_false(_spray().local_coords, "and still where the can left it")
+
+
+# ---- the one that squeezes ----------------------------------------------------
+
+
+func test_the_sponge_squeezes_suds_out_around_its_own_footprint() -> void:
+	# The whole of what was asked: the sponge is the one tool on the belt doing work
+	# you could not see it doing. The ring is the sponge's own size rather than a
+	# number picked to look right, so a resized proxy moves the foam with it.
+	await _settle()
+	await _press_with(DetailingTool.Id.SPONGE)
+	assert_true(_suds().is_squeezing(), "holding the sponge on a panel makes foam")
+	assert_almost_eq(
+		_suds().rim(), _sponge_footprint(), ON_THE_MARK, "out around the sponge's own edge"
+	)
+	assert_eq(_foam().amount, SpongeSuds.BUBBLES, "and all of it")
+
+
+func test_the_suds_lie_in_the_panel_rather_than_being_thrown_at_it() -> void:
+	# The difference between this and a third [SprayMist], and the reason it is not
+	# one: a nozzle throws a cone at a surface, a sponge squeezes a ring out along
+	# it. The ring's axis is the paint's own normal, so the foam spreads across the
+	# panel rather than toward it.
+	await _settle()
+	await _press_with(DetailingTool.Id.SPONGE)
+	var axis: Vector3 = _suds().global_basis * SpongeSuds.FLAT
+	assert_almost_eq(
+		axis.normalized().dot(_marker().global_basis.y.normalized()),
+		1.0,
+		0.001,
+		"the ring lies flat in the paint"
+	)
+	assert_lt(
+		_off_the_paint(_suds().global_position), AimMarker.LIFT, "and sits on it, under the mark"
+	)
+	assert_gt(_off_the_paint(_suds().global_position), 0.0, "on the outside of it")
+
+
+func test_the_suds_spread_out_to_the_patch_the_sponge_is_soaping() -> void:
+	# What makes this a picture of the work rather than a decoration — the same
+	# promise the jet and the mist keep, arriving the other way round. The foam is
+	# born at the sponge and finishes at the edge of the patch
+	# [method Garage._spend_the_trigger] is laying product on.
+	await _settle()
+	await _press_with(DetailingTool.Id.SPONGE)
+	assert_almost_eq(
+		_suds().reach(), _garage().scrub_radius_metres, ON_THE_MARK, "as wide as it soaps"
+	)
+	assert_gt(_garage().scrub_radius_metres, _suds().rim(), "and outward, not inward")
+
+
+func test_the_suds_are_the_white_the_panel_wears() -> void:
+	# The colour is the one thing here that cannot be tuned by eye: the foam in the
+	# air and the film the mask draws are the same [method Surface.product_from], so
+	# a sponge that squeezed a different white would be two products on one panel.
+	await _settle()
+	await _press_with(DetailingTool.Id.SPONGE)
+	assert_lt(
+		_off_tint(_suds().product(), Surface.product_from(DetailingTool.Id.SPONGE)),
+		0.0001,
+		"squeezes what it leaves behind"
+	)
+	assert_lt(_off_tint(_suds().product(), Surface.BODY_PRODUCT), 0.0001, "which is the suds white")
+
+
+func test_no_other_tool_squeezes_suds() -> void:
+	# Swapped mid-press for [method test_the_tools_that_do_not_spray_do_not_spray]'s
+	# reason. The rag is the one that matters: it has no nozzle either, and it buffs
+	# a panel dry — foam coming off it would be the tool putting back what it is
+	# there to take away.
+	await _settle()
+	await _press_with(DetailingTool.Id.SPONGE)
+	assert_true(_suds().is_squeezing(), "the sponge was squeezing to begin with")
+	for id: DetailingTool.Id in (
+		BOTTLES + [DetailingTool.Id.DRYING_RAG, DetailingTool.Id.POWER_WASH]
+	):
+		_view_model().belt().equip(id)
+		await wait_physics_frames(RESOLVE_FRAMES)
+		assert_false(_suds().is_squeezing(), "%d does not squeeze suds" % id)
+
+
+func test_letting_go_stops_the_squeeze_and_leaves_the_lather_on_the_panel() -> void:
+	# Foam sits where it lands, which is the whole reason it is emitted into the
+	# world rather than into the sponge. A release that deleted it would wipe the
+	# lather off the panel the player has just soaped, while they are looking at it.
+	await _settle()
+	await _press_with(DetailingTool.Id.SPONGE)
+	assert_true(_suds().is_squeezing(), "squeezing while the finger is down")
+	await _lift()
+	assert_false(_suds().is_squeezing(), "and not once it is up")
+	assert_true(_foam().visible, "with the lather still drawn")
+	assert_false(_foam().local_coords, "and still where the sponge left it")
