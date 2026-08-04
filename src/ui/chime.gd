@@ -37,10 +37,14 @@
 ## shadow, so what comes out is a bell per audible event rather than a bell per
 ## texel.
 ##
-## [b]The patch bell climbs on a run.[/b] Consecutive calls to
-## [method ring_at] with [constant Bell.Voice.PATCH] step up
-## [constant Bell.PATCH_RUN_RATIOS]; a gap longer than [constant Bell.RUN_RESET_MSEC]
-## resets to the bottom. That step is counted on every call, not only the ones
+## [b]The patch chime climbs on a run, and pays out at the top.[/b] Consecutive
+## calls to [method ring_at] with [constant Bell.Voice.PATCH] step up
+## [constant Bell.PATCH_RUN_RATIOS] — a C major triad — until the top rung,
+## which rings [method Bell.payout]: the whole triad struck at once. A run that
+## keeps going past it holds on the top note rather than paying out again, which
+## is why this builds one more stream than there are rungs. A gap longer than
+## [constant Bell.RUN_RESET_MSEC] resets to the bottom. That step is counted on
+## every call, not only the ones
 ## that get past [constant MIN_GAP_MSEC] — a ding dropped by the rate limit was
 ## still a patch finishing, and a run that only advanced on the dings that made
 ## a sound would fall out of step with what actually happened the moment a
@@ -106,7 +110,10 @@ func _ready() -> void:
 	# long, which [Bell]'s own docs cap for exactly this reason: small enough to
 	# build eagerly without a thought.
 	_streams[Bell.Voice.START] = Bell.voice(Bell.Voice.START)
-	for step: int in Bell.PATCH_RUN_RATIOS.size():
+	# One more stream than there are rungs: the last one is what a run past the
+	# top of the ladder rings, which is the top note on its own rather than the
+	# payout chord again — [method Bell.voice] has why.
+	for step: int in Bell.PATCH_RUN_RATIOS.size() + 1:
 		_patch_streams.append(Bell.voice(Bell.Voice.PATCH, step))
 	for index: int in VOICES:
 		var player: AudioStreamPlayer = AudioStreamPlayer.new()

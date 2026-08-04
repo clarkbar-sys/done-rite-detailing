@@ -26,6 +26,27 @@ func before_each() -> void:
 	add_child_autofree(_chime)
 
 
+## Whether any player in the pool is loaded with [param stream].
+##
+## Compared by samples rather than by identity: [method Bell.voice] builds a
+## fresh [AudioStreamWAV] on every call and is deterministic, so "the same sound"
+## is the only equality there is — and the only one worth asserting, since what
+## the player got handed is the whole question here.
+##
+## Reads the pool through [method Node.get_child] rather than through [Chime]'s
+## own array: the players are public children with a public [member
+## AudioStreamPlayer.stream], and a test that reached past that would be
+## asserting on bookkeeping instead of on what is about to come out of the
+## speaker.
+func _pool_holds(stream: AudioStreamWAV) -> bool:
+	for index: int in _chime.get_child_count():
+		var player: AudioStreamPlayer = _chime.get_child(index) as AudioStreamPlayer
+		var loaded: AudioStreamWAV = player.stream as AudioStreamWAV
+		if loaded != null and loaded.data == stream.data:
+			return true
+	return false
+
+
 func test_it_builds_a_player_for_every_voice_it_promises() -> void:
 	# The pool is the whole reason two dings in quick succession are two dings
 	# rather than one with a hole in it.
@@ -117,6 +138,34 @@ func test_the_run_counts_patches_even_when_the_ding_is_dropped() -> void:
 	var rang: bool = _chime.ring_at(Bell.Voice.PATCH, NOW + Chime.MIN_GAP_MSEC - 1)
 	assert_false(rang, "this ding should have been inside the rate limit")
 	assert_eq(_chime.patch_run(), 2, "the dropped ding should still have counted as a patch")
+
+
+func test_the_top_of_the_run_pays_out() -> void:
+	# The winner: a run long enough to reach the top rung rings the whole triad
+	# at once rather than another note. [code]tests/unit/test_bell.gd[/code] has
+	# what that chord is made of; this is the half that says the pool is actually
+	# handed it on the patch that earns it.
+	var top: int = Bell.PATCH_RUN_RATIOS.size() - 1
+	for step: int in Bell.PATCH_RUN_RATIOS.size():
+		_chime.ring_at(Bell.Voice.PATCH, NOW + step * Chime.MIN_GAP_MSEC)
+	assert_eq(_chime.patch_run(), Bell.PATCH_RUN_RATIOS.size(), "the run did not reach the top")
+	assert_true(
+		_pool_holds(Bell.voice(Bell.Voice.PATCH, top)), "the top of the run did not pay out"
+	)
+
+
+func test_a_run_past_the_top_holds_rather_than_paying_out_again() -> void:
+	# The reason this class builds one more stream than the ladder has rungs. A
+	# sweep that keeps going holds at the top, and re-paying the jackpot on every
+	# patch for as long as the jet is moving is not a jackpot — [method Bell.voice]
+	# makes the same argument at more length.
+	var past: int = Bell.PATCH_RUN_RATIOS.size() + 1
+	for step: int in past:
+		_chime.ring_at(Bell.Voice.PATCH, NOW + step * Chime.MIN_GAP_MSEC)
+	assert_true(
+		_pool_holds(Bell.voice(Bell.Voice.PATCH, past - 1)),
+		"a run past the top rang something other than the note it holds on"
+	)
 
 
 func test_ringing_the_counter_bell_does_not_touch_the_run() -> void:

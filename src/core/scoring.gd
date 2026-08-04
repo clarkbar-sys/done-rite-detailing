@@ -65,10 +65,13 @@
 ## is entirely that the digits move. Nothing downstream divides by these, so the
 ## units cost nothing and buy the thing the feature is for.
 ##
-## [b]The run multiplier is the bell's run.[/b] [Chime] already steps
+## [b]The run multiplier is the chime's run.[/b] [Chime] already steps
 ## [constant Bell.PATCH_RUN_RATIOS] while the player is on a streak of
-## consecutive patches, so the ding climbs a triad up to the octave and then
-## holds. This climbs the same streak on the same clock and with the same
+## consecutive patches, so the ding climbs a C major triad and pays out the whole
+## chord on the rung that caps this multiplier — the patch that stops paying more
+## is the patch that sounds like winning, which is the entire point of putting
+## the two on one ladder. This climbs the same streak on the same clock and with
+## the same
 ## [constant Bell.RUN_RESET_MSEC] gap that ends it — so the note going up and the
 ## multiplier going up are one event with two outputs, and a player who can hear
 ## the top of the ladder is looking at the top of the multiplier. That shared
