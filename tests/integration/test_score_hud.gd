@@ -156,6 +156,50 @@ func test_the_foam_flash_is_visible_against_the_resting_colour() -> void:
 	assert_gt(apart, 0.1, "the foam flash is too close to the resting colour to see")
 
 
+# ---- the quiet half: work coming in between events ---------------------------
+
+
+func test_a_tick_moves_the_digits_without_an_event() -> void:
+	_hud.tick(750)
+	assert_eq(_hud.total(), 750, "a tick did not reach the target")
+	await wait_seconds(SETTLE_SECONDS)
+	assert_eq(_hud.shown(), 750, "the digits never caught up with a tick")
+
+
+## The whole reason [method ScoreHud.tick] exists rather than reusing
+## [method ScoreHud.score]: a jet running is a tick on every frame, and a flash
+## on every frame is a readout that is permanently lit.
+func test_a_tick_does_not_flash_or_pop() -> void:
+	_hud.tick(750)
+	assert_eq(_hud.flash(), 0.0, "a tick lit the score")
+	assert_eq(_hud.flying(), 0, "a tick threw a number")
+
+
+## What a held trigger actually looks like: a small tick every frame, for a
+## while. The digits must track it and then land on it.
+func test_a_trickle_every_frame_is_tracked_and_lands() -> void:
+	var total: int = 0
+	for _frame: int in 30:
+		total += 40
+		_hud.tick(total)
+		await wait_process_frames(1)
+	assert_gt(_hud.shown(), 0, "the digits never moved under a trickle")
+	await wait_seconds(SETTLE_SECONDS)
+	assert_eq(_hud.shown(), total, "the digits never caught up with the trickle")
+
+
+## A patch landing mid-trickle still gets its flash and its pop — the two halves
+## share a readout and the quiet one must not swallow the loud one.
+func test_an_award_during_a_trickle_still_flashes() -> void:
+	_hud.tick(500)
+	await wait_process_frames(1)
+	_award(750, 250)
+	assert_almost_eq(_hud.flash(), 1.0, 0.001, "an award mid-trickle did not light the score")
+	assert_eq(_hud.flying(), 1, "an award mid-trickle threw no number")
+	await wait_seconds(SETTLE_SECONDS)
+	assert_eq(_hud.shown(), 750, "the digits lost the award that landed mid-trickle")
+
+
 ## Nothing in the corner may take a press: the play screen reads aims out of
 ## `_gui_input`, so a control at `stop` here is a piece of the car that cannot be
 ## pointed at. Checked over every descendant rather than the root alone, because

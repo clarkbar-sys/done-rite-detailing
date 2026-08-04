@@ -88,6 +88,80 @@ func _work_it_over() -> void:
 		_map.buff(at, Vector3.RIGHT, 0.15, 0.09)
 
 
+# ---- the work ledger ---------------------------------------------------------
+#
+# What [method GrimeMap.worked] counts, which is what the score is paid from. The
+# assertions here are all identities against the mask rather than against
+# remembered numbers: the ledger and the pixels are two accounts of the same
+# transfers, so any drift between them is the bug worth catching, and no tuning
+# commit can make one of these go red on its own.
+
+
+func test_a_fresh_panel_has_had_no_work_done_on_it() -> void:
+	for stage: GrimeMap.Stage in [
+		GrimeMap.Stage.WASHED, GrimeMap.Stage.FOAMED, GrimeMap.Stage.BUFFED
+	]:
+		assert_eq(_map.worked(stage), 0.0, "stage %d starts with work already done" % stage)
+
+
+func test_washing_banks_work_against_the_wash_and_nothing_else() -> void:
+	_wash_bare(_middle(), 0.2)
+	assert_gt(_map.worked(GrimeMap.Stage.WASHED), 0.0, "washing banked no work")
+	assert_eq(_map.worked(GrimeMap.Stage.FOAMED), 0.0, "washing banked work against the cleaner")
+	assert_eq(_map.worked(GrimeMap.Stage.BUFFED), 0.0, "washing banked work against the rag")
+
+
+## The ledger and the mask, counting the same mud two ways. Only true on a panel
+## nobody has foamed — see the rinsing test below for why.
+func test_the_wash_ledger_agrees_with_the_mud_that_actually_left() -> void:
+	_wash_bare(_middle(), 0.3)
+	var gone: float = (1.0 - _map.remaining()) * float(_map.patches())
+	assert_almost_eq(
+		_map.worked(GrimeMap.Stage.WASHED), gone, TOLERANCE, "the wash ledger and the mask disagree"
+	)
+
+
+## The same identity for the last pass, and this one holds unconditionally:
+## nothing but the rag makes shine, and nothing takes it away.
+func test_the_buff_ledger_agrees_with_the_shine_on_the_panel() -> void:
+	_work_it_over()
+	var shone: float = _map.shine() * float(_map.patches())
+	assert_almost_eq(
+		_map.worked(GrimeMap.Stage.BUFFED),
+		shone,
+		TOLERANCE,
+		"the buff ledger and the mask disagree"
+	)
+
+
+## The rule the wage rests on: rinsing your own product off is not work. The jet
+## goes on moving units long after the mud is gone — [method GrimeMap._touch] has
+## why — and paying for those would be paying the player to undo a pass.
+func test_rinsing_product_off_banks_no_work() -> void:
+	_wash_bare(_middle(), 0.2)
+	_foam_over(_middle(), 0.2)
+	var banked: float = _map.worked(GrimeMap.Stage.WASHED)
+	var covered: float = _map.product()
+	_wash_bare(_middle(), 0.2)
+	assert_lt(_map.product(), covered, "the second wash rinsed nothing, so this proves nothing")
+	assert_eq(
+		_map.worked(GrimeMap.Stage.WASHED), banked, "rinsing product off was paid for as work"
+	)
+
+
+## Never down, whatever order the tools go in — the score reads a difference
+## against this, and a total that could fall would be a wage that could be
+## clawed back.
+func test_the_ledger_only_ever_goes_up() -> void:
+	var highest: PackedFloat64Array = PackedFloat64Array()
+	highest.resize(GrimeMap.Stage.size())
+	for _round: int in 3:
+		_work_it_over()
+		for stage: int in highest.size():
+			assert_gte(_map.worked(stage), highest[stage], "stage %d went backwards" % stage)
+			highest[stage] = _map.worked(stage)
+
+
 # ---- the conveyor: mud, then product, then shine -------------------------------
 
 

@@ -109,16 +109,29 @@ the bands reach zero exactly where the mask does.
 [`src/world/grime.gdshader`](./src/world/grime.gdshader) has each argument where
 the uniform it settles is declared.
 
-And now it keeps score, in the top-right corner, the way a cabinet would. Every
-patch that finishes a pass pays — a wash least, the cleaner more, the drying rag
-most, because a buffed patch is one somebody washed and foamed first and the
-last pass is paying for the ground it stands on. Clean without pausing and the
-awards multiply: the run that already climbs the ding's pitch climbs the
-multiplier too, off the same constant and up to the same rung, so the note going
-up and the number going up are one event. The digits roll rather than jump, a
-`+400` lifts off them and fades, and the whole readout flashes the colour of the
-pass that paid — water, the panel's cleaner, then gold — over exactly the time
-the square on the car stays lit, so the corner and the paint cannot come apart.
+And now it keeps score, in the top-right corner, the way a cabinet would — and
+it moves while you are cleaning rather than only when something completes. Two
+things pay. The work pays as it happens: every unit of mud that actually comes
+off is worth something the instant it does, so the number climbs for as long as
+the trigger is down. And finishing a patch pays a bonus on top of that. The wage
+and the tip. A wash is worth least, the cleaner more, the drying rag most,
+because a buffed patch is one somebody washed and foamed first and the last pass
+is paying for the ground it stands on — one tariff, both halves, so a patch's
+worth of work pays exactly what that patch's completion does. Rinsing your own
+product back off is not work and is not paid for.
+
+Clean without pausing and the bonuses multiply: the run that already climbs the
+ding's pitch climbs the multiplier too, off the same constant and up to the same
+rung, so the note going up and the number going up are one event. The wage
+carries no multiplier, because a run is a streak of *moments* and work has none
+in it.
+
+The digits roll rather than jump, a `+400` lifts off them and fades, and the
+whole readout flashes the colour of the pass that paid — water, the panel's
+cleaner, then gold — over exactly the time the square on the car stays lit, so
+the corner and the paint cannot come apart. Only the bonus does that: the wage
+arrives every frame, so a flash on it would be a readout permanently alight, and
+what a number that will not sit still is telling you needs no punctuation.
 [`Scoring`](./src/core/scoring.gd) is the arithmetic and
 [`ScoreHud`](./src/ui/score_hud.gd) is the corner; neither has heard of the
 other's half. There is deliberately no target and no percentage: the car still
