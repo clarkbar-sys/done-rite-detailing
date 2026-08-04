@@ -31,6 +31,19 @@
 ## second definition of "the player finished something", so there is nothing here
 ## that can disagree with what the player just heard and saw.
 ##
+## [b]Neither half can be farmed, and neither half checks.[/b] The jet takes
+## product off as well as mud — deliberately, because a jet that could be used at
+## any point in the job would teach the player nothing — so foam, rinse, foam is a
+## loop a player can hold on one square for ever. A score paid for units moved
+## would pay them for every turn of it. Nothing here guards against that and
+## nothing here needs to: both of the numbers this class is paid from,
+## [method GrimeMap.worked] and [signal Grime.patch_finished], count how far the
+## panel has irreversibly got rather than how much has moved across it, so the
+## loop is worth exactly zero on the second turn and every turn after. That is a
+## property of the ledger being asked rather than of a rule written here, which is
+## the shape worth keeping: a cap on what a patch may pay would live in this file
+## and would have to be remembered by the next thing that pays for something.
+##
 ## [b]There is no target, no percentage and no "score out of".[/b] An arcade
 ## score counts up and stops being interesting only when the player does, and
 ## that is the right shape for this game for a reason beyond taste: the car has

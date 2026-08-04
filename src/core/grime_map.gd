@@ -123,6 +123,11 @@ var _worked: PackedFloat64Array = PackedFloat64Array()
 var _mud: PackedInt32Array = PackedInt32Array()
 var _product: PackedInt32Array = PackedInt32Array()
 var _shine: PackedInt32Array = PackedInt32Array()
+## The high-water mark of how much of each patch has ever been covered — product
+## plus shine, which is the pair [method _stage_finished] asks about. It is the
+## one total here that a tool cannot lower, and [method _touch] has why the
+## middle pass needs one when the other two do not.
+var _covered: PackedInt32Array = PackedInt32Array()
 var _capacity: PackedInt32Array = PackedInt32Array()
 var _full: int = 0
 var _mud_total: int = 0
@@ -237,8 +242,22 @@ func shine() -> float:
 ## to bare and, once the mud is gone, product to bare as well — rinsing your own
 ## foam off. Only the mud counts: undoing a pass is not doing one, and a number
 ## that went up while the player made the car worse would be paying them for it.
-## The other two stages have no such case, because [method _touch] gives them
-## nowhere to draw from but the pass before.
+##
+## [b]The other side of that is the middle pass, and it is subtler.[/b] Every unit
+## of product the bottle lays down is honest work at the moment it lands, but the
+## jet can take it off again, so the same texel can be covered any number of
+## times. Counting units laid would therefore be counting a loop: foam, rinse,
+## foam, for ever, on one square, for the same points each time and with the car
+## no nearer done. So what is counted is how far each patch has ever got rather
+## than how much has ever been moved — [method _touch] has the mechanism — and
+## re-covering ground the player has already been paid for is worth nothing. The
+## last pass needs no such care: nothing takes shine off, so it is its own
+## high-water mark.
+##
+## The property all three then share is the one a wage can be paid from: this is
+## what the panel has [i]irreversibly[/i] had done to it, so a player who undoes a
+## pass and redoes it is back where they started on the ledger as well as on the
+## paint.
 ##
 ## [b]A float where every other total on this class is an integer[/b], and the
 ## class docs above are emphatic about why those are integers — so this is worth
@@ -349,7 +368,9 @@ func wash(point: Vector3, normal: Vector3, radius_metres: float, amount: float) 
 ## Held on a half-washed spot it covers the washed half and stops.
 ##
 ## Returns the patches this call covered completely: no mud left and no bare paint
-## left either, so there is nothing more a bottle can do to them.
+## left either, so there is nothing more a bottle can do to them. Once each, ever
+## — a patch rinsed bare and covered again is a patch coming back to where it had
+## already been, and [method _touch] has why that is neither scored nor rung for.
 func foam(point: Vector3, normal: Vector3, radius_metres: float, amount: float) -> PackedInt32Array:
 	return _brush(point, normal, radius_metres, amount, Stage.FOAMED)
 
@@ -475,26 +496,54 @@ func _touch(at: Vector2i, amount: float, stage: Stage, finished: PackedInt32Arra
 		)
 	)
 	_dirty = true
+	# How much of this touch was progress rather than motion, which is the one
+	# number the rest of this function is about: the ledger below is paid from it
+	# and the ding below that fires on it.
+	#
+	# [b]Each pass is asked the question its own arithmetic can answer.[/b] The
+	# wash counts the mud it actually stripped and not the product it rinsed off
+	# afterwards, because undoing a pass is not doing one. The buff counts
+	# everything it moved, because shine is the one bucket nothing empties — see
+	# [method wash] on why the jet leaves it alone — so every unit of it is new
+	# ground by construction.
+	#
+	# [b]The middle pass is the one that needs a memory, and it is the whole point
+	# of [member _covered].[/b] Product is not conserved forwards: the jet takes it
+	# back off, which is deliberate and is what makes the order of the job
+	# learnable. But it means foam → rinse → foam is a loop that lays fresh product
+	# on the same texel for ever, so counting units laid would pay a player to hold
+	# two triggers alternately on one square and never finish the car. What is
+	# scored instead is the furthest that patch has ever got, so re-covering ground
+	# already credited earns exactly nothing and covering new ground earns the same
+	# as it always did. Arithmetic that cannot be gamed rather than a cap on what a
+	# patch may pay — the distinction is issue #83's.
+	var forwards: int = moved
+	match stage:
+		Stage.WASHED:
+			forwards = stripped
+		Stage.FOAMED:
+			var covered: int = _product[patch] + _shine[patch]
+			forwards = maxi(covered - _covered[patch], 0)
+			_covered[patch] = maxi(_covered[patch], covered)
 	# Banked against the capacity of the patch it happened on, so a unit of work is
 	# a fraction of *this* patch and not of an average one — the grid does not have
 	# to divide the atlas evenly for the arithmetic to be right, which is the same
-	# thing [method _seed_the_totals] keeps capacities per patch for. The wash
-	# banks the mud it actually stripped rather than everything it moved; rinsing
-	# your own product off is not work, and [method worked] has the argument.
-	var forwards: int = stripped if stage == Stage.WASHED else moved
+	# thing [method _seed_the_totals] keeps capacities per patch for.
 	if forwards > 0 and _capacity[patch] > 0:
 		_worked[int(stage)] += float(forwards) / float(_capacity[patch])
 	# Reported on the transition and only once, without a flag to remember it by.
 	#
-	# [b]The wash needs the extra guard and the other two do not.[/b] A patch that
-	# has just been foamed or buffed has nothing left in that stage's source
-	# bucket, so every later touch returns above and never reaches here. The wash
-	# lost that property when it started taking product off as well: with the mud
-	# already gone it goes on moving units, and "this patch has no mud" would then
-	# be true on every one of them and ring a bell each time. So it reports on
-	# having actually moved mud, which can only be the case up to the touch that
-	# takes the last of it.
-	if stage == Stage.WASHED and stripped <= 0:
+	# [b]Progress is what makes it a transition[/b], which is why this rides the
+	# same number the ledger does rather than asking the patch's state alone. A
+	# patch that has just been foamed or buffed has nothing left in that stage's
+	# source bucket, so every later touch returns above and never reaches here; a
+	# patch whose mud is gone does not, because the jet goes on moving product, and
+	# "this patch has no mud" would be true on every one of those touches and ring
+	# a bell each time. Nor does a patch that was rinsed and covered again, which
+	# is finished by the same test that was true the first time and is not a thing
+	# the player has newly done. Both cases are the same case: nothing went
+	# forwards, so nothing happened worth ringing for.
+	if forwards <= 0:
 		return
 	if _stage_finished(patch, stage):
 		finished.append(patch)
@@ -601,6 +650,7 @@ func _seed_the_totals() -> void:
 	_mud.resize(count)
 	_product.resize(count)
 	_shine.resize(count)
+	_covered.resize(count)
 	_capacity.resize(count)
 	var widths: PackedInt32Array = _spans(_image.get_width(), _patches_across)
 	var heights: PackedInt32Array = _spans(_image.get_height(), _patches_down)
@@ -613,6 +663,7 @@ func _seed_the_totals() -> void:
 			_mud[patch] = units
 			_product[patch] = 0
 			_shine[patch] = 0
+			_covered[patch] = 0
 			_full += units
 	_mud_total = _full
 	_product_total = 0
