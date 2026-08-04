@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.8.0...v1.9.0) (2026-08-04)
+
+
+### Features
+
+* **ui:** put the brand on the play screen's icons and buttons ([#121](https://github.com/clarkbar-sys/done-rite-detailing/issues/121)) ([36eb39a](https://github.com/clarkbar-sys/done-rite-detailing/commit/36eb39a354cda965c525c63d7edb486d6af060ca)), closes [#116](https://github.com/clarkbar-sys/done-rite-detailing/issues/116)
+* **world:** catch a near-miss press with a swept sphere, not a box corner ([#120](https://github.com/clarkbar-sys/done-rite-detailing/issues/120)) ([7be0bbb](https://github.com/clarkbar-sys/done-rite-detailing/commit/7be0bbb986da76799bc82792c7096fab9a20ddc0))
+
+
+### Bug Fixes
+
+* **scoring:** pay for forward progress, not for units moved ([#118](https://github.com/clarkbar-sys/done-rite-detailing/issues/118)) ([adfeec6](https://github.com/clarkbar-sys/done-rite-detailing/commit/adfeec6f7217a80447d39f4409478405d03d584c)), closes [#83](https://github.com/clarkbar-sys/done-rite-detailing/issues/83)
+
 ## [1.8.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.7.0...v1.8.0) (2026-08-04)
 
 
