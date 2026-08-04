@@ -124,25 +124,52 @@ const KNOB_FRACTION: float = 0.4
 ## big they are in the same units.
 ##
 ## The marks are the arrows this replaced, shrunk to hints. A bare circle on a
-## picture of a garage does not say "this moves you" — the triangles do, and they
-## are drawn from the same [constant DIRECTIONS] the stick reports, so a mark
-## cannot end up pointing somewhere the stick does not go.
+## picture of a garage does not say "this moves you" — the marks do, and they are
+## drawn from the same [constant DIRECTIONS] the stick reports, so a mark cannot
+## end up pointing somewhere the stick does not go.
 const MARK_AT: float = 0.82
 const MARK_SIZE: float = 0.13
+
+## How thick a direction mark is drawn, in design pixels.
+##
+## [b]They are chevrons now, not filled triangles.[/b] The tool belt opposite
+## draws five stroked silhouettes, and four solid arrowheads on this side were
+## the heaviest marks on the screen — the eye landed on the furniture rather than
+## on the tools. An outline says the same direction at a fraction of the weight,
+## from the same three points [method mark_corners] already returned.
+const MARK_WIDTH: float = 5.0
 
 ## How much of the middle the ring is filled with. Low, because this sits on top
 ## of the room the player is trying to look at: the stick has to be findable
 ## without being a hole in the picture.
-const BASE_COLOR: Color = Color(0.05, 0.06, 0.08, 0.28)
+const BASE_ALPHA: float = 0.28
+const BASE_COLOR: Color = Color(Brand.INK, BASE_ALPHA)
 
 ## The ring itself, and how thick it is drawn in design pixels.
-const RIM_COLOR: Color = Color(0.88, 0.9, 0.94, 0.5)
+const RIM_ALPHA: float = 0.5
+const RIM_COLOR: Color = Color(Brand.MUTED, RIM_ALPHA)
 const RIM_WIDTH: float = 4.0
 
-## The knob, and the direction marks. Deliberately not one of the tool colours —
-## this says "move", and nothing on the belt should look like it.
-const KNOB_COLOR: Color = Color(0.88, 0.9, 0.94, 0.85)
-const MARK_COLOR: Color = Color(0.88, 0.9, 0.94, 0.45)
+## The knob, and the direction marks. The brand's own greys rather than three
+## hand-mixed ones, so the HUD is lit by one palette — [Brand] has the argument
+## for why every colour in this game is written down in exactly one file.
+const KNOB_ALPHA: float = 0.85
+const KNOB_COLOR: Color = Color(Brand.WHITE, KNOB_ALPHA)
+const MARK_ALPHA: float = 0.55
+const MARK_COLOR: Color = Color(Brand.MUTED, MARK_ALPHA)
+
+## The rim that appears around the knob while a thumb is on it, and how thick it
+## is drawn in design pixels.
+##
+## [b]Red only while held, and that is the whole decision.[/b] On the site red is
+## what a thing you are meant to press wears. The stick is not that — it is
+## furniture you rest a thumb on, and a red disc sitting in the corner of every
+## frame would be the loudest thing on a screen whose actual buttons are in the
+## other corner. Held, it is a different sentence: this is the control you are
+## driving right now, said in the one colour the rest of the HUD already uses for
+## "this one is live".
+const HELD_RIM_COLOR: Color = Brand.RED
+const HELD_RIM_WIDTH: float = 5.0
 
 ## Which finger has the stick, or [constant NO_FINGER] for none.
 var _finger: int = NO_FINGER
@@ -224,6 +251,16 @@ func knob() -> Vector2:
 	if _finger == NO_FINGER:
 		return _centre
 	return _centre + ThumbStick.knob_from(_offset, _radius)
+
+
+## How thick the red rim around the knob is drawn, or zero when there is not one.
+##
+## Public for the reason [method mark_corners] is: it is the value [method _draw]
+## actually uses, so a test can pin "the stick goes red under a thumb and only
+## under a thumb" against the drawing rather than against the flag that is
+## supposed to drive it.
+func knob_rim_width() -> float:
+	return HELD_RIM_WIDTH if is_held() else 0.0
 
 
 ## Where on the glass a thumb has to land to ask, at full strength, to go
@@ -441,5 +478,16 @@ func _draw() -> void:
 	draw_circle(_centre, _radius, BASE_COLOR)
 	draw_circle(_centre, _radius, RIM_COLOR, false, RIM_WIDTH, true)
 	for direction: Vector2i in DIRECTIONS:
-		draw_colored_polygon(mark_corners(direction), MARK_COLOR)
-	draw_circle(knob(), _radius * KNOB_FRACTION, KNOB_COLOR, true, -1.0, true)
+		var corners: PackedVector2Array = mark_corners(direction)
+		if corners.size() != 3:
+			continue
+		# Base, tip, base — the two arms of the chevron meet at the corner
+		# [method mark_corners] puts furthest along the direction, which is what
+		# makes the point the thing that points.
+		var chevron: PackedVector2Array = PackedVector2Array([corners[1], corners[0], corners[2]])
+		draw_polyline(chevron, MARK_COLOR, MARK_WIDTH, true)
+	var at: Vector2 = knob()
+	draw_circle(at, _radius * KNOB_FRACTION, KNOB_COLOR, true, -1.0, true)
+	var rim: float = knob_rim_width()
+	if rim > 0.0:
+		draw_circle(at, _radius * KNOB_FRACTION, HELD_RIM_COLOR, false, rim, true)
