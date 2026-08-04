@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.7.0...v1.8.0) (2026-08-04)
+
+
+### Features
+
+* **title:** give the title screen a 1990s sports theme, built out of arithmetic ([#104](https://github.com/clarkbar-sys/done-rite-detailing/issues/104)) ([8bb07da](https://github.com/clarkbar-sys/done-rite-detailing/commit/8bb07dacf20b52da1f7817c35643c76dc147fc1b))
+* **title:** play the game behind the title card as an attract mode ([#101](https://github.com/clarkbar-sys/done-rite-detailing/issues/101)) ([679ea6f](https://github.com/clarkbar-sys/done-rite-detailing/commit/679ea6f83603f293537fc304e476a5912153b474))
+* **title:** remove the "Done Rite Detailing" text label from the title screen ([#103](https://github.com/clarkbar-sys/done-rite-detailing/issues/103)) ([2f984f5](https://github.com/clarkbar-sys/done-rite-detailing/commit/2f984f558b1dde9cb1b1c5613e6ab25cb10e106a))
+* **ui:** keep an arcade score in the top-right corner ([#108](https://github.com/clarkbar-sys/done-rite-detailing/issues/108)) ([f65de54](https://github.com/clarkbar-sys/done-rite-detailing/commit/f65de5412378c53076891b2721e798da27cd442c))
+* **ui:** pay the score for cleaning, not only for finishing ([#109](https://github.com/clarkbar-sys/done-rite-detailing/issues/109)) ([2dc4ab4](https://github.com/clarkbar-sys/done-rite-detailing/commit/2dc4ab496f2c1854d06a5ff100d55532a18f5b28))
+* **web:** brand the loading screen with the logo and a red bar ([#98](https://github.com/clarkbar-sys/done-rite-detailing/issues/98)) ([df57dbe](https://github.com/clarkbar-sys/done-rite-detailing/commit/df57dbe6b5e30e78a68885c08944816e930a780b))
+* **world:** give every tool a sound while its trigger is held ([#105](https://github.com/clarkbar-sys/done-rite-detailing/issues/105)) ([056058c](https://github.com/clarkbar-sys/done-rite-detailing/commit/056058c151f31704182ab4333ef276abdbbe7f30))
+
+
+### Bug Fixes
+
+* **world:** stop the terrace lines tracing the noise instead of the wash ([#102](https://github.com/clarkbar-sys/done-rite-detailing/issues/102)) ([c9cd880](https://github.com/clarkbar-sys/done-rite-detailing/commit/c9cd88010538799a636e3467b04ce2fafc4259b7))
+
 ## [1.7.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.6.0...v1.7.0) (2026-08-03)
 
 
