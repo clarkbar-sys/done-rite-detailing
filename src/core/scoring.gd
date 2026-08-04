@@ -1,13 +1,35 @@
 ## The running score: what one patch of the car is worth, how a run of them
 ## multiplies, and the total those two add up to.
 ##
-## [b]It scores the same event the bell rings on and the flash lights on[/b] —
+## [b]Two things pay, and the split is the point.[/b] Work pays as it happens —
+## every unit of mud that actually comes off is worth something the instant it
+## does, so the corner climbs while the trigger is held rather than sitting still
+## between patches. And finishing a patch pays a bonus on top, with the run
+## multiplier on it, on exactly the event the bell rings for. The wage and the
+## tip: one is for the cleaning and one is for the moment it lands.
+##
+## The alternative — paying only on [signal Grime.patch_finished] — is what this
+## started as, and the thing wrong with it is not the arithmetic. A patch is a
+## few hundred texels and a couple of seconds of held jet, so the score stepped
+## in silence and then jumped, and the player washing a panel could not see the
+## number answering the thing their hands were doing. Paying for the work is what
+## makes the readout continuous, and it costs nothing to be honest about because
+## the units were already being counted: [GrimeMap] has tracked what every touch
+## moved since the day the ding needed it.
+##
+## [b]A patch's worth of work pays a patch's worth of points.[/b] Work arrives
+## here already measured in patches rather than in texels — [method GrimeMap.worked]
+## has why — so one full pass over one patch trickles exactly
+## [method points_for] and needs no second tariff to keep in step with the first.
+## A patch cleaned from filthy to finished therefore pays its face value twice
+## over: once for the doing and once for the landing. That is deliberate and it
+## is why nothing downstream divides by a total.
+##
+## [b]The bonus rides the same event the bell and the flash do[/b] —
 ## [signal Grime.patch_finished], which [GrimeMap] emits on exactly the
-## transition worth celebrating and nothing else. That is deliberate and it is
-## the whole reason this class is as small as it is: there is no second
-## definition of "the player did something", so there is nothing here that can
-## disagree with what the player just heard and saw. A patch finishing is worth
-## points, and every other question about scoring is a question about the number.
+## transition worth celebrating and nothing else. That is deliberate: there is no
+## second definition of "the player finished something", so there is nothing here
+## that can disagree with what the player just heard and saw.
 ##
 ## [b]There is no target, no percentage and no "score out of".[/b] An arcade
 ## score counts up and stops being interesting only when the player does, and
@@ -82,6 +104,12 @@ var _last_award: int = 0
 var _last_msec: int = 0
 var _started: bool = false
 
+## Every point work has ever earned, fractions included, and how many of them
+## have actually been put on the board. See [method work] — the pair is what
+## makes a trickle add up to what it should.
+var _earned: float = 0.0
+var _wages: int = 0
+
 
 ## What one patch finishing [param stage] pays before the run is applied.
 ##
@@ -148,6 +176,60 @@ func score_at(stage: GrimeMap.Stage, now_msec: int) -> int:
 ## [method Chime.ring_at] already make, for the same reason.
 func score(stage: GrimeMap.Stage) -> int:
 	return score_at(stage, Time.get_ticks_msec())
+
+
+## Pays for [param done] patches' worth of work in [param stage], and returns the
+## whole points that put on the board.
+##
+## The parameter is not called `patches` because [method patches] is, and
+## GDScript treats a parameter shadowing a method in the same class as an error
+## here — the same footnote [method multiplier_for] carries.
+##
+## [b]The fraction is kept rather than rounded away, and that is the whole
+## mechanism.[/b] A frame of held jet moves a small fraction of a patch, which is
+## a fraction of a point — round each frame and a trickle of a third of a point
+## sixty times a second pays nothing at all, for ever. So the fractions run into
+## [member _earned] and this hands over whatever of it is not on the board yet.
+##
+## [b]The running total is rounded, not the increment, and the difference is a
+## point per patch.[/b] The obvious version banks a remainder and pays out whole
+## points as it crosses them, and it is wrong in a way that only shows up in
+## aggregate: a thousand additions of a thousandth land a hair under one in any
+## binary float, so the last point of every patch never arrives and the player is
+## permanently short by one per patch. Measured, not reasoned about — the first
+## version of this shipped into a test that walked a patch in a thousand slices
+## and read 99. Rounding [member _earned] instead is self-correcting: the error
+## is against the total rather than carried forward, so it can never accumulate,
+## and a patch's worth of work pays a patch's worth of points however finely it
+## was sliced. That is the same lesson [GrimeMap]'s class docs record about float
+## totals, arrived at from the other direction.
+##
+## The consequence is that the player is paid exactly [method points_for] per
+## patch of work no matter what the frame rate was while they did it, which is
+## the property a score that moved with the frame rate would not have.
+##
+## [b]No run multiplier on this half.[/b] A run is a streak of patches
+## [i]finished[/i] — moments, countable, and audible as the ding climbing. Work
+## is continuous and has no moments in it, so there is nothing here for a streak
+## to be a streak of; multiplying it would just be paying the same wage at a
+## different rate and would make the number on screen impossible to reconcile
+## with the one the player can hear. The streak belongs to the bonus, where the
+## events are.
+##
+## Negative or zero [param done] pays nothing rather than taking points back.
+## Work only goes forwards — [method GrimeMap.worked] refuses to count a rinse as
+## progress — so a caller handing this a fall has misread a total, and a score
+## that could go down on a misread would be a bug nobody would look for here.
+func work(stage: GrimeMap.Stage, done: float) -> int:
+	if done <= 0.0:
+		return 0
+	_earned += float(points_for(stage)) * done
+	var paid: int = roundi(_earned) - _wages
+	if paid <= 0:
+		return 0
+	_wages += paid
+	_total += paid
+	return paid
 
 
 ## The running total.

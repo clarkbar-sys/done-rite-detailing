@@ -116,6 +116,10 @@ var _patches_across: int
 var _patches_down: int
 var _image: Image = null
 var _texture: ImageTexture = null
+## Patches' worth of work done in each [enum Stage], indexed by it. See
+## [method worked] for why it is measured in patches and why it is the one total
+## on this class that is not an integer.
+var _worked: PackedFloat64Array = PackedFloat64Array()
 var _mud: PackedInt32Array = PackedInt32Array()
 var _product: PackedInt32Array = PackedInt32Array()
 var _shine: PackedInt32Array = PackedInt32Array()
@@ -215,6 +219,39 @@ func product() -> float:
 ## panel is done.
 func shine() -> float:
 	return _fraction(_shine_total)
+
+
+## How much work this panel has had done on it in [param stage], ever, measured
+## in patches' worth.
+##
+## [b]Patches' worth rather than texel-units, and that is the whole point of the
+## number.[/b] A unit is a mask-resolution detail — it changes with
+## [member Grime.tile_pixels] and it means nothing to anything outside this file
+## — where a patch is the size the rest of the game already reasons in: it is
+## what [signal Grime.patch_finished] counts, what the ding rides on and what the
+## square on the car is drawn at. So one patch's worth of washing reads 1.0 here,
+## and a caller that pays per patch can pay for part of one without knowing how
+## big a texel is.
+##
+## [b]Only ever up, and only for work that went forwards.[/b] The wash moves mud
+## to bare and, once the mud is gone, product to bare as well — rinsing your own
+## foam off. Only the mud counts: undoing a pass is not doing one, and a number
+## that went up while the player made the car worse would be paying them for it.
+## The other two stages have no such case, because [method _touch] gives them
+## nowhere to draw from but the pass before.
+##
+## [b]A float where every other total on this class is an integer[/b], and the
+## class docs above are emphatic about why those are integers — so this is worth
+## saying plainly. Those count what the pixels hold, they are compared with
+## [code]==[/code], and a float32 that had drifted by a hair meant a patch nobody
+## could finish. This counts work that has already happened, nothing compares it
+## to anything, and losing a ten-thousandth of a patch to rounding costs a
+## fraction of a point of score. Sixty-four bits rather than the
+## [PackedFloat32Array] elsewhere in the project all the same: it is a sum with
+## no upper bound over a session, and float32 stops being able to add a
+## thousandth to it after a few hours.
+func worked(stage: Stage) -> float:
+	return _worked[int(stage)]
 
 
 ## Whether every patch on the panel has had its mud taken off.
@@ -438,6 +475,15 @@ func _touch(at: Vector2i, amount: float, stage: Stage, finished: PackedInt32Arra
 		)
 	)
 	_dirty = true
+	# Banked against the capacity of the patch it happened on, so a unit of work is
+	# a fraction of *this* patch and not of an average one — the grid does not have
+	# to divide the atlas evenly for the arithmetic to be right, which is the same
+	# thing [method _seed_the_totals] keeps capacities per patch for. The wash
+	# banks the mud it actually stripped rather than everything it moved; rinsing
+	# your own product off is not work, and [method worked] has the argument.
+	var forwards: int = stripped if stage == Stage.WASHED else moved
+	if forwards > 0 and _capacity[patch] > 0:
+		_worked[int(stage)] += float(forwards) / float(_capacity[patch])
 	# Reported on the transition and only once, without a flag to remember it by.
 	#
 	# [b]The wash needs the extra guard and the other two do not.[/b] A patch that
@@ -547,6 +593,11 @@ func _patch_at(at: Vector2i) -> int:
 ## patch on a grid that does not divide evenly.
 func _seed_the_totals() -> void:
 	var count: int = patches()
+	# One running tally per stage of the job, all three starting at nothing done —
+	# see [method worked]. Sized off the enum rather than off a literal three, so
+	# a fourth pass is not a silent out-of-range on the first touch of it.
+	_worked.resize(Stage.size())
+	_worked.fill(0.0)
 	_mud.resize(count)
 	_product.resize(count)
 	_shine.resize(count)

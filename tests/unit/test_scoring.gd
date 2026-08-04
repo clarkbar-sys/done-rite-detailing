@@ -140,6 +140,73 @@ func test_the_multiplier_is_never_zero_or_negative() -> void:
 	assert_eq(Scoring.multiplier_for(-5), 1, "a negative run wipes out an award")
 
 
+# ---- the wage: work paid as it happens ---------------------------------------
+
+
+func test_a_patchs_worth_of_work_pays_a_patchs_worth_of_points() -> void:
+	for stage: GrimeMap.Stage in _stages():
+		var fresh: Scoring = Scoring.new()
+		var paid: int = fresh.work(stage, 1.0)
+		assert_eq(paid, Scoring.points_for(stage), "one patch of work did not pay its face value")
+
+
+## The mechanism the whole feature rests on: a frame of held jet moves a fraction
+## of a patch, which is a fraction of a point, and rounding each frame away would
+## pay nothing at all for ever.
+func test_a_trickle_too_small_to_pay_still_adds_up() -> void:
+	var slices: int = 1000
+	var paid: int = 0
+	for _slice: int in slices:
+		paid += _score.work(GrimeMap.Stage.WASHED, 1.0 / float(slices))
+	assert_eq(paid, Scoring.WASH_POINTS, "a patch paid in a thousand slices did not add up")
+	assert_eq(_score.total(), Scoring.WASH_POINTS, "and the total disagrees with what was paid")
+
+
+## The same work at two frame rates pays the same. A score that moved with the
+## frame rate would pay a phone less than a desktop for the same sweep.
+func test_the_same_work_pays_the_same_however_it_is_sliced() -> void:
+	var coarse: Scoring = Scoring.new()
+	var fine: Scoring = Scoring.new()
+	for _slice: int in 10:
+		coarse.work(GrimeMap.Stage.BUFFED, 0.3)
+	for _slice: int in 300:
+		fine.work(GrimeMap.Stage.BUFFED, 0.01)
+	assert_eq(coarse.total(), fine.total(), "the same work paid differently at two frame rates")
+
+
+func test_work_that_did_not_happen_pays_nothing() -> void:
+	assert_eq(_score.work(GrimeMap.Stage.WASHED, 0.0), 0, "no work paid something")
+	assert_eq(_score.work(GrimeMap.Stage.WASHED, -2.0), 0, "work going backwards paid something")
+	assert_eq(_score.total(), 0, "and it reached the total")
+
+
+## A rag's work is worth more than a jet's, the same way its finished patch is —
+## one tariff, both halves.
+func test_work_is_paid_at_the_stages_own_rate() -> void:
+	var washer: Scoring = Scoring.new()
+	var buffer: Scoring = Scoring.new()
+	washer.work(GrimeMap.Stage.WASHED, 2.0)
+	buffer.work(GrimeMap.Stage.BUFFED, 2.0)
+	assert_gt(buffer.total(), washer.total(), "buffing pays no better than washing per patch")
+
+
+## The wage is not a patch finishing, so it must not touch the run — the run is
+## what the ding climbs, and a wage that stepped it would put the multiplier out
+## of step with the pitch on every frame of a held trigger.
+func test_work_does_not_touch_the_run() -> void:
+	_score.work(GrimeMap.Stage.WASHED, 5.0)
+	assert_eq(_score.run(), Scoring.NO_RUN, "work started a run")
+	assert_eq(_score.patches(), 0, "work counted as a finished patch")
+	assert_eq(_score.last_award(), 0, "work counted as an award")
+
+
+## Both halves reach the same total, and the bonus does not swallow the wage.
+func test_the_wage_and_the_bonus_both_land() -> void:
+	var wage: int = _score.work(GrimeMap.Stage.WASHED, 1.0)
+	var bonus: int = _score.score_at(GrimeMap.Stage.WASHED, NOW)
+	assert_eq(_score.total(), wage + bonus, "the total is not the wage plus the bonus")
+
+
 ## Nothing is scored twice by asking about it. The getters are the readout's only
 ## view of this class and a scoreboard that could move the score by drawing it
 ## would be a bug nobody would look for here.

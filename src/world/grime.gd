@@ -199,6 +199,28 @@ func shine() -> float:
 	return buffed / float(_maps.size())
 
 
+## How much work the whole car has had done on it in [param stage], ever,
+## measured in patches' worth — see [method GrimeMap.worked].
+##
+## [b]Summed and not averaged[/b], which is the one place this differs from the
+## three readings above it. Those answer "how far through is the car", so a
+## panel-average is the honest shape and a car with one spotless wing is not
+## finished. This answers "how much has been done", and half a patch of washing
+## is half a patch of washing whichever panel it happened on — dividing by twelve
+## would make the same stroke worth less on a car with more pieces.
+##
+## Monotonic, so a caller reads it twice and pays for the difference. That is the
+## whole intended use: cleaning is a thing that is true across frames rather than
+## an event, so it is polled once a frame the way the walk is, and not signalled
+## the way a finished patch is. [code]src/screens/play_screen.gd[/code] has the
+## longer version of that distinction.
+func worked(stage: GrimeMap.Stage) -> float:
+	var done: float = 0.0
+	for map: GrimeMap in _maps:
+		done += map.worked(stage)
+	return done
+
+
 ## Takes [param amount] of mud off [param panel] at [param world_point], over a
 ## brush of [param radius_metres], for a surface facing [param world_normal].
 ##

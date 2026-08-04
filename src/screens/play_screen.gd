@@ -110,19 +110,31 @@
 ## and nothing else, and it goes up to the host rather than sideways because a
 ## screen is freed the moment it asks for the next state.
 ##
-## [b]And the fifth loop is the score[/b], which rides the same signal the bell
-## does and is the same shape again: the room says a patch finished a step,
-## [Scoring] turns that into a number, and [ScoreHud] turns that into digits in
-## the corner. Neither of the two has heard of the other — the scorer has never
-## heard of a [Label] and the readout has never heard of a [Grime] — and this is
-## the only file that knows both exist.
+## [b]And the fifth loop is the score[/b], which is the only one that runs both
+## ways at once, and deliberately so. [Scoring] turns what the room reports into
+## a number and [ScoreHud] turns that into digits in the corner; neither has
+## heard of the other — the scorer has never heard of a [Label] and the readout
+## has never heard of a [Grime] — and this is the only file that knows both
+## exist. What is different is that it is fed from two places, because there are
+## two different kinds of thing to be paid for.
 ##
-## The order in [method _on_patch_finished] is not arbitrary: the score is taken
-## before the bell is asked for, because both climb the same run of consecutive
-## patches on the same clock and reading one after ringing the other would put a
-## frame's worth of nothing between two things that are one event. [Chime]'s
-## class docs have why the two count their runs separately rather than one
-## reading the other's.
+## [b]Finishing a patch is an instant, so it is a signal.[/b] The room says a
+## patch finished a step, this file scores it and rings the bell for it, and the
+## corner flashes. The order in [method _on_patch_finished] is not arbitrary: the
+## score is taken before the bell is asked for, because both climb the same run
+## of consecutive patches on the same clock and reading one after ringing the
+## other would put a frame's worth of nothing between two things that are one
+## event. [Chime]'s class docs have why the two count their runs separately
+## rather than one reading the other's.
+##
+## [b]Cleaning is true across frames, so it is polled.[/b] Mud coming off is not
+## a moment — it is what is happening for as long as the trigger is down — so
+## [method _pay_for_the_work] reads a running total off the room once a frame and
+## pays for the difference, which is the same treatment the walk gets two
+## paragraphs up and for the same reason. That is what makes the corner climb
+## while a panel is being washed instead of sitting still between patches, and it
+## is why the readout has a second, quieter entry point that neither flashes nor
+## pops.
 ##
 ## The eye walks a rail around the car and cannot look away from it, and that is
 ## a decision rather than an omission: turning your head brings a look control
@@ -185,6 +197,15 @@ var _finger: int = NO_FINGER
 ## leaves [signal Grime.patch_finished] unconnected for the same reason.
 var _score: Scoring = Scoring.new()
 
+## How much work each stage had had done on it when this screen last looked, in
+## patches' worth — [method Grime.worked]'s units. What
+## [method _pay_for_the_work] takes the difference against, and the reason the
+## wage is paid once per frame rather than once per touch.
+##
+## Sized off the enum rather than off a literal three, so a fourth pass is a
+## tariff somebody has to write rather than an out-of-range on the first frame.
+var _worked: PackedFloat64Array = _fresh_work()
+
 @onready var _garage: Garage = $Garage
 @onready var _hud: ToolBeltHud = $ToolBelt
 @onready var _pad: MotionPad = $MotionPad
@@ -221,12 +242,13 @@ func _process(_delta: float) -> void:
 	var turn: float = _pad.turn() + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
 	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
 	_garage.steer(turn, lift)
+	var grime: Grime = _garage.grime()
 	# Only while the masks are up. The number costs a walk over twelve panels and
 	# nothing is reading it otherwise, so a game nobody has pressed the key in
 	# does not pay for the readout.
-	var grime: Grime = _garage.grime()
 	if _masks.is_shown() and grime != null:
 		_masks.report(grime.remaining(), grime.shine())
+	_pay_for_the_work(grime)
 
 
 ## Keys, for the half of the players who will never tap the [b]T[/b].
@@ -430,6 +452,48 @@ func _on_patch_finished(_panel: String, _patch: int, stage: GrimeMap.Stage) -> v
 	var award: int = _score.score(stage)
 	_scoreboard.score(_score.total(), award, stage, _score.multiplier())
 	ring_bell(Bell.Voice.PATCH)
+
+
+## A tally of nothing done, one entry per stage of the job.
+static func _fresh_work() -> PackedFloat64Array:
+	var work: PackedFloat64Array = PackedFloat64Array()
+	work.resize(GrimeMap.Stage.size())
+	return work
+
+
+## Pays for whatever cleaning happened since the last frame, if [param grime]
+## exists yet.
+##
+## [b]Polled rather than signalled, and that is the same rule the walk follows
+## rather than an inconsistency.[/b] Finishing a patch happens at an instant, so
+## it is a signal. Cleaning is a thing that is [i]true across frames[/i] — the
+## trigger is held, water is landing, mud is coming off — so it is read once a
+## frame off a running total, exactly the way a direction is read off the pad and
+## the keys. The class docs make the same distinction about tool changes and
+## movement; this is its third instance.
+##
+## The alternative is a signal per touch, which is [Grime] emitting sixty times a
+## second per tool, carrying a float, for a readout — the precise thing
+## [signal Garage.aimed] exists in its current shape to avoid.
+##
+## Three stages and three remembered totals rather than one, because a rag and a
+## jet pay different rates and a sweep can be moving both at once — the player
+## buffing one hand's width while the other end of the panel is still under
+## water. Summing them first would pay the whole lot at whichever tariff was
+## asked for last.
+func _pay_for_the_work(grime: Grime) -> void:
+	if grime == null:
+		return
+	var earned: int = 0
+	for stage: int in _worked.size():
+		var done: float = grime.worked(stage)
+		# The difference and not the total: this is a wage paid on work that has
+		# happened since the last look, and a fall — which cannot happen, see
+		# [method Grime.worked] — pays nothing rather than clawing anything back.
+		earned += _score.work(stage, done - _worked[stage])
+		_worked[stage] = done
+	if earned > 0:
+		_scoreboard.tick(_score.total())
 
 
 ## The "Debug Tools" switch inside the "~" panel was flipped, so every tool

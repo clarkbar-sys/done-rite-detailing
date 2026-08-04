@@ -206,6 +206,28 @@ func score(reached: int, award: int, stage: GrimeMap.Stage, multiplier: int) -> 
 	_paint()
 
 
+## The score has climbed to [param reached] by work rather than by an event, so
+## the digits chase it and nothing else happens.
+##
+## [b]No flash and no pop, and that is the difference the whole split exists
+## for.[/b] Work is continuous — this is called on any frame the trigger is doing
+## something, which while a jet is running is every one of them — so a flash here
+## would be a readout permanently lit and a pop would be sixty labels a second.
+## What the player is being told by a number that will not sit still is exactly
+## "this is still going", and it needs no punctuation. The punctuation is
+## [method score], for the moments that have some.
+##
+## The roll is retargeted the same way an award retargets it, so a trickle is
+## chased at the rate the gap deserves rather than at a fixed speed: the digits
+## run a little behind a fast sweep, catch up within [constant ROLL_SECONDS] of
+## it stopping, and never overshoot.
+func tick(reached: int) -> void:
+	if reached == _total:
+		return
+	_total = reached
+	_roll = maxf(float(_total) - _shown, 1.0) / ROLL_SECONDS
+
+
 ## The colour the score throws for a patch that finished [param stage].
 ##
 ## The middle one is asked of [Surface] rather than written here, so the corner

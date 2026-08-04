@@ -178,6 +178,47 @@ func test_the_score_and_the_ding_are_on_the_same_run() -> void:
 	)
 
 
+## The follow-up the whole wage half exists for: the score has to move while a
+## panel is being cleaned, not only when a square happens to complete. Asserted
+## with a brush too weak to finish anything, so the only thing that can have paid
+## is the work itself.
+func test_the_score_moves_while_cleaning_before_anything_finishes() -> void:
+	await _start()
+	var body: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	assert_not_null(body, "the car has no bodywork")
+	if body == null:
+		return
+	var box: AABB = body.global_transform * body.get_aabb()
+	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
+	# A tenth of the panel and a light touch: enough mud moves to be worth paying
+	# for, nowhere near enough to take a patch all the way clean.
+	var narrow: float = _whole_face_of(body) * 0.1
+	var finished: int = 0
+	for _sweep: int in 8:
+		finished += _grime().wash(body, on_top, Vector3.UP, narrow, 0.02)
+		await wait_process_frames(1)
+	assert_eq(finished, 0, "the sweep finished a patch, so this proves nothing about the wage")
+	assert_gt(_scoreboard().total(), 0, "cleaning paid nothing until a patch completed")
+
+
+## And the wage is quiet: a trigger held is not an event, so it must not be
+## ringing the corner like one.
+func test_the_wage_does_not_flash_the_corner() -> void:
+	await _start()
+	var body: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	if body == null:
+		return
+	var box: AABB = body.global_transform * body.get_aabb()
+	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
+	var narrow: float = _whole_face_of(body) * 0.1
+	for _sweep: int in 8:
+		_grime().wash(body, on_top, Vector3.UP, narrow, 0.02)
+		await wait_process_frames(1)
+	assert_gt(_scoreboard().total(), 0, "nothing was paid, so this proves nothing")
+	assert_eq(_scoreboard().flash(), 0.0, "the wage lit the corner like a finished patch")
+	assert_eq(_scoreboard().flying(), 0, "the wage threw a number like a finished patch")
+
+
 func test_the_score_is_in_the_corner_the_grime_board_is_not_using() -> void:
 	await _start()
 	var toggle: Control = _screen().get_node("GrimeDebug").get_node("%Toggle") as Control
