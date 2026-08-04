@@ -108,6 +108,46 @@ const FOCUS_RING_ALPHA: float = 0.55
 ## a polygon at the radii a 176-pixel-tall button needs.
 const CORNER_DETAIL: int = 20
 
+## The contrast a badge's picture has to clear against the plate behind it.
+##
+## WCAG 2.1 puts non-text graphics at 3:1 and normal-size text at 4.5:1, and the
+## higher number is the one used here on purpose: a tool badge is read the way a
+## word is — glanced at once, in peripheral vision, over a lit garage that is
+## brighter than any page this palette was designed for. The failure it exists
+## for is measurable rather than aesthetic. Tire & Engine Cleaner's albedo is
+## near-black, which is correct for a bottle standing in a garage and
+## [b]1.02:1[/b] against [constant PANEL] — a badge you cannot see is not a
+## dimmer badge, it is an empty plate.
+const BADGE_CONTRAST: float = 4.5
+
+## How many steps [method badge_tint] may take on its way to the floor above.
+##
+## The last step is [code]lightened(1.0)[/code], which is white and clears any
+## floor, so the search always terminates — and it terminates at the [i]least[/i]
+## lightening that works, which is what keeps a tint the tool's own colour rather
+## than a pastel of it. Fifty is a 2% step: fine enough that nothing is lifted
+## further than it had to be, coarse enough to be a loop and not a solver.
+const TINT_STEPS: int = 50
+
+## The two halves of the sRGB transfer function, as
+## [url=https://www.w3.org/TR/WCAG21/#dfn-relative-luminance]WCAG 2.1[/url]
+## writes them. Transcribed rather than taken from [method Color.srgb_to_linear]
+## for the reason the palette above is transcribed twice: the numbers being
+## checked and the numbers doing the checking should not be the same numbers.
+const SRGB_KNEE: float = 0.04045
+const SRGB_SLOPE: float = 12.92
+const SRGB_OFFSET: float = 0.055
+const SRGB_SCALE: float = 1.055
+const SRGB_GAMMA: float = 2.4
+
+## The three channel weights relative luminance is a sum of, and the constant the
+## ratio is offset by so that black against black is 1:1 rather than a divide by
+## zero.
+const LUMA_RED: float = 0.2126
+const LUMA_GREEN: float = 0.7152
+const LUMA_BLUE: float = 0.0722
+const LUMA_FLOOR: float = 0.05
+
 
 ## The site's pill button ([code].btn[/code]) in [param fill], sized for a
 ## control [param height] design pixels tall.
@@ -165,3 +205,85 @@ static func card() -> StyleBoxFlat:
 	box.shadow_size = CARD_SHADOW_SIZE
 	box.shadow_offset = Vector2(0.0, float(CARD_SHADOW_DROP))
 	return box
+
+
+## A round plate in [param fill], [param side] design pixels across: what a
+## picture is printed on when the picture is the whole control.
+##
+## [b]It is a pill, and that is not a shortcut.[/b] [method pill] sets every
+## corner to half the height, so asking for one at a square size gives a circle
+## by the same arithmetic that gives the Start button its round ends — one shape
+## in this file, two aspect ratios. A separate "circle" builder would be a second
+## definition of the same corner, free to drift.
+##
+## The hairline is [method card]'s, for [method card]'s reason: this is something
+## you look at as well as press, and without a lit edge a dark disc over a dark
+## garage is a hole rather than a plate.
+static func badge(fill: Color, side: float) -> StyleBoxFlat:
+	var box: StyleBoxFlat = pill(fill, side)
+	box.set_border_width_all(1)
+	box.border_color = LINE
+	return box
+
+
+## [param albedo] as it should be [i]drawn on a badge[/i]: the tool's own colour,
+## lightened only as far as it takes to clear [constant BADGE_CONTRAST] against
+## [constant PANEL].
+##
+## [b]The distinction this function exists to make.[/b] A tool's albedo is what
+## it is made of — the near-black plastic of a bottle, which is correct in a lit
+## garage where light falls on it. A badge is flat, unlit and small, so the same
+## number that reads as "black plastic" in the player's hands reads as nothing at
+## all on a plate. This lifts the second without touching the first: the mesh
+## still uses [member DetailingTool.albedo], and the two cannot drift apart
+## because the tint is derived from it rather than written down beside it.
+##
+## A no-op for a colour that already clears the floor — three of the five tools —
+## because lightening a silver wand that is already 11:1 would be inventing a
+## colour the tool does not have, in the name of a problem it does not have.
+static func badge_tint(albedo: Color) -> Color:
+	var tint: Color = albedo
+	for step: int in TINT_STEPS:
+		if contrast_ratio(tint, PANEL) >= BADGE_CONTRAST:
+			return tint
+		tint = albedo.lightened(float(step + 1) / float(TINT_STEPS))
+	# The last step above is `lightened(1.0)`, which is white: 15:1 on the panel
+	# and 21:1 on anything darker, so this line is reached only by a floor nobody
+	# could satisfy, and returning white is the closest to satisfying it there is.
+	return tint
+
+
+## How far apart [param first] and [param second] are to a pair of eyes, on the
+## [url=https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio]WCAG 2.1[/url] scale:
+## 1.0 for the same colour, 21.0 for black against white.
+##
+## Symmetric, because the definition is — the lighter of the two goes on top of
+## the fraction whichever order it arrived in. Alpha is ignored: a ratio is
+## between two things that are actually on screen, and a translucent colour is
+## not one of them until it has been composited, which is the caller's job and
+## not this function's.
+static func contrast_ratio(first: Color, second: Color) -> float:
+	var one: float = _relative_luminance(first)
+	var other: float = _relative_luminance(second)
+	return (maxf(one, other) + LUMA_FLOOR) / (minf(one, other) + LUMA_FLOOR)
+
+
+## [param colour]'s relative luminance: its three channels taken back to linear
+## light and weighted the way an eye weights them, which is why green counts for
+## seven times what blue does.
+static func _relative_luminance(colour: Color) -> float:
+	return (
+		LUMA_RED * _to_linear(colour.r)
+		+ LUMA_GREEN * _to_linear(colour.g)
+		+ LUMA_BLUE * _to_linear(colour.b)
+	)
+
+
+## One sRGB [param channel] as linear light. A straight line below the knee and a
+## power curve above it — the piecewise definition, not the [code]^2.2[/code]
+## approximation, because the whole point of the numbers this feeds is that they
+## can be checked against a contrast checker somebody else wrote.
+static func _to_linear(channel: float) -> float:
+	if channel <= SRGB_KNEE:
+		return channel / SRGB_SLOPE
+	return pow((channel + SRGB_OFFSET) / SRGB_SCALE, SRGB_GAMMA)

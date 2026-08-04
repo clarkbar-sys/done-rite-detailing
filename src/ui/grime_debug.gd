@@ -59,9 +59,10 @@ extends Control
 ## crosshair.
 signal debug_tools_toggled(enabled: bool)
 
-## What the toggle says. A glyph the font already has rather than an icon, for
-## the reason [constant ToolBeltHud.TOGGLE_TEXT] is a letter: there is no asset
-## pipeline yet and a character cannot go missing.
+## What the toggle says. A glyph the font already has rather than a drawn mark,
+## and deliberately not the brand treatment [ToolBeltHud] wears: this switch is
+## debug-only, and a debug control that looked like the game's own is a debug
+## control somebody ships.
 const TOGGLE_TEXT: String = "~"
 
 ## How wide each panel's thumbnail is drawn, in design pixels. The masks are

@@ -146,19 +146,28 @@ func test_the_icons_are_in_belt_order() -> void:
 		var icon: ToolBeltHud.ToolIcon = _hud.icon_at(index)
 		assert_not_null(icon, "belt slot %d must have an icon" % index)
 		assert_eq(
-			icon.fill_color().to_html(false),
-			tools[index].albedo.to_html(false),
-			"icon %d must be filled with its own tool's colour" % index
+			icon.tooltip_text,
+			tools[index].display_name,
+			"icon %d must stand for the tool at that place on the belt" % index
 		)
+		# The equipped badge is white on red and is checked in its own test below;
+		# what is being pinned here is that every *other* badge is drawn in the
+		# colour of the tool sitting at its own index, rather than at some other.
+		if index != _belt.equipped_index():
+			assert_eq(
+				icon.fill_color().to_html(false),
+				Brand.badge_tint(tools[index].albedo).to_html(false),
+				"icon %d must be drawn in its own tool's colour" % index
+			)
 		previous_top = icon.get_global_rect().position.y
 	assert_lt(previous_top, toggle_top + 1.0, "the roll-up grows upward out of the corner")
 
 
 func test_pressing_the_toggle_expands_and_pressing_again_collapses() -> void:
 	_hud.toggle_button().pressed.emit()
-	assert_true(_hud.is_expanded(), "the T rolls the tools out")
+	assert_true(_hud.is_expanded(), "the corner rolls the tools out")
 	_hud.toggle_button().pressed.emit()
-	assert_false(_hud.is_expanded(), "the T puts them away again")
+	assert_false(_hud.is_expanded(), "the corner puts them away again")
 
 
 func test_a_tap_on_the_toggle_rolls_the_tools_out() -> void:
@@ -166,7 +175,7 @@ func test_a_tap_on_the_toggle_rolls_the_tools_out() -> void:
 	# unhittable on a phone fails here rather than in a browser.
 	_tap(_hud.toggle_button().get_global_rect().get_center())
 	await wait_process_frames(1)
-	assert_true(_hud.is_expanded(), "a tap on the T must roll the tools out")
+	assert_true(_hud.is_expanded(), "a tap on the corner must roll the tools out")
 
 
 # ---- sizing: the phone-shaped half, and the reason this file exists ----------
@@ -179,8 +188,8 @@ func test_every_target_is_big_enough_for_a_finger() -> void:
 	await _open()
 	var minimum: float = TouchTarget.min_design_size()
 	var toggle: Button = _hud.toggle_button()
-	assert_gte(toggle.size.x, minimum, "the T is too narrow to hit on a phone")
-	assert_gte(toggle.size.y, minimum, "the T is too short to hit on a phone")
+	assert_gte(toggle.size.x, minimum, "the corner is too narrow to hit on a phone")
+	assert_gte(toggle.size.y, minimum, "the corner is too short to hit on a phone")
 	for index: int in _hud.icon_count():
 		var icon: ToolBeltHud.ToolIcon = _hud.icon_at(index)
 		assert_gte(icon.size.x, minimum, "icon %d is too narrow to hit on a phone" % index)
@@ -210,7 +219,8 @@ func test_every_target_is_on_screen() -> void:
 	# — reachable by nobody, and invisible to the size test above.
 	await _open()
 	var screen: Rect2 = Rect2(Vector2.ZERO, _hud.size)
-	assert_true(screen.encloses(_hud.toggle_button().get_global_rect()), "the T must be on screen")
+	var corner: Rect2 = _hud.toggle_button().get_global_rect()
+	assert_true(screen.encloses(corner), "the corner must be on screen")
 	for index: int in _hud.icon_count():
 		assert_true(
 			screen.encloses(_hud.icon_at(index).get_global_rect()),
@@ -218,14 +228,79 @@ func test_every_target_is_on_screen() -> void:
 		)
 
 
-# ---- the equipped tool: dimmed *and* ringed ---------------------------------
+# ---- the brand, on the belt --------------------------------------------------
 
 
-func test_the_equipped_icon_is_dimmed_and_ringed_and_no_other_is() -> void:
-	# Both halves in one test because the design decision is the pair. Dimming
-	# alone is what a *disabled* control looks like, and the tool you are already
-	# holding is the one the eye should land on first — so the fade is what the
-	# spec asked for and the ring is what keeps it from reading as broken.
+func test_every_badge_is_a_disc_in_the_brands_own_colours() -> void:
+	# The failure this pins is what the whole pass is for: an unstyled [Button] is
+	# a grey rectangle with square corners and a border that is nobody's
+	# --line, and five of them in the corner of a lit garage is a HUD that does not
+	# belong to the game it is drawn over. Read back off the control rather than
+	# trusted, because a stylebox built and never applied looks identical in the
+	# source and blank on screen.
+	await _open()
+	for index: int in _hud.icon_count():
+		var icon: ToolBeltHud.ToolIcon = _hud.icon_at(index)
+		var box: StyleBoxFlat = icon.get_theme_stylebox("normal") as StyleBoxFlat
+		assert_not_null(box, "icon %d is still wearing the engine's own button" % index)
+		if box == null:
+			continue
+		assert_eq(box.bg_color, icon.plate_color(), "icon %d's plate" % index)
+		assert_eq(
+			box.corner_radius_top_left,
+			roundi(icon.size.y / 2.0),
+			"icon %d must be a disc, not a card" % index
+		)
+
+
+func test_every_badge_glyph_can_be_seen_on_its_own_plate() -> void:
+	# Colour was doing this job alone and failing it — Tire & Engine Cleaner's
+	# albedo is 1.02:1 on --panel, which is a badge you cannot see. Asserted here
+	# as well as in the unit test because this is the pair that actually reaches
+	# the screen: the colour the icon draws with, against the plate it draws on.
+	await _open()
+	for index: int in _hud.icon_count():
+		var icon: ToolBeltHud.ToolIcon = _hud.icon_at(index)
+		assert_gte(
+			Brand.contrast_ratio(icon.fill_color(), icon.plate_color()),
+			Brand.BADGE_CONTRAST,
+			"icon %d is invisible on its own plate" % index
+		)
+
+
+func test_every_tool_has_its_own_silhouette_and_it_stays_on_the_grid() -> void:
+	# Shape carries what colour was carrying alone, so "every tool has a shape" is
+	# a claim worth checking rather than an intention. The bounds half is the bug
+	# a stroke table develops silently: a point at 30 on a 24-unit grid draws
+	# outside the plate and looks like a rendering glitch, not like a typo.
+	var seen: Array[String] = []
+	for carried: DetailingTool in DetailingTool.catalogue():
+		var paths: Array[PackedVector2Array] = ToolBeltHud.ToolIcon.glyph(carried.id)
+		assert_gt(paths.size(), 0, "%s has no silhouette" % carried.display_name)
+		var shape: String = str(paths)
+		assert_false(
+			seen.has(shape), "%s draws the same picture as another tool" % carried.display_name
+		)
+		seen.append(shape)
+		for path: PackedVector2Array in paths:
+			assert_gt(
+				path.size(), 1, "%s has a stroke with nothing to stroke" % carried.display_name
+			)
+			for point: Vector2 in path:
+				assert_between(
+					point.x, 0.0, ToolBeltHud.GLYPH_GRID, "%s off grid" % carried.display_name
+				)
+				assert_between(
+					point.y, 0.0, ToolBeltHud.GLYPH_GRID, "%s off grid" % carried.display_name
+				)
+
+
+func test_the_equipped_icon_is_a_red_plate_and_no_other_is() -> void:
+	# The tool you are already holding is the one the eye should land on first —
+	# and it is the one icon you cannot usefully press, so the old treatment faded
+	# it, which is the universal look of a control that is broken. Red is what the
+	# site puts on the thing you have pressed and white is the only colour that
+	# goes on top of it; neither is a colour this belt did not already have.
 	# Asserted on the values [method ToolBeltHud.ToolIcon._draw] actually uses,
 	# not on a flag that is supposed to make it use them.
 	await _open()
@@ -233,14 +308,16 @@ func test_the_equipped_icon_is_dimmed_and_ringed_and_no_other_is() -> void:
 	for index: int in _hud.icon_count():
 		var icon: ToolBeltHud.ToolIcon = _hud.icon_at(index)
 		if index == equipped:
-			assert_lt(icon.fill_color().a, 1.0, "the tool in your hands is drawn dimmed")
-			assert_gt(icon.ring_width(), 0.0, "and ringed, or dimmed just reads as broken")
+			assert_eq(icon.plate_color(), Brand.RED, "the tool in your hands wears the accent")
+			assert_eq(
+				icon.fill_color(), Brand.WHITE, "and is drawn in the one colour that goes on it"
+			)
 		else:
-			assert_eq(icon.fill_color().a, 1.0, "icon %d is not the one being held" % index)
-			assert_eq(icon.ring_width(), 0.0, "icon %d must not be ringed" % index)
+			assert_eq(icon.plate_color(), Brand.PANEL, "icon %d is not the one being held" % index)
+			assert_ne(icon.fill_color(), Brand.WHITE, "icon %d keeps its own colour" % index)
 
 
-func test_the_ring_follows_the_belt() -> void:
+func test_the_red_plate_follows_the_belt() -> void:
 	# Through the belt's own signal rather than by calling the handler, so a
 	# connection dropped in bind() fails here rather than on screen.
 	await _open()
@@ -248,8 +325,34 @@ func test_the_ring_follows_the_belt() -> void:
 	_belt.equip(DetailingTool.Id.DRYING_RAG)
 	var now: int = _belt.index_of(DetailingTool.Id.DRYING_RAG)
 	assert_ne(now, was, "the test needs a tool that isn't already equipped")
-	assert_gt(_hud.icon_at(now).ring_width(), 0.0, "the ring moves to the new tool")
-	assert_eq(_hud.icon_at(was).ring_width(), 0.0, "and leaves the old one")
+	assert_eq(_hud.icon_at(now).plate_color(), Brand.RED, "the accent moves to the new tool")
+	assert_eq(_hud.icon_at(was).plate_color(), Brand.PANEL, "and leaves the old one")
+
+
+# ---- the corner ---------------------------------------------------------------
+
+
+func test_the_corner_wears_the_brand_and_says_what_it_is_for() -> void:
+	# It used to be a letter on the engine's grey rectangle. A T is initialism
+	# rather than an icon, and it said the same thing whether the tools were out
+	# or not — which is the one job a toggle's picture has.
+	var box: StyleBoxFlat = _hud.toggle_button().get_theme_stylebox("normal") as StyleBoxFlat
+	assert_not_null(box, "the corner is still wearing the engine's own button")
+	if box == null:
+		return
+	assert_eq(box.bg_color, Brand.PANEL, "closed, the corner is a dark plate")
+	assert_eq(box.border_color, Brand.LINE, "with the brand's own lit edge")
+	assert_eq(_hud.toggle_button().text, "", "and no letter left on top of it")
+
+
+func test_the_corner_says_close_while_the_tools_are_out() -> void:
+	assert_false(_hud.toggle_mark().is_open(), "put away, the corner says tools")
+	await _open()
+	assert_true(_hud.toggle_mark().is_open(), "out, it says close rather than saying tools twice")
+	var box: StyleBoxFlat = _hud.toggle_button().get_theme_stylebox("normal") as StyleBoxFlat
+	assert_eq(box.bg_color, Brand.RED, "and wears the accent, like the badge you have picked")
+	await _close()
+	assert_false(_hud.toggle_mark().is_open(), "and goes back to saying tools")
 
 
 # ---- picking: emits, and nothing else ---------------------------------------
