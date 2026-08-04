@@ -1,0 +1,39 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/score_hud.gd" id="1_score"]
+
+; Full-rect and ignoring the mouse, like every other piece of this HUD: the
+; readout is laid out by hand inside it (see `_relayout` in score_hud.gd), and a
+; control that stopped a press would be a rectangle of the car the player cannot
+; point a tool at.
+[node name="ScoreHud" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_score")
+
+; The digits. Sizes and colours are set in code — they move with the flash — so
+; what is here is only the alignment and the outline that keeps the number off
+; the sky behind it.
+[node name="Total" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_outline_color = Color(0.035, 0.035, 0.043, 0.7)
+theme_override_constants/outline_size = 8
+horizontal_alignment = 2
+text = "000000"
+
+; The run multiplier, hidden until there is one worth printing.
+[node name="Multiplier" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_outline_color = Color(0.035, 0.035, 0.043, 0.7)
+theme_override_constants/outline_size = 8
+horizontal_alignment = 2
+text = "×1"

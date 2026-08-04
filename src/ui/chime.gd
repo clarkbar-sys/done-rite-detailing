@@ -39,14 +39,28 @@
 ##
 ## [b]The patch bell climbs on a run.[/b] Consecutive calls to
 ## [method ring_at] with [constant Bell.Voice.PATCH] step up
-## [constant Bell.PATCH_RUN_RATIOS]; a gap longer than [constant RUN_RESET_MSEC]
+## [constant Bell.PATCH_RUN_RATIOS]; a gap longer than [constant Bell.RUN_RESET_MSEC]
 ## resets to the bottom. That step is counted on every call, not only the ones
 ## that get past [constant MIN_GAP_MSEC] — a ding dropped by the rate limit was
 ## still a patch finishing, and a run that only advanced on the dings that made
 ## a sound would fall out of step with what actually happened the moment a
 ## sweep finished two patches faster than [constant MIN_GAP_MSEC] apart.
-## [method patch_run] hands back the count itself, for anything downstream —
-## scoring, most likely — that wants the same number the pitch is reading.
+## [method patch_run] hands back the count itself, for anything downstream that
+## wants a run's length rather than its pitch.
+##
+## [b][Scoring] climbs the same run, and does not read it from here.[/b] It
+## counts its own on [constant Bell.RUN_RESET_MSEC] — the constant both read, and
+## the reason that constant moved onto [Bell]. Reaching for this one instead
+## would mean plumbing an answer from the host, which owns the [Chime], back down
+## into a screen, which is a direction nothing in this project runs in and a lot
+## of wiring for an integer. What keeps the two honest is that they are fed the
+## same events at the same instants: a screen asks for a ding on every patch and
+## scores on every patch, both through [signal Grime.patch_finished], and both
+## step their run on every call rather than on the ones that made a noise —
+## which is what the paragraph above is about, and is why the pitch and the
+## multiplier cannot come apart over a fast sweep.
+## [code]tests/integration/test_play_screen_score.gd[/code] walks one sequence
+## through both and asserts they agree.
 ##
 ## [b]The browser's rule about sound, which is the reason Start dings at all.[/b]
 ## A page may not make a noise until the person on it has touched it — every
@@ -74,14 +88,6 @@ const VOICES: int = 4
 ## enough that a single tick finishing several patches is one bell.
 const MIN_GAP_MSEC: int = 70
 
-## How long a gap between two patches, in milliseconds, resets the run back to
-## the bottom of [constant Bell.PATCH_RUN_RATIOS] rather than continuing to
-## climb it. A taste knob, the same way [constant Bell.PATCH_SECONDS] is: long
-## enough that the run survives the player swinging the jet from one panel to
-## the next, short enough that stopping to think really does start the ladder
-## over rather than picking up where it left off a few seconds later.
-const RUN_RESET_MSEC: int = 1500
-
 var _players: Array[AudioStreamPlayer] = []
 var _streams: Dictionary[Bell.Voice, AudioStreamWAV] = {}
 var _patch_streams: Array[AudioStreamWAV] = []
@@ -89,7 +95,7 @@ var _next: int = 0
 var _last_msec: int = -MIN_GAP_MSEC
 var _rung: int = 0
 var _run: int = 0
-var _last_patch_msec: int = -RUN_RESET_MSEC
+var _last_patch_msec: int = -Bell.RUN_RESET_MSEC
 
 
 func _ready() -> void:
@@ -154,7 +160,7 @@ func patch_run() -> int:
 func _stream_for(which: Bell.Voice, now_msec: int) -> AudioStreamWAV:
 	if which != Bell.Voice.PATCH:
 		return _streams[which] if _streams.has(which) else null
-	if now_msec - _last_patch_msec >= RUN_RESET_MSEC:
+	if now_msec - _last_patch_msec >= Bell.RUN_RESET_MSEC:
 		_run = 0
 	else:
 		_run += 1

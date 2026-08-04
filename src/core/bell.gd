@@ -101,6 +101,23 @@ const PATCH_HZ: float = 1568.0
 ## as "as high as this bell goes" instead.
 const PATCH_RUN_RATIOS: PackedFloat32Array = [1.0, 1.25, 1.5, 2.0]
 
+## How long a gap between two patches, in milliseconds, ends a run — dropping the
+## next one back to the bottom of [constant PATCH_RUN_RATIOS] rather than letting
+## it carry on climbing. A taste knob, the same way [constant PATCH_SECONDS] is:
+## long enough that a run survives the player swinging the jet from one panel to
+## the next, short enough that stopping to think really does start the ladder
+## over rather than picking up where it left off a few seconds later.
+##
+## [b]It is here rather than on [Chime] because it is not only the bell's.[/b]
+## [Scoring] climbs the same run for the multiplier, and the whole point of that
+## feature is that the note going up and the number going up are one event: a
+## reset the pitch honoured and the score did not would be a player hearing the
+## ladder start over while the multiplier stayed high, which reads as a bug in
+## whichever of the two they were watching. One constant, two readers, no way for
+## them to drift. It sits beside [constant PATCH_RUN_RATIOS] because the ladder
+## and how long you have to stay on it are the same decision.
+const RUN_RESET_MSEC: int = 1500
+
 ## How long the patch bell rings for. A third of the counter bell: these arrive
 ## in bursts, and the point is to be able to count them.
 const PATCH_SECONDS: float = 0.36
