@@ -93,7 +93,7 @@ func test_the_first_patch_of_a_run_is_the_first_step() -> void:
 
 
 func test_consecutive_patches_climb_the_run() -> void:
-	# Well inside [constant Chime.RUN_RESET_MSEC] of each other, so this is a
+	# Well inside [constant Bell.RUN_RESET_MSEC] of each other, so this is a
 	# sweep rather than three separate runs.
 	_chime.ring_at(Bell.Voice.PATCH, NOW)
 	_chime.ring_at(Bell.Voice.PATCH, NOW + 200)
@@ -105,7 +105,7 @@ func test_a_gap_resets_the_run() -> void:
 	# Hesitating starts the ladder over — the class docs on [Chime] have why.
 	_chime.ring_at(Bell.Voice.PATCH, NOW)
 	_chime.ring_at(Bell.Voice.PATCH, NOW + 200)
-	_chime.ring_at(Bell.Voice.PATCH, NOW + 200 + Chime.RUN_RESET_MSEC)
+	_chime.ring_at(Bell.Voice.PATCH, NOW + 200 + Bell.RUN_RESET_MSEC)
 	assert_eq(_chime.patch_run(), 1, "a gap past the reset window did not reset the run")
 
 

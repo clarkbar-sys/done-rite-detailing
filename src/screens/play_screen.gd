@@ -110,6 +110,20 @@
 ## and nothing else, and it goes up to the host rather than sideways because a
 ## screen is freed the moment it asks for the next state.
 ##
+## [b]And the fifth loop is the score[/b], which rides the same signal the bell
+## does and is the same shape again: the room says a patch finished a step,
+## [Scoring] turns that into a number, and [ScoreHud] turns that into digits in
+## the corner. Neither of the two has heard of the other — the scorer has never
+## heard of a [Label] and the readout has never heard of a [Grime] — and this is
+## the only file that knows both exist.
+##
+## The order in [method _on_patch_finished] is not arbitrary: the score is taken
+## before the bell is asked for, because both climb the same run of consecutive
+## patches on the same clock and reading one after ringing the other would put a
+## frame's worth of nothing between two things that are one event. [Chime]'s
+## class docs have why the two count their runs separately rather than one
+## reading the other's.
+##
 ## The eye walks a rail around the car and cannot look away from it, and that is
 ## a decision rather than an omission: turning your head brings a look control
 ## the phone has no thumb spare for, and walking anywhere else brings a character
@@ -163,11 +177,20 @@ const MOUSE_FINGER: int = -2
 var _belt: ToolBelt = null
 var _finger: int = NO_FINGER
 
+## The running score. Built here rather than read off anything, because unlike
+## the belt there is nothing else in the game that has one — and unlike the belt
+## it is this screen's, not the room's: the room is also what the title card is
+## showing off, and an attract mode that quietly ran up a score would hand the
+## player a number they did not earn. [code]src/screens/title_screen.gd[/code]
+## leaves [signal Grime.patch_finished] unconnected for the same reason.
+var _score: Scoring = Scoring.new()
+
 @onready var _garage: Garage = $Garage
 @onready var _hud: ToolBeltHud = $ToolBelt
 @onready var _pad: MotionPad = $MotionPad
 @onready var _readout: Label = $PanelReadout
 @onready var _masks: GrimeDebug = $GrimeDebug
+@onready var _scoreboard: ScoreHud = $ScoreHud
 
 
 func _ready() -> void:
@@ -379,14 +402,15 @@ func _on_grimed() -> void:
 	grime.patch_finished.connect(_on_patch_finished)
 
 
-## A bit of the car finished a step of the job, so the player hears about it.
+## A bit of the car finished a step of the job, so the player hears about it,
+## sees it in the corner, and gets paid for it.
 ##
-## None of the three arguments is used, and that is the point rather than an
-## oversight — the bell says "that worked", and which texel it was is the
-## sight's job to have already made obvious. What stops a sweep of the jet
-## from being a hundred bells is [Chime], which drops any ding landing inside the
-## last one: the rule about how often a sound is worth making belongs with the
-## thing making it, not with every place that asks.
+## What stops a sweep of the jet from being a hundred bells is [Chime], which
+## drops any ding landing inside the last one: the rule about how often a sound
+## is worth making belongs with the thing making it, not with every place that
+## asks. Nothing drops an [i]award[/i] — the money is for the work and not for
+## the noise — which is why the score and the ding are different counts over a
+## fast sweep, and [ScoreHud]'s class docs have why that is the honest way round.
 ##
 ## [b]The same bell for all three stages[/b], washed, foamed and buffed alike.
 ## There are two voices in [enum Bell.Voice] and one of them is Start, so a bell
@@ -395,7 +419,16 @@ func _on_grimed() -> void:
 ## the car. A distinct chime for the buff is worth having the day the shine is
 ## worth celebrating separately from the wash; it is not a thing to invent
 ## alongside the mechanic it would be rewarding.
-func _on_patch_finished(_panel: String, _patch: int, _stage: GrimeMap.Stage) -> void:
+##
+## [b]The stage is used and the other two arguments still are not.[/b] Which pass
+## finished decides what the patch pays and what colour the corner throws —
+## [method Scoring.points_for] and [method ScoreHud.tint_for] have both — while
+## the panel and the patch remain the sight's business to have already made
+## obvious. The bell is unchanged: it says "that worked" in one voice for all
+## three, and the paragraph above is still the argument for that.
+func _on_patch_finished(_panel: String, _patch: int, stage: GrimeMap.Stage) -> void:
+	var award: int = _score.score(stage)
+	_scoreboard.score(_score.total(), award, stage, _score.multiplier())
 	ring_bell(Bell.Voice.PATCH)
 
 

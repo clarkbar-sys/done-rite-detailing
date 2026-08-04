@@ -109,6 +109,22 @@ the bands reach zero exactly where the mask does.
 [`src/world/grime.gdshader`](./src/world/grime.gdshader) has each argument where
 the uniform it settles is declared.
 
+And now it keeps score, in the top-right corner, the way a cabinet would. Every
+patch that finishes a pass pays — a wash least, the cleaner more, the drying rag
+most, because a buffed patch is one somebody washed and foamed first and the
+last pass is paying for the ground it stands on. Clean without pausing and the
+awards multiply: the run that already climbs the ding's pitch climbs the
+multiplier too, off the same constant and up to the same rung, so the note going
+up and the number going up are one event. The digits roll rather than jump, a
+`+400` lifts off them and fades, and the whole readout flashes the colour of the
+pass that paid — water, the panel's cleaner, then gold — over exactly the time
+the square on the car stays lit, so the corner and the paint cannot come apart.
+[`Scoring`](./src/core/scoring.gd) is the arithmetic and
+[`ScoreHud`](./src/ui/score_hud.gd) is the corner; neither has heard of the
+other's half. There is deliberately no target and no percentage: the car still
+has spots a tool cannot reach, and a completion figure nobody can close is a
+worse thing to print on screen all game than a number that only goes up.
+
 And the title screen now plays it, which is what an arcade cabinet does with a
 machine nobody is standing at. Behind the logo the car is under mud and
 somebody is working it: the power wash takes a panel back to bare paint, the
