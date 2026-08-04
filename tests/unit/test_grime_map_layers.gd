@@ -149,6 +149,40 @@ func test_rinsing_product_off_banks_no_work() -> void:
 	)
 
 
+## The other half of the same rule, and the one that takes a memory to keep:
+## re-covering product the jet took off is not work either. The loop is the
+## trigger-holding player's shortest route to an unbounded score — foam, rinse,
+## foam, on one square — and what stops it is that the ledger counts how far the
+## patch has ever got rather than how much product has ever landed on it.
+func test_re_covering_rinsed_product_banks_no_work() -> void:
+	_wash_bare(_middle(), 0.2)
+	_foam_over(_middle(), 0.2)
+	var banked: float = _map.worked(GrimeMap.Stage.FOAMED)
+	assert_gt(banked, 0.0, "covering bare paint the first time banked nothing")
+	for _turn: int in 3:
+		var covered: float = _map.product()
+		_wash_bare(_middle(), 0.2)
+		assert_lt(_map.product(), covered, "the jet rinsed nothing, so this proves nothing")
+		_foam_over(_middle(), 0.2)
+	assert_almost_eq(
+		_map.worked(GrimeMap.Stage.FOAMED),
+		banked,
+		TOLERANCE,
+		"the foam/rinse loop was paid for as work"
+	)
+
+
+## And the ledger is not simply frozen after the first pass: ground the player
+## has never covered pays whenever they get to it.
+func test_covering_ground_never_covered_before_banks_work() -> void:
+	_wash_bare(_middle(), 0.4)
+	_foam_over(_middle(), 0.1)
+	var banked: float = _map.worked(GrimeMap.Stage.FOAMED)
+	_wash_bare(_middle(), 0.4)
+	_foam_over(_middle(), 0.4)
+	assert_gt(_map.worked(GrimeMap.Stage.FOAMED), banked, "a wider pass banked nothing new")
+
+
 ## Never down, whatever order the tools go in — the score reads a difference
 ## against this, and a total that could fall would be a wage that could be
 ## clawed back.
@@ -391,10 +425,13 @@ func test_rinsing_product_off_a_clean_patch_rings_nothing() -> void:
 	assert_eq(rung, 0, "washing product off an already-clean patch rang the bell")
 
 
-func test_a_patch_rinsed_bare_can_be_covered_and_ring_again() -> void:
-	# And the other side of it: the covering ding is allowed to fire twice,
-	# because the player really did do the work twice. What must not repeat is a
-	# bell for a transition that never happened.
+func test_a_patch_rinsed_bare_and_covered_again_does_not_ring_twice() -> void:
+	# The same trap approached from the other side, and the reason the covering
+	# ding rides on progress rather than on the patch's state. Rinsing a covered
+	# patch and covering it again leaves it exactly where it already was, so the
+	# second arrival is not a transition — and a bell that rang for it would be a
+	# bell the player could ring for ever on one square, with the score that
+	# follows it doing the same.
 	_wash_bare(_middle(), 2.0)
 	var first: int = 0
 	for _sweep: int in 200:
@@ -405,4 +442,25 @@ func test_a_patch_rinsed_bare_can_be_covered_and_ring_again() -> void:
 	var again: int = 0
 	for _sweep: int in 200:
 		again += _map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
-	assert_eq(again, first, "re-covering a rinsed face did not report the same patches")
+	assert_eq(again, 0, "re-covering a rinsed face rang for ground it had already covered")
+
+
+func test_covering_new_ground_after_a_rinse_still_rings() -> void:
+	# And the guard against overcorrecting into a map that rings once and then goes
+	# quiet: a patch that never came up covered has genuinely not finished the pass,
+	# so finishing it later — even after the jet has been over it — is a first time
+	# and rings like one.
+	_wash_bare(_middle(), 2.0)
+	# A brush too narrow to finish any of them: the point is the corner the four
+	# patches of the face meet at, so each gets a quarter of the splash and none
+	# comes up covered.
+	var partial: int = 0
+	for _sweep: int in 200:
+		partial += _map.foam(_middle(), Vector3.RIGHT, 0.3, 0.05).size()
+	assert_eq(partial, 0, "the narrow brush finished a patch, so the rinse below proves nothing")
+	for _sweep: int in 60:
+		_map.wash(_middle(), Vector3.RIGHT, 2.0, 0.2)
+	var rung: int = 0
+	for _sweep: int in 400:
+		rung += _map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
+	assert_eq(rung, PATCHES * PATCHES, "covering the face for the first time did not ring")
