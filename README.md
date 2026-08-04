@@ -17,10 +17,12 @@ hand. There is nothing drawn on screen to move you: press near the edge of the
 frame and you go that way — sideways to walk around the car, up or down to
 raise and lower your eye, a corner to do both — at whatever speed you reach out
 to, and back to the middle to stop. Press in the middle and you are working on
-the car instead, which is the whole of the scheme: a band one thumb thick round
-the edge of the glass steers, everything inside it cleans, and no press ever
-does both. The arrow keys and WASD do the same job at a desk. A **T** in the
-bottom-left corner rolls out the five tools you carry.
+the car instead, which is the whole of the scheme: a band round the edge of the
+glass steers, everything inside it cleans, and no press ever does both. The band
+is a quarter of the way in on each axis and never thinner than a thumb, so it is
+the same share of the screen whether you hold the phone upright or sideways. The
+arrow keys and WASD do the same job at a desk. A **T** in the bottom-left corner
+rolls out the five tools you carry.
 Press anywhere on the car and the tool in your hand swings to point at it,
 with a red crosshair on the paint where it lands; press past the car and the
 crosshair snaps to the nearest bodywork instead. Holding is aiming, letting go

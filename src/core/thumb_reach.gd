@@ -96,17 +96,45 @@ const DIRECTIONS: Array[Vector2i] = [LEFT, RIGHT, UP, DOWN]
 ## How much of each axis stays a trigger no matter how thick the band is, as a
 ## fraction of the half-extent.
 ##
-## The band is measured in pixels and the screen is not: a browser window can be
-## short enough that a border a tap target thick from the top and another from the
-## bottom would meet in the middle, leaving nothing to aim at and a camera that
-## walks whenever the player touches the car. The floor keeps the middle half of
-## every axis a trigger and lets the band be the thinner of the two things
+## The minimum band is measured in pixels and the screen is not: a browser window
+## can be short enough that a border a tap target thick from the top and another
+## from the bottom would meet in the middle, leaving nothing to aim at and a camera
+## that walks whenever the player touches the car. The floor keeps the middle half
+## of every axis a trigger and lets the band be the thinner of the two things
 ## instead, which is the failure worth having — a shorter reach to full speed,
 ## rather than a game with no trigger in it.
 const MIN_TRIGGER_FRACTION: float = 0.5
 
+## How thick the band is on an axis, as a fraction of that axis's half-extent.
+##
+## [b]This is proportional and not a fixed pixel count, and a phone in portrait is
+## the reason.[/b] The first version of this took [method steer_band] as the
+## thickness on all four sides, which is the right size in the abstract and the
+## wrong size in practice — because `window/stretch/aspect` is `expand`, so a
+## portrait phone does not letterbox the 16:9 design, it grows the viewport
+## downward. Measured in a real browser at 411x838 CSS px: the viewport comes out
+## 1280 x 2611 design px, and a band of 164 design px is 52.6 CSS px — 12.8% of the
+## width, which is fine, and [b]6.3% of the height[/b], which is not. That put "raise
+## your eye" in a sliver at the top and bottom edges of a tall phone: the two hardest
+## places on the device to reach, and on Firefox for Android the two the browser
+## itself owns — its toolbar sits along the bottom and a drag at the top is a
+## pull-to-refresh. Turning worked and lifting did not.
+##
+## A quarter of the half-extent is the same fraction of the screen whatever shape
+## the screen is, so the band cannot be squeezed by an aspect ratio again. At
+## 411x838 it makes the top and bottom bands 105 CSS px instead of 52.6 — clear of
+## the browser's furniture, and twice the travel to ramp the lift over, which was
+## twitchy at the old thickness for the same reason.
+##
+## A quarter is also very close to [method steer_band] on the narrowest screen the
+## game targets, which is why the two agree rather than fight: at 375 CSS px the
+## half-width is 187 px and a quarter of it is 47, against a 48 px tap target. So on
+## a small screen the floor takes over and on a big or oddly-shaped one the fraction
+## does, and neither ever hands the player a band they cannot hit.
+const BAND_FRACTION: float = 0.25
 
-## How thick the steering band is, in design pixels.
+
+## The smallest a band may be, in design pixels, whatever shape the screen is.
 ##
 ## [method TouchTarget.min_design_size] — 164 design px today, about 13 mm on the
 ## narrowest screen the game targets. The same number the stick's radius was, and
@@ -114,18 +142,29 @@ const MIN_TRIGGER_FRACTION: float = 0.5
 ## reliably hit this" means, and a movement control nobody can hit reads as a game
 ## that has frozen.
 ##
-## [b]It is the one number here worth playing with.[/b] Thicker is a band that is
-## easier to reach and less of the frame you can start a press in; thinner is the
-## reverse, and the failure it buys is worse — a press meant for the mud near the
-## edge of the car that walks the camera instead reads as a game that ignored you.
-## So it errs on the generous side, and the drag rule above is what pays for it.
+## A floor rather than the thickness itself — see [constant BAND_FRACTION] for the
+## measurement that made it one. What it still does is the small-screen case, where
+## a quarter of the half-extent is less than a finger.
 static func steer_band() -> float:
 	return TouchTarget.min_design_size()
 
 
+## How thick the band actually is on each axis, for a screen [param half] the size
+## of and a minimum band [param band] px thick.
+##
+## The greater of [constant BAND_FRACTION] of the axis and [param band], which is
+## the whole rule: proportional so an aspect ratio cannot squeeze it, floored so a
+## small screen cannot make it unhittable.
+##
+## Public because it is the number worth reading when asking "can a thumb get at
+## this on that phone", which is the question the fixed-thickness version got wrong.
+static func band_axes(half: Vector2, band: float) -> Vector2:
+	return Vector2(_band_axis(half.x, band), _band_axis(half.y, band))
+
+
 ## How far from the middle of the glass a press can land and still be a trigger,
-## per axis, given a screen [param half] the size of and a band [param band]
-## thick.
+## per axis, given a screen [param half] the size of and a minimum band
+## [param band] thick.
 ##
 ## [param half] is half the screen, so these are half-extents too: the quiet
 ## region is the box they describe, centred on the glass. Public because it is the
@@ -133,7 +172,8 @@ static func steer_band() -> float:
 ## that wants to know whether the band has been squeezed by
 ## [constant MIN_TRIGGER_FRACTION] can compare the two.
 static func trigger_axes(half: Vector2, band: float) -> Vector2:
-	return Vector2(_trigger_axis(half.x, band), _trigger_axis(half.y, band))
+	var thickness: Vector2 = band_axes(half, band)
+	return Vector2(_trigger_axis(half.x, thickness.x), _trigger_axis(half.y, thickness.y))
 
 
 ## Whether a press [param offset] from the middle of the glass is asking to move
@@ -234,17 +274,28 @@ static func steer_point(direction: Vector2i, half: Vector2, band: float) -> Vect
 	return Vector2(float(direction.x) * across.x, -float(direction.y) * across.y)
 
 
-## One axis of [method trigger_axes]: how far out the quiet region reaches on an
-## axis that is [param half] long from the middle, with a band [param band] thick
-## taken off it.
+## One axis of [method band_axes]: how thick the band is on an axis that is
+## [param half] long from the middle, given a minimum of [param band] px.
 ##
-## A negative band is treated as none rather than as a band that grows the quiet
-## region past the screen, which would put full deflection somewhere a finger
-## cannot reach.
-static func _trigger_axis(half: float, band: float) -> float:
+## A negative minimum is treated as none rather than as one that shrinks the band,
+## which would let a typo delete the movement control.
+static func _band_axis(half: float, band: float) -> float:
 	if half <= 0.0:
 		return 0.0
-	return maxf(half - maxf(band, 0.0), half * MIN_TRIGGER_FRACTION)
+	return maxf(half * BAND_FRACTION, maxf(band, 0.0))
+
+
+## One axis of [method trigger_axes]: how far out the quiet region reaches on an
+## axis that is [param half] long from the middle, with a band already sized to
+## [param thickness] taken off it.
+##
+## Floored rather than allowed to go negative, for the reason
+## [constant MIN_TRIGGER_FRACTION] records: a band thicker than the axis is a screen
+## with nothing on it to press.
+static func _trigger_axis(half: float, thickness: float) -> float:
+	if half <= 0.0:
+		return 0.0
+	return maxf(half - thickness, half * MIN_TRIGGER_FRACTION)
 
 
 ## One axis of the ask: how hard [param reach] from the middle is pushing, given

@@ -240,10 +240,25 @@ func _settle() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
 
 
-## Puts a finger on the glass at [param at], or takes it off again.
+## [param at] in the screen's own coordinates, as the window coordinate a touch has
+## to arrive at to land there.
+##
+## [b]The two are the same number at the design resolution and only there.[/b]
+## [method Input.parse_input_event] takes a window coordinate, and the engine scales
+## it into the canvas by `window/stretch/mode` on the way in — which is a no-op while
+## `before_each` holds the window at `content_scale_size`, and is emphatically not one
+## in [method test_a_portrait_phone_can_still_reach_the_band_that_moves_your_eye],
+## which resizes away from it on purpose. Measured the hard way: without this the
+## portrait press landed at 1.8x its intended depth into the glass, missed the band
+## entirely and read as a control that had stopped working.
+func _on_the_window(at: Vector2) -> Vector2:
+	return get_tree().root.get_final_transform() * at
+
+
+## Puts a finger on the glass at [param at], in the screen's own coordinates.
 func _touch(at: Vector2, pressed: bool) -> void:
 	var touch: InputEventScreenTouch = InputEventScreenTouch.new()
-	touch.position = at
+	touch.position = _on_the_window(at)
 	touch.pressed = pressed
 	Input.parse_input_event(touch)
 	Input.flush_buffered_events()
@@ -254,7 +269,7 @@ func _touch(at: Vector2, pressed: bool) -> void:
 ## of pair that gets one half wired.
 func _drag(at: Vector2) -> void:
 	var dragged: InputEventScreenDrag = InputEventScreenDrag.new()
-	dragged.position = at
+	dragged.position = _on_the_window(at)
 	Input.parse_input_event(dragged)
 	Input.flush_buffered_events()
 
@@ -411,6 +426,60 @@ func test_losing_focus_stops_a_walk_nobody_can_let_go_of() -> void:
 	var stopped: float = _bearing()
 	await wait_physics_frames(30)
 	assert_almost_eq(_walked(stopped), 0.0, TOLERANCE, "the camera must not still be walking")
+
+
+func test_a_portrait_phone_can_still_reach_the_band_that_moves_your_eye() -> void:
+	# [b]The bug a phone found and this suite could not.[/b] `window/stretch/aspect`
+	# is `expand`, so a portrait screen does not letterbox the 16:9 design — it grows
+	# the viewport downward, to 1280 x 2611 design px on a 411x838 CSS phone. A band
+	# of a fixed 164 design px is 6.3% of that height, tucked into the two hardest
+	# edges of the device to reach and, in Firefox for Android, the two the browser
+	# owns: its toolbar along the bottom, pull-to-refresh at the top. Turning worked
+	# and lifting did not. [constant ThumbReach.BAND_FRACTION] has the fix.
+	#
+	# Driven through a real resize and a real finger rather than asserted on the
+	# arithmetic, because the arithmetic is
+	# [code]tests/unit/test_thumb_reach.gd[/code]'s and what is new here is the whole
+	# chain surviving a shape the game is genuinely played in.
+	get_tree().root.size = Vector2i(720, 1280)
+	# Two frames: one for the window, one for the anchors to have re-laid the screen
+	# out under it, since every number below is read off the screen's own size.
+	await wait_process_frames(2)
+	var half: Vector2 = _screen.size * 0.5
+	assert_gt(half.y, half.x, "the test needs a viewport that is actually portrait")
+	assert_gt(
+		ThumbReach.band_axes(half, ThumbReach.steer_band()).y,
+		ThumbReach.steer_band(),
+		"a tall screen has to get more than the floor, or lifting is unreachable again"
+	)
+	await _settle()
+	var standing: float = _camera().global_position.y
+	var at: Vector2 = _steer_point(ThumbReach.DOWN)
+	_touch(at, true)
+	await wait_physics_frames(30)
+	var lowered: float = _camera().global_position.y
+	_touch(at, false)
+	assert_lt(lowered, standing, "a thumb in the bottom band of a portrait phone lowers the eye")
+
+
+func test_a_browser_resizing_under_a_held_thumb_does_not_stop_the_walk() -> void:
+	# A phone browser changes the viewport whenever its own toolbar shows or hides,
+	# which on Firefox for Android happens under a thumb that is already down. The
+	# first version of this screen let go of the steer on [signal Control.resized] to
+	# avoid reporting a direction measured against an old middle — so the walk died
+	# every time the toolbar moved. Keeping the finger's position instead of its
+	# offset makes a resize a non-event, and this is what says so.
+	await _settle()
+	var at: Vector2 = _steer_point(ThumbReach.RIGHT)
+	_touch(at, true)
+	await wait_physics_frames(10)
+	get_tree().root.size = Vector2i(1000, 700)
+	await wait_process_frames(2)
+	var before: float = _bearing()
+	await wait_physics_frames(30)
+	var walked: float = _walked(before)
+	_touch(at, false)
+	assert_gt(walked, 0.0, "the walk has to survive the browser moving its own furniture")
 
 
 func test_a_press_on_the_car_does_not_walk_the_camera() -> void:

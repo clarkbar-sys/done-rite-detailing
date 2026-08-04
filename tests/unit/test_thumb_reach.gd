@@ -20,12 +20,25 @@ const TOLERANCE: float = 0.0001
 ## it is tall like the design is, and deliberately not the shipping size: these are
 ## arithmetic tests with worked numbers beside them, and a test that only ever saw
 ## the real resolution would keep passing if the mapping started depending on it.
-const HALF: Vector2 = Vector2(500.0, 300.0)
+const HALF: Vector2 = Vector2(500.0, 400.0)
 
-## A band to measure against, and round for the same reason. It leaves the quiet
-## region 400 x 200 and gives each axis 100 px of travel, so every number below can
-## be read off by hand.
-const BAND: float = 100.0
+## A minimum band to measure against, and round for the same reason. Chosen to sit
+## between the two rules that could take over from it, so that this file measures the
+## plain case: above [constant ThumbReach.BAND_FRACTION] of both half-extents, which
+## is 125 and 100, and below what would push either axis into
+## [constant ThumbReach.MIN_TRIGGER_FRACTION], which is 250 and 200. That is the
+## shape the shipping 16:9 design gets, where the floor is what decides. It leaves the
+## quiet region 350 x 250 and gives each axis 150 px of travel, so every number can be
+## read off by hand. The two rules it steps around are pinned in
+## [method test_a_tall_screen_gets_a_band_in_proportion_to_it] and
+## [method test_a_short_screen_keeps_a_trigger_in_the_middle_of_it].
+const BAND: float = 150.0
+
+## A portrait phone, as half-extents in design pixels, and not a made-up one:
+## measured in a real browser at 411x838 CSS px, where `window/stretch/aspect` being
+## `expand` makes the viewport 1280 x 2611 design px. The shape the fixed-thickness
+## band got wrong.
+const PORTRAIT: Vector2 = Vector2(640.0, 1305.5)
 
 ## How many samples the ramp sweep takes. Fine enough to catch a step in the middle
 ## of it, coarse enough to stay a unit test.
@@ -64,6 +77,53 @@ func test_the_band_is_the_frame_less_one_band_on_every_side() -> void:
 	# from it: the quiet region is the screen inset by the band, not a fraction of
 	# the screen and not a circle inscribed in it.
 	assert_almost_eq(_quiet(), HALF - Vector2(BAND, BAND), Vector2.ONE * TOLERANCE)
+
+
+func test_a_tall_screen_gets_a_band_in_proportion_to_it() -> void:
+	# [b]The bug this is here for was found on a phone and could not have been found
+	# in this file as it was.[/b] `window/stretch/aspect` is `expand`, so a portrait
+	# phone does not letterbox the 16:9 design — it grows the viewport downward, to
+	# 1280 x 2611 design px at 411x838 CSS. A band of a fixed 164 design px is then
+	# 12.8% of the width and 6.3% of the height: "raise your eye" ended up in a sliver
+	# at the top and bottom edges of a tall phone, which is where the browser's own
+	# toolbar and its pull-to-refresh live. Turning worked and lifting did not.
+	#
+	# Proportional fixes it because a quarter of the axis is a quarter of the axis
+	# whatever shape the screen is. Asserted as the ratio rather than as 326.375, so
+	# it keeps meaning "a quarter of the height" if the constant is retuned.
+	var thickness: Vector2 = ThumbReach.band_axes(PORTRAIT, ThumbReach.steer_band())
+	assert_almost_eq(
+		thickness.y,
+		PORTRAIT.y * ThumbReach.BAND_FRACTION,
+		TOLERANCE,
+		"a tall axis has to give its band room in proportion"
+	)
+	assert_gt(
+		thickness.y,
+		ThumbReach.steer_band() * 1.5,
+		"and that has to be a real improvement on the fixed thickness, not a rounding"
+	)
+	# The narrow axis of the same screen is where the floor still does the work: a
+	# quarter of 640 is 160, under the 164 a finger needs.
+	assert_almost_eq(
+		thickness.x, ThumbReach.steer_band(), TOLERANCE, "the floor still holds the short axis up"
+	)
+
+
+func test_the_shipping_design_is_the_case_where_the_floor_decides() -> void:
+	# 16:9 at the base resolution, which is what every integration suite presses
+	# against. A quarter of 640 is 160 and a quarter of 360 is 90, both under the tap
+	# target — so the band is the floor on both axes and the proportional rule changes
+	# nothing here. Worth pinning, because it is why adding the fraction did not move
+	# a single one of those suites.
+	var design: Vector2 = Vector2(TouchTarget.design_width(), 720.0) * 0.5
+	var thickness: Vector2 = ThumbReach.band_axes(design, ThumbReach.steer_band())
+	assert_almost_eq(
+		thickness,
+		Vector2.ONE * ThumbReach.steer_band(),
+		Vector2.ONE * TOLERANCE,
+		"the design resolution is floored on both axes"
+	)
 
 
 func test_a_press_in_the_middle_of_the_glass_cleans_rather_than_walks() -> void:
@@ -213,10 +273,10 @@ func test_every_side_of_the_frame_has_a_place_a_press_can_land_and_steer() -> vo
 
 
 func test_a_short_screen_keeps_a_trigger_in_the_middle_of_it() -> void:
-	# The band is in pixels and the glass is not. A browser window short enough that
-	# a band off the top and another off the bottom would meet leaves nothing to aim
-	# at and a camera that walks whenever the player touches the car; the floor makes
-	# the band the thing that gives way instead.
+	# The minimum band is in pixels and the glass is not. A browser window short
+	# enough that a band off the top and another off the bottom would meet leaves
+	# nothing to aim at and a camera that walks whenever the player touches the car;
+	# the floor makes the band the thing that gives way instead.
 	var squat: Vector2 = Vector2(500.0, 100.0)
 	var quiet: Vector2 = ThumbReach.trigger_axes(squat, BAND * 4.0)
 	assert_almost_eq(
@@ -242,17 +302,21 @@ func test_a_screen_with_no_size_walks_nobody_anywhere() -> void:
 	assert_eq(ThumbReach.input_from(Vector2(10.0, 10.0), Vector2.ZERO, BAND), Vector2.ZERO)
 
 
-func test_a_band_with_no_thickness_leaves_the_whole_screen_a_trigger() -> void:
-	# The degenerate end of the tuning knob, pinned so that a band accidentally set
-	# to zero fails as "the camera stopped moving" rather than as a divide by zero
-	# on the frame's own edge. Negative is treated the same, rather than as a band
-	# that grows the quiet region out past the glass.
+func test_a_minimum_of_nothing_still_leaves_a_band_to_steer_with() -> void:
+	# The degenerate end of the tuning knob. It used to be that a band set to zero
+	# deleted the movement control outright; now the floor is only a floor, so the
+	# proportional rule underneath keeps a quarter of each axis whatever anybody types
+	# here. Negative is treated as zero rather than as a band that eats into itself.
 	for band: float in [0.0, -BAND]:
 		assert_almost_eq(
-			ThumbReach.trigger_axes(HALF, band), HALF, Vector2.ONE * TOLERANCE, "%s px" % band
+			ThumbReach.band_axes(HALF, band),
+			HALF * ThumbReach.BAND_FRACTION,
+			Vector2.ONE * TOLERANCE,
+			"%s px" % band
 		)
-		assert_false(ThumbReach.steers(_right(HALF.x), HALF, band), "%s px steers nowhere" % band)
-		assert_eq(ThumbReach.input_from(_right(HALF.x * 10.0), HALF, band), Vector2.ZERO)
+		assert_true(
+			ThumbReach.steers(_right(HALF.x), HALF, band), "%s px still steers at the edge" % band
+		)
 
 
 func test_the_shipping_band_is_the_size_a_finger_can_actually_hit() -> void:
@@ -261,3 +325,7 @@ func test_the_shipping_band_is_the_size_a_finger_can_actually_hit() -> void:
 	# written for — and the band inherits it, because the band *is* the control.
 	assert_almost_eq(ThumbReach.steer_band(), TouchTarget.min_design_size(), TOLERANCE)
 	assert_gt(ThumbReach.steer_band(), 0.0, "a band of nothing would be no control at all")
+	# And the fraction has to be small enough to leave a trigger and big enough to be
+	# a band, which is the pair of failures either end of it produces.
+	assert_gt(ThumbReach.BAND_FRACTION, 0.0, "no fraction is no band on a large screen")
+	assert_lt(ThumbReach.BAND_FRACTION, 1.0 - ThumbReach.MIN_TRIGGER_FRACTION, "and no trigger")

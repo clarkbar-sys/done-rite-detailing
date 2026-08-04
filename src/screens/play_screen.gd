@@ -33,11 +33,12 @@
 ##
 ## [b]Movement and the trigger are now the same press, sorted by where it
 ## landed[/b], and this file is the thing that sorts them. [ThumbReach] owns the
-## rule — a band one tap target thick round the edge of the glass steers, and
-## everything inside it aims and fires — and the whole of its argument is in that
-## class. What belongs here is the bookkeeping: a press is asked once, at the
-## instant it goes down, which of the two jobs it has, and it keeps that job until
-## it lifts. So a press that started on the car can be dragged out to the sill, the
+## rule — a band round the edge of the glass steers, a quarter of the way in on
+## each axis and never thinner than a tap target, and everything inside it aims and
+## fires — and the whole of its argument is in that class. What belongs here is the
+## bookkeeping: a press is asked once, at the instant it goes down, which of the two
+## jobs it has, and it keeps that job until it lifts. So a press that started on the
+## car can be dragged out to the sill, the
 ## roofline or clean off the glass and goes on cleaning; a press that started in the
 ## band can be pulled back into the middle to settle the shot and goes quiet
 ## without letting go. Deciding it fresh on every drag event instead would make the
@@ -236,11 +237,21 @@ var _finger: int = NO_FINGER
 ## slot would make washing while walking impossible by construction.
 var _steer_finger: int = NO_FINGER
 
-## Where that pointer is, relative to the middle of the glass, in this screen's own
-## coordinates. Meaningless while [member _steer_finger] is [constant NO_FINGER],
-## and zeroed on release rather than left behind, so a stray read cannot report the
-## last direction anybody held.
-var _steer_offset: Vector2 = Vector2.ZERO
+## Where that pointer is, in this screen's own coordinates. Meaningless while
+## [member _steer_finger] is [constant NO_FINGER], and zeroed on release rather than
+## left behind, so a stray read cannot report the last place anybody held.
+##
+## [b]Where the finger is and not how far it is from the middle, which is a mobile
+## browser bug rather than a preference.[/b] Storing the offset means storing an
+## answer that goes stale the moment the screen changes shape — and on a phone the
+## screen changes shape constantly, because showing or hiding the browser's own
+## toolbar resizes the visual viewport under a thumb that is already down. The first
+## version of this let go of the steer on [signal Control.resized] to stay honest,
+## which on Firefox for Android meant the walk died every time the toolbar moved.
+## Keeping the position and subtracting [method _middle] at the point of use makes a
+## resize a non-event: the finger has not moved on the glass, the middle has, and the
+## direction that falls out is the true one on the new shape.
+var _steer_at: Vector2 = Vector2.ZERO
 
 ## The running score. Built here rather than read off anything, because unlike
 ## the belt there is nothing else in the game that has one — and unlike the belt
@@ -276,12 +287,8 @@ func _ready() -> void:
 	_garage.aimed.connect(_on_aimed)
 	_garage.grimed.connect(_on_grimed)
 	_masks.debug_tools_toggled.connect(_on_debug_tools_toggled)
-	# A screen that changed shape under a held thumb has moved the middle of the
-	# glass out from under it, and an offset measured against the old middle is not
-	# a direction anybody is asking for any more. The stick dropped its finger on
-	# relayout for the same reason; the band inherits the debt because the band is
-	# derived from the screen's own size.
-	resized.connect(_drop_the_steer)
+	# Nothing listens for `resized`, and that is deliberate — see [member _steer_at]
+	# for the mobile-browser measurement that took the listener out again.
 	_readout.text = ""
 
 
@@ -416,7 +423,7 @@ func _finger_moved(index: int, at: Vector2, pressed: bool) -> void:
 		if _steer_finger != NO_FINGER:
 			return
 		_steer_finger = index
-		_steer_offset = at - _middle()
+		_steer_at = at
 		return
 	if _finger != NO_FINGER:
 		return
@@ -446,7 +453,7 @@ func _finger_lifted(index: int) -> void:
 ## phone is exactly how a thumb leaves the glass.
 func _finger_dragged(index: int, at: Vector2) -> void:
 	if index == _steer_finger:
-		_steer_offset = at - _middle()
+		_steer_at = at
 		return
 	if index != _finger:
 		return
@@ -462,7 +469,7 @@ func _finger_dragged(index: int, at: Vector2) -> void:
 func _steer_input() -> Vector2:
 	if _steer_finger == NO_FINGER:
 		return Vector2.ZERO
-	return ThumbReach.input_from(_steer_offset, _middle(), ThumbReach.steer_band())
+	return ThumbReach.input_from(_steer_at - _middle(), _middle(), ThumbReach.steer_band())
 
 
 ## The middle of the glass, in this screen's own coordinates — and, because
@@ -486,7 +493,7 @@ func _middle() -> Vector2:
 ## check or an event to answer.
 func _drop_the_steer() -> void:
 	_steer_finger = NO_FINGER
-	_steer_offset = Vector2.ZERO
+	_steer_at = Vector2.ZERO
 
 
 ## Both flags let go when the game stops being the thing in front of the player.
