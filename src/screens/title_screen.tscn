@@ -49,13 +49,37 @@ stretch_mode = 5
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 
-[node name="Start" type="Button" parent="Center/Column"]
+; Start and Call side by side rather than stacked, and the reason is the height
+; budget rather than a preference. The design is 720 px tall; the framed logo is
+; 343 of them and a tap target is 164 at the very least (see TouchTarget), so a
+; second button under Start puts this column past the bottom of the screen — and
+; a CenterContainer answers that by overflowing both ends, which would take the
+; top off the logo as well. Side by side is also what the site does with its own
+; pair of buttons, and what the mockups in issue #75 do with theirs.
+[node name="Buttons" type="HBoxContainer" parent="Center/Column"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 16
+
+[node name="Start" type="Button" parent="Center/Column/Buttons"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(440, 176)
 layout_mode = 2
 size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 64
 text = "Start"
+
+; The number is written in by the script, not here: it is the business's, it
+; already lives in Service, and a second copy in a scene file is one no test
+; reads and no grep finds. Smaller type than Start on purpose — this is the
+; button you press instead, not the one you press first.
+[node name="Call" type="Button" parent="Center/Column/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(440, 176)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 40
+text = "Call"
 
 [node name="Build" type="Label" parent="."]
 unique_name_in_owner = true

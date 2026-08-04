@@ -154,6 +154,18 @@ func test_the_icons_are_in_belt_order() -> void:
 	assert_lt(previous_top, toggle_top + 1.0, "the roll-up grows upward out of the corner")
 
 
+func test_every_icon_names_its_tool_and_the_service_it_does() -> void:
+	# The belt's half of making the game a demonstration of the service menu.
+	# Both halves are asserted because either alone is the wrong sentence: the
+	# tool without the service is the old label back, and the service without the
+	# tool leaves three icons all reading "Hand Wash & Dry".
+	for index: int in _belt.size():
+		var carried: DetailingTool = _belt.tools()[index]
+		var tip: String = _hud.icon_at(index).tooltip_text
+		assert_true(tip.contains(carried.display_name), "icon %d must name its tool" % index)
+		assert_true(tip.contains(carried.service), "icon %d must name what it is doing" % index)
+
+
 func test_pressing_the_toggle_expands_and_pressing_again_collapses() -> void:
 	_hud.toggle_button().pressed.emit()
 	assert_true(_hud.is_expanded(), "the T rolls the tools out")

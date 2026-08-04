@@ -155,6 +155,29 @@ mode cannot show a wash the game would not have given you, and the day one of
 those breaks the title screen breaks with it. The one thing it does that you
 cannot is put the mud back at the end of a lap.
 
+And the game now says what it is a game *about*. Done Rite is a real business
+that sells four named things, and three of them are the three passes you have
+been doing all along — so the belt and the corner call them by those names. The
+power wash, the sponge and the window cleaner are Hand Wash & Dry, the tyre
+cleaner is the whole of Wheel & Tire Shine, and the drying rag's buff is Protect
+& Maintain, which is sorted by the work each does rather than by the noun on the
+bottle. Every patch that comes clean now throws the service that paid for it
+above its `+400`, so a run of them reads as a job being done to a menu instead
+of a texture changing colour. The fourth, Interior Deep Clean, is on no tool,
+because the car has no inside — a gap the tests assert rather than leave to be
+rediscovered. [`Service`](./src/core/service.gd) is those four strings
+transcribed from the business's own page, the way
+[`Brand`](./src/core/brand.gd) is its stylesheet, and
+[`tests/unit/test_service.gd`](./tests/unit/test_service.gd) holds this repo to
+that page a second time so a rename on the site is a red build rather than a
+game advertising work nobody sells.
+
+The title screen carries the other direction: beside Start, in the site's own
+dark button rather than its red one, is the number the business is actually
+reached on, and pressing it opens the dialler. It is deliberately the quieter of
+the two — somebody who came here to play should press Start, and somebody who
+came for a quote should not have to finish a car first.
+
 The room is still
 boxes and the car is still a green one under all that; see the
 [day-0 initiative](https://github.com/clarkbar-sys/done-rite-detailing/issues/5)

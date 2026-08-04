@@ -359,9 +359,20 @@ class ToolIcon:
 	## Tells this badge which tool it stands for. Separate from
 	## [method Object._init] because [Button] has its own and a subclass that
 	## replaces it has to keep calling it.
+	##
+	## [b]The tooltip names the service as well as the tool[/b] — "Sponge — Hand
+	## Wash & Dry" — which is the belt's half of making the game a demonstration
+	## of what is being sold rather than a game that happens to share a name with
+	## it. [member DetailingTool.service] has that argument.
+	##
+	## A tooltip reaches a mouse and not a thumb, and this is the corner of a
+	## phone screen. That is a real limit rather than an oversight, and it is why
+	## the service is also printed by [method ScoreHud.score], where every player
+	## sees it on every patch: this line is the desk's version of the same
+	## sentence, not the only place it is said.
 	func carry(shown: DetailingTool) -> void:
 		_tool = shown
-		tooltip_text = shown.display_name
+		tooltip_text = "%s — %s" % [shown.display_name, shown.service]
 		queue_redraw()
 
 	## Marks this badge as the tool in the player's hands.

@@ -66,6 +66,10 @@ func _start_button() -> Button:
 	return _screen.get_node("%Start") as Button
 
 
+func _call_button() -> Button:
+	return _screen.get_node("%Call") as Button
+
+
 func _garage() -> Garage:
 	return _screen.get_node("Garage") as Garage
 
@@ -151,6 +155,76 @@ func test_every_face_of_start_is_dressed() -> void:
 			start.has_theme_stylebox_override(state),
 			"Start's `%s` box must come from Brand" % state
 		)
+
+
+# ---- the business: the number the game is named after -----------------------
+#
+# Everything up to the press, and deliberately not the press itself. The handler
+# is one line to `OS.shell_open`, and a test that fired it would be asking CI's
+# container to place a phone call; `tests/unit/test_service.gd` asserts the URL
+# it would open instead, and `title_screen.gd`'s own docs record the trade.
+
+
+func test_it_offers_the_business_phone_number() -> void:
+	# The game has worn Done Rite's colours since [Brand] landed and could not
+	# reach Done Rite. This is the button that fixes that, and the assertion is
+	# on the number rather than on the button existing: a Call button that read
+	# somebody else's number would pass every other test in this file.
+	var call_button: Button = _call_button()
+	assert_not_null(call_button, "the title screen must offer the business's number")
+	if call_button == null:
+		return
+	assert_true(
+		call_button.text.contains(Service.PHONE_SPOKEN),
+		"the button must print the number the site prints, not a placeholder"
+	)
+
+
+func test_call_wears_the_dark_pill_and_start_keeps_the_red() -> void:
+	# The ordering rule the whole thing hangs on: red is what you press first,
+	# and it must stay the only red on the screen. A Call button that came out
+	# red would be a second Start.
+	var normal: StyleBoxFlat = _call_button().get_theme_stylebox("normal") as StyleBoxFlat
+	assert_not_null(normal, "Call must be a brand pill, not the theme's button")
+	if normal == null:
+		return
+	assert_eq(normal.bg_color, Brand.BUTTON_DARK, "Call is the site's dark button")
+	assert_ne(normal.bg_color, Brand.RED, "Start is the one red thing on the screen")
+	assert_eq(normal.shadow_size, 0, "and the one that glows")
+
+
+func test_every_face_of_call_is_dressed() -> void:
+	# Same gate as Start's, for the same reason: an unstyled state strands the
+	# theme's grey at the one moment the button is being used.
+	for state: String in ["normal", "hover", "pressed", "focus"]:
+		assert_true(
+			_call_button().has_theme_stylebox_override(state),
+			"Call's `%s` box must come from Brand" % state
+		)
+
+
+func test_call_is_big_enough_for_a_finger() -> void:
+	# The phone number is the business's front door, so of the two buttons this
+	# is the one that being unhittable would actually cost something.
+	var call_button: Button = _call_button()
+	var minimum: float = TouchTarget.min_design_size()
+	assert_gte(call_button.size.x, minimum, "Call is too narrow to hit on a phone")
+	assert_gte(call_button.size.y, minimum, "Call is too short to hit on a phone")
+
+
+func test_both_buttons_fit_on_the_screen() -> void:
+	# Why they are side by side rather than stacked: a second 176 px button under
+	# Start puts the column past 720, and a CenterContainer answers that by
+	# overflowing at both ends — which takes the top off the logo as well as the
+	# bottom off the button. Measured here rather than left as a comment in the
+	# scene, so the next control added to this column fails rather than clips.
+	var column: Control = _screen.get_node("Center/Column") as Control
+	assert_not_null(column, "the title card's column must be there to measure")
+	if column == null:
+		return
+	assert_lte(
+		column.size.y, _screen.size.y, "the title card must fit inside the screen it is drawn on"
+	)
 
 
 func test_start_asks_for_the_play_state() -> void:

@@ -40,6 +40,16 @@ const RED_DARK: Color = Color("#a90f16")
 ## lifted off the page rather than a hole cut in it.
 const PANEL: Color = Color("#141418")
 
+## `.btn-dark{background:#17171b}`: the site's second button — the one beside the
+## red one that is not the thing you are meant to press first.
+##
+## A literal in the stylesheet rather than a `:root` variable, which is why this
+## is the one colour here whose name is a component and not a CSS custom
+## property. Three shades off [constant PANEL] and deliberately kept apart from
+## it: a dark button that was exactly a card would read as a card, and the whole
+## job of the pair is that one of them can be pressed.
+const BUTTON_DARK: Color = Color("#17171b")
+
 ## `--line`: the hairline around every card and dark button. White at 9%, which
 ## is a highlight rather than a border — it catches the top edge and disappears
 ## everywhere else.
@@ -126,6 +136,32 @@ static func pill(fill: Color, height: float) -> StyleBoxFlat:
 	box.shadow_color = Color(fill, PILL_SHADOW_ALPHA)
 	box.shadow_size = PILL_SHADOW_SIZE
 	box.shadow_offset = Vector2(0.0, float(PILL_SHADOW_DROP))
+	return box
+
+
+## The site's other button ([code].btn-dark[/code]) at [param height] design
+## pixels tall, in [param fill]: the same pill, edged rather than lit.
+##
+## [b]No glow, and that is the difference the pair is made of.[/b] The red pill
+## carries [code]box-shadow:0 12px 30px rgba(226,27,35,.26)[/code] and this one
+## carries no shadow at all — on the site, because a dark halo under a dark
+## button on a near-black page is not visible, and here because the halo is how
+## the eye is told which of two buttons is the one to press. Reusing
+## [method pill] with a dark fill would produce exactly that: a second glowing
+## pill, in a colour nobody notices is different, competing with Start.
+##
+## What replaces it is the card's own hairline — [code]border-color:var(--line)[/code]
+## on the site, [constant LINE] here — which is what keeps the button off the
+## background it is nearly the colour of. Over a lit garage rather than a black
+## page that edge is doing more work than it does on the site, which is the
+## argument for it being here rather than a border baked into a scene.
+static func dark_pill(fill: Color, height: float) -> StyleBoxFlat:
+	var box: StyleBoxFlat = StyleBoxFlat.new()
+	box.bg_color = fill
+	box.set_corner_radius_all(roundi(height / 2.0))
+	box.corner_detail = CORNER_DETAIL
+	box.set_border_width_all(1)
+	box.border_color = LINE
 	return box
 
 

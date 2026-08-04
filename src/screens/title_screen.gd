@@ -59,6 +59,15 @@
 ## the colours and corners from [Brand] — so restyling the game is a diff in
 ## one file rather than a hunt through scenes.
 ##
+## [b]And there are two pills now, which is the site's own pair.[/b] Red is
+## Start; beside it, dark and edged rather than lit, is the phone number the
+## business is actually reached on — [method Service.tel_url] through
+## [method OS.shell_open], and [method _on_call_pressed] has the rest. The game
+## has worn Done Rite's colours since [Brand] landed and has never once been able
+## to reach Done Rite; this is the whole of that, and it is deliberately the
+## quieter of the two buttons. Somebody who came here to play should press Start,
+## and the visitor who came for a quote should not have to finish a car first.
+##
 ## The logo is imported with mipmaps and drawn with a mipmapped filter, which is
 ## not this project's default for a 2D texture. It has to be: the design is
 ## scaled to roughly a third on a phone (see [TouchTarget] for where that number
@@ -79,13 +88,18 @@ var _sounded: bool = false
 
 @onready var _build: Label = %Build
 @onready var _start: Button = %Start
+@onready var _call: Button = %Call
 @onready var _logo_card: PanelContainer = %LogoCard
 
 
 func _ready() -> void:
 	_build.text = BuildInfo.describe()
+	# Written here rather than into the scene so there is one copy of the number,
+	# in the file that transcribes it from the business's own page.
+	_call.text = "Call %s" % Service.PHONE_SPOKEN
 	_dress()
 	_start.pressed.connect(_on_start_pressed)
+	_call.pressed.connect(_on_call_pressed)
 	# So the screen is playable from the keyboard or a pad the moment it opens,
 	# rather than only by whoever brought a mouse.
 	_start.grab_focus()
@@ -145,10 +159,22 @@ func _dress() -> void:
 	)
 	_start.add_theme_stylebox_override("pressed", Brand.pill(Brand.RED_DARK, height))
 	_start.add_theme_stylebox_override("focus", Brand.focus_ring(height))
+	# The dark pill takes the same four faces and the same white type, off the
+	# same two numbers — its own height, and [Brand]. What it does not take is the
+	# red: [method Brand.dark_pill] has why the second button is edged instead of
+	# lit, and the whole of the difference between the pair is there.
+	var call_height: float = _call.custom_minimum_size.y
+	_call.add_theme_stylebox_override("normal", Brand.dark_pill(Brand.BUTTON_DARK, call_height))
+	_call.add_theme_stylebox_override(
+		"hover", Brand.dark_pill(Brand.BUTTON_DARK.lightened(Brand.HOVER_LIFT), call_height)
+	)
+	_call.add_theme_stylebox_override("pressed", Brand.dark_pill(Brand.PANEL, call_height))
+	_call.add_theme_stylebox_override("focus", Brand.focus_ring(call_height))
 	for role: String in [
 		"font_color", "font_hover_color", "font_pressed_color", "font_focus_color"
 	]:
 		_start.add_theme_color_override(role, Brand.WHITE)
+		_call.add_theme_color_override(role, Brand.WHITE)
 
 
 ## The bell, the theme stepping aside, then the game.
@@ -170,3 +196,31 @@ func _on_start_pressed() -> void:
 	ring_bell(Bell.Voice.START)
 	stop_music()
 	request_transition(PlayGameState.new())
+
+
+## Hands the business's number to whatever the platform uses for one.
+##
+## [b]The one thing in this game that reaches the business it is named after.[/b]
+## The site's front door is a phone number rather than a leaderboard, and until
+## now a player could finish a car and have no way of asking for the real thing.
+## One line, no plugin, no web-only path: [method OS.shell_open] puts a
+## [code]tel:[/code] in front of the dialler on a phone, the registered handler
+## on a desktop and the browser's own on the web build. [method Service.tel_url]
+## owns the string.
+##
+## Nothing else happens. No bell, because the counter bell means "the game is
+## starting" and this is the press that means it is not; no fade, because
+## whatever the OS does with a [code]tel:[/code] the title screen is still there
+## behind it, and music that stopped for a call that was never placed would have
+## to be started again by a press this screen has already spent.
+##
+## [b]This handler is deliberately not exercised by pressing the button.[/b]
+## Every other control here is tested through its own signal precisely so a
+## dropped connection fails in CI — but the assertion for this one would be a
+## container being asked to place a phone call. So
+## [code]tests/integration/test_title_screen.gd[/code] tests everything up to the
+## press (that the button is there, dressed, tappable and reads the right number)
+## and [code]tests/unit/test_service.gd[/code] tests the string it would open,
+## and the one line between them is left as the reviewable part.
+func _on_call_pressed() -> void:
+	OS.shell_open(Service.tel_url())

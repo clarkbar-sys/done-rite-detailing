@@ -46,7 +46,17 @@ func before_each() -> void:
 
 ## Scores one wash worth [param award], bringing the total to [param total].
 func _award(total: int, award: int, multiplier: int = 1) -> void:
-	_hud.score(total, award, GrimeMap.Stage.WASHED, multiplier)
+	_hud.score(total, award, GrimeMap.Stage.WASHED, multiplier, Service.HAND_WASH_AND_DRY)
+
+
+## The receipt the first award threw, as it is actually drawn.
+##
+## By node name because the [Label] is the thing on screen — a getter returning
+## the string the HUD meant to draw would be assertable and would not be the
+## same claim. Pop 0 is the one a fresh HUD uses first; the pool is round-robin
+## from there.
+func _first_pop() -> Label:
+	return _hud.get_node("Pop0") as Label
 
 
 func test_starts_at_nothing() -> void:
@@ -54,6 +64,31 @@ func test_starts_at_nothing() -> void:
 	assert_eq(_hud.shown(), 0, "and its digits do not read zero")
 	assert_eq(_hud.flash(), 0.0, "and it is lit before anything happened")
 	assert_eq(_hud.flying(), 0, "and something is already in the air")
+
+
+func test_a_pop_names_the_service_that_paid_it() -> void:
+	# The visible half of "the game demonstrates the service menu": every patch
+	# that comes clean says which of the business's four services just got done,
+	# on every platform, rather than only in a tooltip a thumb cannot reach.
+	_hud.score(250, 250, GrimeMap.Stage.BUFFED, 1, Service.PROTECT_AND_MAINTAIN)
+	var pop: Label = _first_pop()
+	assert_true(
+		pop.text.contains(Service.PROTECT_AND_MAINTAIN), "the receipt must name the service"
+	)
+	assert_true(pop.text.contains("+250"), "and must still say what it paid")
+
+
+func test_a_pop_is_tall_enough_for_both_its_lines() -> void:
+	# The service goes above the number because the column is a third of the
+	# screen and the two do not fit across it — see [method ScoreHud._pop]. A
+	# label sized for one line would draw the second outside its own rect.
+	_award(250, 250)
+	await wait_process_frames(1)
+	assert_gte(
+		_first_pop().size.y,
+		float(ScoreHud.POP_FONT) * float(ScoreHud.POP_LINES),
+		"a two-line receipt in a one-line box loses a line"
+	)
 
 
 func test_an_award_lands_on_the_total_at_once() -> void:

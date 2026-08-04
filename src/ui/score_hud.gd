@@ -119,6 +119,10 @@ const RUN_FONT: int = 40
 ## Point size of a pop.
 const POP_FONT: int = 36
 
+## How many lines of type a pop is: the service, then what it paid. See
+## [method _pop] for why it is not one.
+const POP_LINES: int = 2
+
 ## How thick the outline under every number is. The same treatment the panel
 ## readout gets and for the same reason: what is behind this corner is sometimes
 ## sky and sometimes tarmac, and type with no edge on it disappears into one of
@@ -185,14 +189,29 @@ func _process(delta: float) -> void:
 
 
 ## One patch paid [param award], bringing the score to [param reached], on a run
-## multiplying by [param multiplier], for a patch that finished [param stage].
+## multiplying by [param multiplier], for a patch that finished [param stage] of
+## [param service].
 ##
-## Four numbers rather than a [Scoring] handed over, so this file cannot read
-## anything it was not told and cannot be tempted to do the arithmetic again —
-## the split the class docs open on. The first is [param reached] rather than
-## `total` because [method total] is a method on this class, and GDScript treats
-## a parameter shadowing one as an error here.
-func score(reached: int, award: int, stage: GrimeMap.Stage, multiplier: int) -> void:
+## Four numbers and a string rather than a [Scoring] handed over, so this file
+## cannot read anything it was not told and cannot be tempted to do the
+## arithmetic again — the split the class docs open on. The first is
+## [param reached] rather than `total` because [method total] is a method on this
+## class, and GDScript treats a parameter shadowing one as an error here.
+##
+## [b][param service] is the business's name for the pass that just paid[/b] —
+## "Hand Wash & Dry" over the [code]+250[/code] — and it arrives as a string
+## rather than being worked out from [param stage] on purpose. Two of the three
+## passes are one service each, but the middle one is not: the sponge and the
+## window cleaner are foaming their way through Hand Wash & Dry while the tyre
+## cleaner is doing the whole of Wheel & Tire Shine, and
+## [signal Grime.patch_finished] carries a panel's name rather than its
+## [enum Surface.Kind]. So the caller — which is holding the tool that did it —
+## is the one that knows, and it says so instead of this file guessing. Same
+## reasoning as [method tint_for]'s note on why the middle colour is asked of
+## [Surface] rather than written here.
+func score(
+	reached: int, award: int, stage: GrimeMap.Stage, multiplier: int, service: String
+) -> void:
 	_total = reached
 	# The gap is measured now rather than per frame, so an award landing mid-roll
 	# retargets and still arrives in [constant ROLL_SECONDS] instead of
@@ -202,7 +221,7 @@ func score(reached: int, award: int, stage: GrimeMap.Stage, multiplier: int) -> 
 	_tint = tint_for(stage)
 	_run_label.visible = multiplier > SHOW_RUN_ABOVE
 	_run_label.text = "×%d" % multiplier
-	_pop(award)
+	_pop(award, service)
 	_paint()
 
 
@@ -301,18 +320,27 @@ func _lift_pops(delta: float) -> void:
 		_place_pop(index)
 
 
-## Starts a [code]+[param award][/code] rising from the total.
+## Starts a [param service] and a [code]+[param award][/code] rising from the
+## total.
 ##
 ## Round-robin over the pool, so a burst past [constant POPS] takes the oldest
 ## back rather than dropping the newest. The one being reclaimed is the one
 ## furthest through its own life and therefore the faintest, which is the version
 ## of "something went missing" nobody can see.
-func _pop(award: int) -> void:
+##
+## [b]The service goes above the number rather than beside it[/b], for a reason
+## that is arithmetic and not taste: the column is [method _row_width] wide,
+## which is a third of the screen, and "Protect & Maintain +900" at
+## [constant POP_FONT] does not fit inside it on the narrowest screen this game
+## is drawn at. A pop that overflowed its own rect would be a receipt sliding off
+## the edge of the screen. Two lines fit at any width the design is scaled to,
+## and they read in the right order besides — what was done, then what it paid.
+func _pop(award: int, service: String) -> void:
 	var index: int = _next_pop
 	_next_pop = (_next_pop + 1) % _pops.size()
 	if not _pops[index].visible:
 		_flying += 1
-	_pops[index].text = "+%d" % award
+	_pops[index].text = "%s\n+%d" % [service, award]
 	_pops[index].visible = true
 	_ages[index] = 0.0
 	_place_pop(index)
@@ -325,7 +353,7 @@ func _pop(award: int) -> void:
 func _place_pop(index: int) -> void:
 	var amount: float = clampf(_ages[index] / POP_SECONDS, 0.0, 1.0)
 	var pop: Label = _pops[index]
-	pop.size = Vector2(_row_width(), float(POP_FONT) * 1.5)
+	pop.size = Vector2(_row_width(), float(POP_FONT) * 1.5 * float(POP_LINES))
 	pop.position = Vector2(_left(), _pop_top() - POP_RISE * amount)
 	pop.modulate = Color(_tint, 1.0 - amount * amount)
 

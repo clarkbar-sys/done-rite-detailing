@@ -56,6 +56,46 @@ func test_every_tool_is_named() -> void:
 		assert_ne(tool_carried.display_name, "", "tool %d has no name" % tool_carried.id)
 
 
+func test_every_tool_does_one_of_the_businesss_services() -> void:
+	# Against [Service.menu] rather than against a list written here, so a tool
+	# labelled with a service the business does not sell fails rather than ships.
+	# This is the gate on "the game demonstrates the service menu": a free-text
+	# field would let the next tool be labelled "Tyres" and nothing would notice.
+	for tool_carried: DetailingTool in _tools:
+		assert_true(
+			Service.menu().has(tool_carried.service),
+			(
+				"%s claims to do %s, which is not a service"
+				% [tool_carried.display_name, tool_carried.service]
+			)
+		)
+
+
+func test_the_three_passes_are_the_three_services_they_stand_for() -> void:
+	# The mapping issue #75 asked for, asserted rather than left in a comment.
+	# The rag is Protect & Maintain and not the "Dry" half of Hand Wash & Dry —
+	# [member DetailingTool.service] has that argument at length.
+	assert_eq(_by_id(DetailingTool.Id.POWER_WASH).service, Service.HAND_WASH_AND_DRY)
+	assert_eq(_by_id(DetailingTool.Id.SPONGE).service, Service.HAND_WASH_AND_DRY)
+	assert_eq(_by_id(DetailingTool.Id.WINDOW_CLEANER).service, Service.HAND_WASH_AND_DRY)
+	assert_eq(_by_id(DetailingTool.Id.TIRE_ENGINE_CLEANER).service, Service.WHEEL_AND_TIRE_SHINE)
+	assert_eq(_by_id(DetailingTool.Id.DRYING_RAG).service, Service.PROTECT_AND_MAINTAIN)
+
+
+func test_the_belt_covers_every_service_the_car_has_an_outside_for() -> void:
+	# Three of the four, and the fourth is Interior Deep Clean — which no tool
+	# does because the car has no inside. Asserted rather than assumed so that
+	# the day a tool for it lands, this is the test that says the gap closed.
+	var covered: Array[String] = []
+	for tool_carried: DetailingTool in _tools:
+		if not covered.has(tool_carried.service):
+			covered.append(tool_carried.service)
+	assert_eq(covered.size(), 3, "the belt should cover three of the four services")
+	assert_false(
+		covered.has(Service.INTERIOR_DEEP_CLEAN), "there is no inside to clean and no tool for it"
+	)
+
+
 func test_tools_are_the_shapes_the_design_asked_for() -> void:
 	assert_eq(_by_id(DetailingTool.Id.POWER_WASH).shape, DetailingTool.Shape.CYLINDER)
 	assert_eq(_by_id(DetailingTool.Id.SPONGE).shape, DetailingTool.Shape.BOX)
@@ -133,6 +173,7 @@ func test_a_tool_keeps_what_it_was_built_with() -> void:
 	var built: DetailingTool = DetailingTool.new(
 		DetailingTool.Id.SPONGE,
 		"Test Tool",
+		"Test Service",
 		DetailingTool.Shape.BOX,
 		Vector3(1.0, 2.0, 3.0),
 		Color(0.1, 0.2, 0.3),
@@ -141,6 +182,7 @@ func test_a_tool_keeps_what_it_was_built_with() -> void:
 	)
 	assert_eq(built.id, DetailingTool.Id.SPONGE)
 	assert_eq(built.display_name, "Test Tool")
+	assert_eq(built.service, "Test Service")
 	assert_eq(built.shape, DetailingTool.Shape.BOX)
 	assert_eq(built.extent, Vector3(1.0, 2.0, 3.0))
 	assert_eq(built.albedo, Color(0.1, 0.2, 0.3))

@@ -41,10 +41,33 @@ enum Shape {
 ## Which tool this is.
 var id: Id
 
-## What a player would call it. Not shown anywhere yet — the roll-up is icons —
-## but it is what a tooltip, a label or a save file will want, and inventing it
-## per caller later is how five spellings of "Tire & Engine Cleaner" happen.
+## What a player would call it. The roll-up is icons, so this is what its
+## tooltip reads; it is also what a label or a save file will want, and inventing
+## it per caller later is how five spellings of "Tire & Engine Cleaner" happen.
 var display_name: String
+
+## Which of the business's four services this tool is doing — a [Service]
+## constant, never a string written here.
+##
+## [b]This is the whole of "the game demonstrates the service menu".[/b] The
+## three passes the job is made of already [i]are[/i] three of the four things
+## Done Rite sells; until now they were called Power Wash, Sponge and Drying Rag,
+## which are the names of the objects rather than the names of the work. Carrying
+## the service alongside the object costs one string per tool and turns the belt
+## into the menu — see [ToolBeltHud.ToolIcon.carry] and [ScoreHud.score] for the
+## two places a player reads it.
+##
+## [b]The rag is [constant Service.PROTECT_AND_MAINTAIN] and not the "Dry" of
+## Hand Wash & Dry[/b], which is the one mapping worth arguing rather than
+## asserting. By its name the rag dries; by what it does in this game it is the
+## buff pass — [GrimeMap] will not let it touch a panel that has no product on
+## it, and what it leaves behind is shine. "Vehicle-care options that help
+## preserve shine" is the site's own blurb for Protect & Maintain, so the pass is
+## sorted by the work it does rather than by the noun on the tool.
+##
+## [constant Service.INTERIOR_DEEP_CLEAN] is on no tool here, and that is not an
+## oversight: the car has no inside. [Service] has the note.
+var service: String
 
 ## The primitive this tool renders as.
 var shape: Shape
@@ -76,6 +99,7 @@ var roughness: float
 func _init(
 	tool_id: Id,
 	name_shown: String,
+	service_done: String,
 	proxy_shape: Shape,
 	proxy_extent: Vector3,
 	proxy_albedo: Color,
@@ -84,6 +108,7 @@ func _init(
 ) -> void:
 	id = tool_id
 	display_name = name_shown
+	service = service_done
 	shape = proxy_shape
 	extent = proxy_extent
 	albedo = proxy_albedo
@@ -104,6 +129,7 @@ static func catalogue() -> Array[DetailingTool]:
 		DetailingTool.new(
 			Id.POWER_WASH,
 			"Power Wash",
+			Service.HAND_WASH_AND_DRY,
 			Shape.CYLINDER,
 			Vector3(0.06, 0.72, 0.06),
 			Color(0.78, 0.80, 0.84),
@@ -117,6 +143,7 @@ static func catalogue() -> Array[DetailingTool]:
 		DetailingTool.new(
 			Id.SPONGE,
 			"Sponge",
+			Service.HAND_WASH_AND_DRY,
 			Shape.BOX,
 			Vector3(0.24, 0.10, 0.17),
 			Color(0.93, 0.82, 0.16),
@@ -131,6 +158,7 @@ static func catalogue() -> Array[DetailingTool]:
 		DetailingTool.new(
 			Id.DRYING_RAG,
 			"Drying Rag",
+			Service.PROTECT_AND_MAINTAIN,
 			Shape.PLANE,
 			Vector3(0.32, 0.0, 0.28),
 			Color(0.20, 0.42, 0.85),
@@ -144,6 +172,7 @@ static func catalogue() -> Array[DetailingTool]:
 		DetailingTool.new(
 			Id.WINDOW_CLEANER,
 			"Window Cleaner",
+			Service.HAND_WASH_AND_DRY,
 			Shape.CYLINDER,
 			Vector3(0.10, 0.26, 0.10),
 			Color(0.16, 0.66, 0.92),
@@ -157,6 +186,7 @@ static func catalogue() -> Array[DetailingTool]:
 		DetailingTool.new(
 			Id.TIRE_ENGINE_CLEANER,
 			"Tire & Engine Cleaner",
+			Service.WHEEL_AND_TIRE_SHINE,
 			Shape.CYLINDER,
 			Vector3(0.11, 0.30, 0.11),
 			Color(0.09, 0.09, 0.10),

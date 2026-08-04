@@ -448,9 +448,17 @@ func _on_grimed() -> void:
 ## the panel and the patch remain the sight's business to have already made
 ## obvious. The bell is unchanged: it says "that worked" in one voice for all
 ## three, and the paragraph above is still the argument for that.
+##
+## [b]The corner is also told which service just paid[/b], and the belt is what
+## is asked rather than [param stage], because the belt is the only thing that
+## knows. A finished patch means the tool in the player's hands moved the last of
+## something off it — that is what [GrimeMap] emits the signal on — so the
+## equipped tool at this instant is the tool that did the work, and its
+## [member DetailingTool.service] is the business's name for it.
+## [method ScoreHud.score] has why the stage on its own cannot answer this.
 func _on_patch_finished(_panel: String, _patch: int, stage: GrimeMap.Stage) -> void:
 	var award: int = _score.score(stage)
-	_scoreboard.score(_score.total(), award, stage, _score.multiplier())
+	_scoreboard.score(_score.total(), award, stage, _score.multiplier(), _belt.equipped().service)
 	ring_bell(Bell.Voice.PATCH)
 
 
