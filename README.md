@@ -25,6 +25,13 @@ is not. On a touchscreen the aim is taken a thumb's width above your finger
 rather than under it — the one part of a phone you cannot see is the part you
 are touching — so the mark stays in view while you drag it around the paint. A
 mouse aims at the pointer, because a cursor hides nothing.
+A press that only just misses is forgiven by the width of the tool you are
+holding: over the roofline, or through the gap between a wheel and its arch, a
+sphere that size is swept down the same aim and lands you on real paint, so the
+tool works there rather than merely pointing there. That matters most on a
+phone, where the thumb's lift is what put the aim over the roof in the first
+place. Miss by more than a tool's width and the mark still snaps to the nearest
+bodywork, but there is nothing under it to clean.
 
 And the trigger now spends something. The car starts under mud, and holding the
 power wash on a panel takes it off where the water lands — a patch at a time,

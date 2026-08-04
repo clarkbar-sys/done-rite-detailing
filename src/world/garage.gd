@@ -167,6 +167,17 @@
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
 ## grime work needs and the reason [signal aimed] carries a name at all.
 ##
+## [i]And a press that misses by a hair is caught before any of that.[/i] The aim
+## is answered in three tiers, each strictly wider than the one above it, and
+## [method _under_the_finger] is where they are stacked: the exact ray, then a
+## sphere the width of the held tool swept down the same line ([AimSweep]), then
+## the nearest-panel fallback ([method _nearest_on_the_car]). The middle tier is
+## the one that earns its keep on a touchscreen — [ThumbLift] throws the aim a
+## thumb's width up the glass on purpose, and over a low car that regularly puts
+## the ray in the sky — and what it buys is not a hit where there was none, but a
+## hit with a [i]measured normal[/i] where the bottom tier could only invent one.
+## [AimSweep] has the whole argument, including why it is not the first tier.
+##
 ## [b]And the tools that work the paint draw their own sight.[/b] The water the
 ## power wash throws, the product the two bottles spray, the suds the sponge
 ## squeezes out and the crosshair all three retired are one decision and live in
@@ -536,6 +547,7 @@ var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
 var _standoff: Standoff = null
 var _sight: ToolSight = null
+var _sweep: AimSweep = null
 var _racket: ToolRacket = null
 var _grime: Grime = null
 var _routine: AttractRoutine = null
@@ -794,6 +806,11 @@ func _take_up_aiming() -> void:
 	_sight = ToolSight.new(wash_radius_metres, scrub_radius_metres)
 	_sight.name = "ToolSight"
 	_car.get_parent().add_child(_sight)
+	# Built here rather than per press for the reason [AimSweep] gives: it owns two
+	# engine objects that would otherwise be allocated twice a tick for as long as a
+	# finger is dragging across the sky. Given the same reach the exact ray is cast
+	# at, because it is the same aim asked a wider question.
+	_sweep = AimSweep.new(aim_reach)
 	if noisy:
 		_racket = ToolRacket.new()
 		_racket.name = "ToolRacket"
@@ -873,19 +890,25 @@ func _resolve_aim(delta: float) -> void:
 	# docs. This is that split, and it is one line: the hand is pointed at the
 	# press, whatever the press turns out to have landed on.
 	_view_model.aim_toward(_camera.global_basis.inverse() * facing)
-	var found: Dictionary = _under_the_finger(from, facing)
+	# Asked of the belt once a tick and handed down, rather than asked again by each
+	# of the three things below that need it. Still every tick — which is the
+	# property [method _sight_the_aim] was written for, so that a tool swapped while
+	# the finger is down changes the sight, the sweep and the trigger on the same
+	# tick — but now there is one copy of the answer instead of three.
+	var held: DetailingTool = _view_model.belt().equipped()
+	var found: Dictionary = _under_the_finger(from, facing, _reach_of(held.id))
 	if found.is_empty():
 		return
 	var surface: Vector3 = found["position"]
 	var outward: Vector3 = found["normal"]
 	var panel: Node = found["collider"]
-	_sight_the_aim(surface, outward)
+	_sight_the_aim(surface, outward, held)
 	# Where it landed, which the hand needs and the direction above cannot carry: a
 	# tool held below and to one side of the lens has to be pointed at the mark
 	# rather than along the ray to reach it. See [method ViewModel.mark_at], which
 	# is also where the one case these two deliberately disagree in is written down.
 	_view_model.mark_at(surface, outward)
-	_spend_the_trigger(found, delta)
+	_spend_the_trigger(found, held.id, delta)
 	var named: String = "" if panel == null else String(panel.name)
 	if named == _marked:
 		return
@@ -906,14 +929,14 @@ func _resolve_aim(delta: float) -> void:
 ## whole subject and none of this class's.
 ##
 ## What is decided here is only what that needs handing: which tool is in the
-## player's hands, and where its business end is. Both are asked of the belt and
-## the viewmodel every tick rather than wired up on a swap, so a tool changed while
-## the finger is down changes the sight on the same tick and there is no second copy
-## of "which tool is this" to fall out of step with the first. The tool itself goes
+## player's hands, and where its business end is. [param held] is read off the belt
+## once a tick by [method _resolve_aim] and the muzzle is asked of the viewmodel
+## here, rather than either being wired up on a swap — so a tool changed while the
+## finger is down changes the sight on the same tick and there is no second copy of
+## "which tool is this" to fall out of step with the first. The tool itself comes
 ## over rather than its id, because the sponge's foam is drawn at the size of the
 ## sponge — see [method ToolSight.sight], which has the argument.
-func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
-	var held: DetailingTool = _view_model.belt().equipped()
+func _sight_the_aim(surface: Vector3, outward: Vector3, held: DetailingTool) -> void:
 	_sight.sight(surface, outward, held, _view_model.muzzle_of(held.id), debug_tools)
 	# The same tool, on the same tick, said out loud. Deliberately not under
 	# [member debug_tools]: that switch trades what a tool draws for a crosshair so
@@ -966,7 +989,7 @@ func _sight_the_aim(surface: Vector3, outward: Vector3) -> void:
 ## does not work at all teaches them to pick up the other bottle, which is the
 ## thing worth learning.
 ##
-func _spend_the_trigger(found: Dictionary, delta: float) -> void:
+func _spend_the_trigger(found: Dictionary, held: DetailingTool.Id, delta: float) -> void:
 	if _grime == null or not _grime.is_laid() or not found.get("surface", false):
 		return
 	# Read out into typed locals rather than passed straight through: a
@@ -975,37 +998,75 @@ func _spend_the_trigger(found: Dictionary, delta: float) -> void:
 	var panel: Node = found["collider"]
 	var surface: Vector3 = found["position"]
 	var outward: Vector3 = found["normal"]
-	var held: DetailingTool.Id = _view_model.belt().equipped().id
+	# How wide the brush is comes from [method _reach_of] rather than from the
+	# export named on each branch below, so that the patch this works on and the
+	# window [AimSweep] opened to find it are one number rather than two.
+	var reach: float = _reach_of(held)
 	if held == DetailingTool.Id.POWER_WASH:
-		_grime.wash(panel, surface, outward, wash_radius_metres, wash_per_second * delta)
+		_grime.wash(panel, surface, outward, reach, wash_per_second * delta)
 		return
 	if held == DetailingTool.Id.DRYING_RAG:
-		_grime.buff(panel, surface, outward, buff_radius_metres, buff_per_second * delta)
+		_grime.buff(panel, surface, outward, reach, buff_per_second * delta)
 		return
 	if held != Surface.cleaner_for(_car.kind_of(panel)):
 		return
-	_grime.foam(panel, surface, outward, scrub_radius_metres, scrub_per_second * delta)
+	_grime.foam(panel, surface, outward, reach, scrub_per_second * delta)
 
 
-## What the press landed on: the panel the ray hit, or failing that the nearest
-## bit of car to it.
+## How wide [param held] works, as a radius in metres.
+##
+## The one place the belt is turned into a size, and it is read twice: it is the
+## patch [method _spend_the_trigger] lays down, and it is the window [AimSweep]
+## forgives a near miss by. Those are deliberately the same number — the argument
+## is [AimSweep]'s, and it is that the forgiveness a player gets should be the
+## width of the brush they can already see.
+##
+## Three answers and five tools, because the three cleaners are one size: a bottle
+## and a sponge are both pressed against the paint, and only the wash is thrown
+## from a step back and only the rag is a cloth. The same grouping
+## [method _spend_the_trigger] routes on, said once instead of at each branch.
+func _reach_of(held: DetailingTool.Id) -> float:
+	if held == DetailingTool.Id.POWER_WASH:
+		return wash_radius_metres
+	if held == DetailingTool.Id.DRYING_RAG:
+		return buff_radius_metres
+	return scrub_radius_metres
+
+
+## What the press landed on: the panel the ray hit, the panel a tool-wide sphere
+## swept down the same line touched, or failing both the nearest bit of car to it.
 ##
 ## Shaped like the engine's own [method PhysicsDirectSpaceState3D.intersect_ray]
 ## result — [code]position[/code], [code]normal[/code], [code]collider[/code] —
 ## including when it is assembled by hand below, so the caller has one shape to
-## read rather than two and cannot forget which case it is in.
+## read rather than four and cannot forget which case it is in.
 ##
 ## Plus one key the engine does not set: [code]surface[/code], true when the
 ## position and the normal came off real geometry and false when they were
 ## reconstructed from a bounding box.
 ##
-## It is not "did the ray hit" — two of the three answers below come from a real
-## raycast and both set it. It is "is this a place on the car, with the car's own
-## normal", which is the only question anything writing to a texture can use:
-## everything that draws is happy with an approximation and says so by ignoring
-## this, and a projection fed an invented normal picks the wrong face of the wrong
-## panel. See [method _spend_the_trigger], which had this rule wrong once.
-func _under_the_finger(from: Vector3, facing: Vector3) -> Dictionary:
+## It is not "did the ray hit" — three of the four answers below come off real
+## geometry and all three set it. It is "is this a place on the car, with the
+## car's own normal", which is the only question anything writing to a texture can
+## use: everything that draws is happy with an approximation and says so by
+## ignoring this, and a projection fed an invented normal picks the wrong face of
+## the wrong panel. See [method _spend_the_trigger], which had this rule wrong
+## once.
+##
+## [b]Three tiers, each strictly wider than the one above it, in that order for a
+## reason.[/b] The exact ray is first because where it hits it is exactly right,
+## and it answers nearly every press. [AimSweep] is second and not first because a
+## swept sphere stops at the first thing it touches, which at a grazing angle is
+## the roof edge rather than the door being pointed at — asked only after the ray
+## came back empty, it has no exact answer left to steal. [param reach] is how wide
+## the tool in hand works ([method _reach_of]), which is the window it forgives by.
+##
+## The nearest-panel fallback stays underneath both, unchanged, because it is the
+## only one of the three that always answers: a sphere the width of a sponge is
+## bounded by definition, and a press at the horizon should still put the mark on
+## the car rather than nowhere. What the sweep took off it is the cases where it
+## was reduced to inventing a normal — see [method _nearest_on_the_car].
+func _under_the_finger(from: Vector3, facing: Vector3, reach: float) -> Dictionary:
 	var space: PhysicsDirectSpaceState3D = _camera.get_world_3d().direct_space_state
 	var hit: Dictionary = space.intersect_ray(
 		PhysicsRayQueryParameters3D.create(from, from + facing * aim_reach)
@@ -1013,6 +1074,9 @@ func _under_the_finger(from: Vector3, facing: Vector3) -> Dictionary:
 	if not hit.is_empty():
 		hit["surface"] = true
 		return hit
+	var swept: Dictionary = _sweep.onto(space, from, facing, reach)
+	if not swept.is_empty():
+		return swept
 	return _nearest_on_the_car(space, from, facing)
 
 
@@ -1026,11 +1090,20 @@ func _under_the_finger(from: Vector3, facing: Vector3) -> Dictionary:
 ## second ray goes from the eye to just past that point, and if it hits, the mark
 ## goes on the real surface with the real panel's real normal.
 ##
-## [b]When even that misses[/b] — a press level with the gap between a wheel and
-## its arch can thread the whole car — the box point is used as-is, faced at the
-## player. It is the honest answer to "nearest bit of car" and it is visibly
-## approximate, which beats showing nothing at all in the one case the player is
-## most likely to be probing at the edges of.
+## [b]When even that misses[/b] the box point is used as-is, faced at the player.
+## It is the honest answer to "nearest bit of car" and it is visibly approximate,
+## which beats showing nothing at all — but it is also the one answer nothing may
+## clean, because its normal was invented rather than measured, so a press that
+## lands here draws a working tool that moves no mud.
+##
+## [b]That last case is rarer than it was, and [AimSweep] is why.[/b] The presses
+## it used to catch were mostly near misses — a thumb-lifted aim just over the
+## roofline, or a ray threading the gap between a wheel and its arch — and those
+## are now answered a tier above this with a real normal off real paint. What is
+## left down here is the genuinely distant press: the sky well above the car, the
+## tarmac metres to one side. Which is the right shape for it. A last resort that
+## fires on a near miss is a bug wearing a fallback's clothes; a last resort that
+## fires when the player is plainly not pointing at the car is doing its job.
 func _nearest_on_the_car(
 	space: PhysicsDirectSpaceState3D, from: Vector3, facing: Vector3
 ) -> Dictionary:
