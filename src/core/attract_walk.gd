@@ -1,7 +1,7 @@
 ## The demo's thumb: how hard to push the walk to bring the eye round to the bit
 ## of car the attract mode is about to work on.
 ##
-## [b]It pushes the stick rather than moving the camera[/b], and that is the whole
+## [b]It asks for a walk rather than moving the camera[/b], and that is the whole
 ## design. A player walks around the car by handing [method Garage.steer] two
 ## numbers in [code]-1..1[/code]; so does this, through the same call, into the
 ## same [OrbitDrive], onto the same [CameraOrbit], with the same [Standoff]

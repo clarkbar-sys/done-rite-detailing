@@ -41,12 +41,12 @@
 ## which one it is in.
 ##
 ## [b]And that standing eye can now walk.[/b] [member walkaround] hands the
-## circle the standing shot was cut out of back to the player: left and right on
-## the HUD's pad walk you around the car, up and down raise and lower your eye.
-## It is deliberately a rail and not a character — there is no body, no collision
-## against the room, and no way to face away from the car — because the target is
-## a web page on a phone, where there is no mouse to capture and a virtual stick
-## costs a thumb the player needs for the tool belt. Circling the thing you are
+## circle the standing shot was cut out of back to the player: reaching left or
+## right on the glass walks you around the car, up or down raises and lowers your
+## eye. It is deliberately a rail and not a character — there is no body, no
+## collision against the room, and no way to face away from the car — because the
+## target is a web page on a phone, where there is no mouse to capture and a drawn
+## stick costs both a thumb and a third of the picture. Circling the thing you are
 ## working on is what a detailer physically does anyway, so the rail is close to
 ## free.
 ##
@@ -57,8 +57,8 @@
 ## what the title screen shows instead of a car nobody is touching.
 ##
 ## The rule it is built on is that it gets no privileges. [AttractRoutine] decides
-## what a person would do next and [AttractWalk] decides how hard they would push
-## the stick, and both answers go in through [method steer], [method aim_at] and the
+## what a person would do next and [AttractWalk] decides how hard they would reach,
+## and both answers go in through [method steer], [method aim_at] and the
 ## [ToolBelt] — the three doors a player has, and the only three. So there is no
 ## demo branch in the trigger, the aim, the standoff or the grime, the attract mode
 ## cannot show a wash the game would not have given, and the day one of those breaks
@@ -627,7 +627,7 @@ func _process(delta: float) -> void:
 ##
 ## The demo goes first of all, because it is standing in for the player and the
 ## player's presses arrive before the tick rather than during it. What it does is
-## press the glass and push the stick, so everything below reads them the same way
+## press the glass and ask for a walk, so everything below reads them the same way
 ## it reads a real one's.
 func _physics_process(delta: float) -> void:
 	_run_the_demo(delta)
@@ -644,9 +644,9 @@ func _physics_process(delta: float) -> void:
 ## nothing at all if this room is not one anybody can walk in.
 ##
 ## The room takes the numbers and not the buttons. What is on screen is the play
-## screen's business (a pad today, a stick or a swipe later), and none of that
-## should be able to reach in here; what arrives is "walk right", which is the
-## only part the camera has an opinion about.
+## screen's business (a band round the edge of the glass today, a stick or a swipe
+## later), and none of that should be able to reach in here; what arrives is "walk
+## right", which is the only part the camera has an opinion about.
 func steer(turn: float, lift: float) -> void:
 	if _drive == null:
 		return

@@ -1,9 +1,8 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/screens/play_screen.gd" id="1_play"]
 [ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
 [ext_resource type="PackedScene" path="res://src/ui/tool_belt_hud.tscn" id="3_hud"]
-[ext_resource type="PackedScene" path="res://src/ui/motion_pad.tscn" id="4_pad"]
 [ext_resource type="PackedScene" path="res://src/ui/grime_debug.tscn" id="5_grimedebug"]
 [ext_resource type="PackedScene" path="res://src/ui/score_hud.tscn" id="6_score"]
 
@@ -25,11 +24,8 @@ noisy = true
 [node name="ToolBelt" parent="." instance=ExtResource("3_hud")]
 layout_mode = 1
 
-[node name="MotionPad" parent="." instance=ExtResource("4_pad")]
-layout_mode = 1
-
-; Which panel the mark is on, in the one corner of the screen neither the
-; belt nor the pad reaches. Debug scaffolding — see `_on_aimed` in
+; Which panel the mark is on, in the one corner of the screen the belt does not
+; reach. Debug scaffolding — see `_on_aimed` in
 ; play_screen.gd — so it is a plain Label with a font big enough to read at the
 ; third-scale a phone renders this design at, and an outline because the thing
 ; behind it is sometimes sky and sometimes tarmac.

@@ -49,6 +49,9 @@ const SETTLE_FRAMES: int = 90
 ## for a reason that has nothing to do with the code.
 const RESOLVE_FRAMES: int = 4
 
+## The other thumb, for the tests where one finger steers and another cleans.
+const SECOND_FINGER: int = 1
+
 var _main: Control = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
@@ -82,8 +85,12 @@ func before_each() -> void:
 
 func after_each() -> void:
 	# A finger left on the glass is global state: the next test would start with
-	# something already aiming, and its failure would land nowhere near its cause.
+	# something already aiming or already walking, and its failure would land nowhere
+	# near its cause. Losing focus is how the screen itself lets go of both, whichever
+	# index they were on — see `_notification` in play_screen.gd.
 	_lift()
+	if _main != null:
+		_screen().notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
 	get_tree().root.size = _window_size_before
 
 
@@ -121,8 +128,16 @@ func _marker() -> AimMarker:
 	return _garage().aim_marker()
 
 
-func _pad() -> MotionPad:
-	return _screen().get_node("MotionPad") as MotionPad
+## Where a press has to land to steer rather than to aim — halfway across
+## [ThumbReach]'s band on the side [param direction] names, in the screen's own
+## coordinates.
+##
+## Built from the screen's real size rather than from written-down pixels, so it
+## follows the band the game actually uses. The screen is full-rect on a full-rect
+## host, so its coordinates are the glass's.
+func _steer_point(direction: Vector2i) -> Vector2:
+	var half: Vector2 = _screen().size * 0.5
+	return half + ThumbReach.steer_point(direction, half, ThumbReach.steer_band())
 
 
 ## Where [param point] in the world lands on the glass. Through the camera's own
@@ -152,11 +167,23 @@ func _at_the_bonnet() -> Vector2:
 ## for the reason the walk suite gives: this is the path a real tap takes,
 ## emulated mouse and all, so it exercises the de-duplication in the screen
 ## rather than a parallel route around it.
-func _touch(at: Vector2, pressed: bool) -> void:
+func _touch(at: Vector2, pressed: bool, index: int = 0) -> void:
 	var touch: InputEventScreenTouch = InputEventScreenTouch.new()
+	touch.index = index
 	touch.position = at
 	touch.pressed = pressed
 	Input.parse_input_event(touch)
+	Input.flush_buffered_events()
+
+
+## Slides finger [param index] to [param at] without lifting it. A different event
+## from the press, delivered to a different branch of the screen, which is exactly
+## the kind of pair that gets one half wired.
+func _drag(at: Vector2, index: int = 0) -> void:
+	var dragged: InputEventScreenDrag = InputEventScreenDrag.new()
+	dragged.index = index
+	dragged.position = at
+	Input.parse_input_event(dragged)
 	Input.flush_buffered_events()
 
 
@@ -222,34 +249,60 @@ func test_the_screen_host_underneath_still_stops_what_it_is_handed() -> void:
 # ---- whose finger was it -----------------------------------------------------
 
 
-func test_a_tap_on_the_motion_pad_is_not_an_aim() -> void:
-	# The stick claims presses that land on it, and this is the half of that claim
-	# only the real screen can show: a screen that also aimed on them would put a
-	# crosshair on the car every time the player took a step. It works because the
-	# pad takes the touch in [method Node._input], before the GUI hands it to the
-	# screen underneath — so a pad that had merely stopped picking it up in the
-	# right place would fail here rather than in a browser.
+func test_a_press_in_the_steering_band_is_not_an_aim() -> void:
+	# The half of the split only the real screen can show. A press in the band walks
+	# the camera and must not also point the tool at whatever happens to be behind
+	# it: a mark on the paint every time the player takes a step is how "one press
+	# does both" announces itself, and firing there is what would rinse a foamed wing
+	# on the way past.
 	await _settle()
-	await _press(_pad().point_for(MotionPad.RIGHT))
-	assert_true(_pad().is_held(), "the stick took the press")
-	assert_false(_marker().is_marking(), "and the room was not asked to aim")
+	var before: Vector3 = _camera().global_position
+	await _press(_steer_point(ThumbReach.RIGHT))
+	await wait_physics_frames(RESOLVE_FRAMES * 4)
+	assert_gt(before.distance_to(_camera().global_position), 0.0, "the press walked the eye")
+	assert_false(_marker().is_marking(), "and the room was never asked to aim")
 
 
 func test_walking_and_aiming_at_the_same_time_both_work() -> void:
 	# The two-thumb case, and the whole reason this screen reads touch events
 	# instead of the mouse the engine emulates from them: the engine only emulates
-	# the *first* finger, so a thumb parked on the pad would otherwise make the
+	# the *first* finger, so a thumb parked in the band would otherwise make the
 	# second finger produce no event at all.
 	await _settle()
-	var stick: Vector2 = _pad().point_for(MotionPad.RIGHT)
+	var band: Vector2 = _steer_point(ThumbReach.RIGHT)
 	var before: Vector3 = _camera().global_position
-	_touch(stick, true)
+	_touch(band, true)
 	await wait_physics_frames(RESOLVE_FRAMES)
-	await _press(_at_the_car())
+	# A real second finger and not another press on index 0: the whole point is that
+	# the engine emulates a mouse from the first finger only, so the second one has
+	# to be reached through its own touch event or it is not the case being tested.
+	_touch(_at_the_car(), true, SECOND_FINGER)
 	await wait_physics_frames(RESOLVE_FRAMES * 4)
 	assert_true(_marker().is_marking(), "the second finger aimed")
 	assert_gt(before.distance_to(_camera().global_position), 0.0, "while the first one walked")
-	_touch(stick, false)
+	_touch(_at_the_car(), false, SECOND_FINGER)
+	_touch(band, false)
+
+
+func test_an_aim_dragged_out_into_the_band_keeps_cleaning() -> void:
+	# The rule that makes the band affordable: a press is asked once what it is for.
+	# The band eats the outer edge of the frame, so if the job were re-decided on
+	# every drag the tool would cut out halfway down a wing — and the sills and the
+	# roofline, which is where a press has to be dragged to reach them, would be
+	# unwashable. Only the first instant has to be in the middle.
+	await _settle()
+	await _press(_at_the_car())
+	assert_true(_marker().is_marking(), "the test needs the press on the car to have landed")
+	var before: Vector3 = _camera().global_position
+	_drag(_steer_point(ThumbReach.RIGHT))
+	await wait_physics_frames(RESOLVE_FRAMES * 4)
+	assert_true(_marker().is_marking(), "dragging out to the edge must not put the tool away")
+	assert_almost_eq(
+		before.distance_to(_camera().global_position),
+		0.0,
+		TOLERANCE,
+		"nor turn a finger that was cleaning into one that walks"
+	)
 
 
 func test_a_second_finger_does_not_steal_the_aim() -> void:

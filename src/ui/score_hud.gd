@@ -4,8 +4,8 @@
 ##
 ## [b]It is a readout and not a scorer.[/b] [Scoring] owns every number in here;
 ## this file owns how long they take to arrive and what colour they are on the
-## way. That split is the same one [MotionPad] and [ToolBeltHud] already make
-## against [CameraOrbit] and [ToolBelt], and it is what lets the values be
+## way. That split is the same one [ToolBeltHud] already makes against [ToolBelt]
+## and [ThumbReach] makes against [CameraOrbit], and it is what lets the values be
 ## unit-tested without a [SceneTree] and the presentation be retuned without
 ## touching them. What crosses is four integers and a [enum GrimeMap.Stage].
 ##

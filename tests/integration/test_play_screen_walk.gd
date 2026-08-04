@@ -33,7 +33,7 @@ const ABOVE_THE_RUNNER: int = 200
 ## Close enough for positions in metres — a tenth of a millimetre.
 const TOLERANCE: float = 0.0001
 
-## The keyboard half of the motion pad. Named here as strings rather than read
+## The keyboard half of the walk. Named here as strings rather than read
 ## off the screen, because [code]src/screens/play_screen.gd[/code] has no
 ## [code]class_name[/code] — no screen in this project does — and because the
 ## real source of truth for both copies is the InputMap in `project.godot`, which
@@ -89,8 +89,8 @@ var _window_size_before: Vector2i = Vector2i.ZERO
 
 func before_each() -> void:
 	# A headless window is 64x64, which is smaller than a single tap target — so
-	# the motion pad's stick would be laid out into nonsense and the one test
-	# below that uses a real finger would be measuring that instead.
+	# the steering band would be the whole screen twice over and the tests below
+	# that use a real finger would be measuring that instead.
 	# `content_scale_size` is the design resolution from project.godot. Put back
 	# in after_each: every suite shares this window.
 	var root: Window = get_tree().root
@@ -116,9 +116,12 @@ func before_each() -> void:
 func after_each() -> void:
 	# A held action is global state. A test that walked the camera right and left
 	# the key down would walk every test after it, and the failure would land
-	# somewhere else entirely.
+	# somewhere else entirely. A finger left in the steering band is the same thing
+	# said with a touch, and losing focus is how the screen itself lets go of one.
 	for action: String in ACTIONS:
 		Input.action_release(action)
+	if _screen != null:
+		_screen.notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
 	get_tree().root.size = _window_size_before
 
 
@@ -142,8 +145,15 @@ func _view_model() -> Node3D:
 	return _garage().get_node("%ViewModel") as Node3D
 
 
-func _pad() -> MotionPad:
-	return _screen.get_node("MotionPad") as MotionPad
+## Where a press has to land to ask, at full strength, to go [param direction] —
+## halfway across the steering band, in the screen's own coordinates.
+##
+## Built from [ThumbReach] and the screen's real size rather than from written-down
+## pixels, so it follows the band the game actually uses. The screen is full-rect on
+## a full-rect host, so its coordinates are the glass's.
+func _steer_point(direction: Vector2i) -> Vector2:
+	var half: Vector2 = _screen.size * 0.5
+	return half + ThumbReach.steer_point(direction, half, ThumbReach.steer_band())
 
 
 ## The car's bounding box in world space — read off the car rather than written
@@ -239,6 +249,16 @@ func _touch(at: Vector2, pressed: bool) -> void:
 	Input.flush_buffered_events()
 
 
+## Slides that finger to [param at] without lifting it. A different event from the
+## press, delivered to a different branch of the screen, which is exactly the kind
+## of pair that gets one half wired.
+func _drag(at: Vector2) -> void:
+	var dragged: InputEventScreenDrag = InputEventScreenDrag.new()
+	dragged.position = at
+	Input.parse_input_event(dragged)
+	Input.flush_buffered_events()
+
+
 func test_the_eye_can_be_walked_around_the_car() -> void:
 	assert_true(_garage().walkaround, "the game is a car you can walk around")
 
@@ -254,10 +274,10 @@ func test_the_camera_holds_still_until_it_is_asked_not_to() -> void:
 
 
 func test_the_walk_is_bound_to_keys_as_well_as_buttons() -> void:
-	# The pad is the spec and is what ships; these exist because nobody at a desk
-	# is going to reach for a button on screen to walk around a car. An action
-	# missing from the InputMap would make `Input.get_axis` push an error on every
-	# frame the game is running.
+	# The band is the spec and is what ships; these exist because nobody at a desk
+	# is going to drag a pointer to the edge of a window to walk around a car. An
+	# action missing from the InputMap would make `Input.get_axis` push an error on
+	# every frame the game is running.
 	for action: String in ACTIONS:
 		assert_true(InputMap.has_action(action), "%s is not bound in project.godot" % action)
 
@@ -313,37 +333,99 @@ func test_the_eye_cannot_be_walked_down_through_the_floor() -> void:
 	assert_gt(_camera().global_position.y, 0.0, "and above the floor it is standing on")
 
 
-func test_a_thumb_on_the_pad_walks_the_eye_too() -> void:
-	# The whole chain, through a real finger: a touch, to the stick, to
-	# [method MotionPad.turn], to the play screen's poll, to the garage, to a
-	# camera. Everything else here drives the keyboard half, which shares only the
-	# last three of those — so without this, a pad wired to nothing would pass.
+func test_a_thumb_at_the_edge_of_the_glass_walks_the_eye_too() -> void:
+	# The whole chain, through a real finger: a touch, to [ThumbReach], to the play
+	# screen's poll, to the garage, to a camera. Everything else here drives the
+	# keyboard half, which shares only the last three of those — so without this, a
+	# band wired to nothing would pass.
 	await _settle()
 	var before: float = _bearing()
-	var at: Vector2 = _pad().point_for(MotionPad.RIGHT)
+	var at: Vector2 = _steer_point(ThumbReach.RIGHT)
 	_touch(at, true)
 	await wait_physics_frames(30)
 	var walked: float = _walked(before)
 	_touch(at, false)
-	assert_gt(walked, 0.0, "a thumb pushing the stick right must walk you right")
+	assert_gt(walked, 0.0, "a thumb in the right-hand band must walk you right")
 
 
-func test_a_thumb_can_walk_and_lift_at_the_same_time() -> void:
-	# The reason the four arrows became a circle, at the far end of the chain: one
-	# thumb in the corner of the stick asks for both axes, and both have to survive
-	# the summing in the play screen's poll and the clamping in [OrbitDrive].
+func test_a_thumb_in_a_corner_of_the_glass_walks_and_lifts_at_the_same_time() -> void:
+	# The reason the band is a border rather than two sliders, at the far end of the
+	# chain: one thumb in a corner of the frame asks for both axes, and both have to
+	# survive the summing in the play screen's poll and the clamping in [OrbitDrive].
 	# Neither is true of two buttons a single finger cannot hold at once.
+	#
+	# The bottom-right corner and not the top-right, because the top-right is the
+	# grime board's toggle — a real [Button], which is hit-tested before this screen
+	# and takes the press. That is the right outcome and not a bug (a control that is
+	# there wins), but it makes that one corner a place a test cannot steer from. The
+	# bottom-right is the corner the thumb stick used to own and now nothing does.
 	await _settle()
 	var before: float = _bearing()
 	var standing: float = _camera().global_position.y
-	var at: Vector2 = _pad().point_for(Vector2i(1, 1))
+	var at: Vector2 = _steer_point(ThumbReach.RIGHT + ThumbReach.DOWN)
 	_touch(at, true)
 	await wait_physics_frames(30)
 	var walked: float = _walked(before)
-	var raised: float = _camera().global_position.y
+	var lowered: float = _camera().global_position.y
 	_touch(at, false)
-	assert_gt(walked, 0.0, "the corner of the stick walks you round the car")
-	assert_gt(raised, standing, "and raises your eye on the way")
+	assert_gt(walked, 0.0, "the corner of the frame walks you round the car")
+	assert_lt(lowered, standing, "and lowers your eye on the way")
+
+
+func test_a_thumb_pulled_back_into_the_middle_stops_the_walk_without_letting_go() -> void:
+	# "Reach out, then come back" is the gesture the band is designed around: the
+	# player drags the shot toward them and settles it with the same thumb, rather
+	# than lifting and re-pressing. So a steering finger dragged into the quiet
+	# middle has to go quiet while it is still down — and it has to *keep* the
+	# steering job, which is the half a naive re-classify-every-drag would break by
+	# turning it into an aim.
+	await _settle()
+	var before: float = _bearing()
+	_touch(_steer_point(ThumbReach.RIGHT), true)
+	await wait_physics_frames(30)
+	var walked: float = _walked(before)
+	_drag(_screen.size * 0.5)
+	# Two ticks for the poll to have read the new offset, so what is measured after
+	# them is a stopped camera rather than one still finishing the frame it was on.
+	await wait_physics_frames(2)
+	var settled: float = _bearing()
+	await wait_physics_frames(30)
+	var crept: float = _walked(settled)
+	_touch(_screen.size * 0.5, false)
+	assert_gt(walked, 0.0, "the test needs the reach out to have walked the eye")
+	assert_almost_eq(crept, 0.0, TOLERANCE, "a thumb back in the middle asks for nothing")
+
+
+func test_losing_focus_stops_a_walk_nobody_can_let_go_of() -> void:
+	# The one thing four arrow buttons were immune to by construction, bought back by
+	# hand. A finger on the glass when the browser tab is switched away never sends
+	# its release, and a screen still holding that direction is a camera walking on
+	# its own when the player comes back.
+	await _settle()
+	var before: float = _bearing()
+	_touch(_steer_point(ThumbReach.RIGHT), true)
+	await wait_physics_frames(30)
+	assert_gt(_walked(before), 0.0, "the test needs the reach to have landed")
+	_screen.notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
+	await wait_physics_frames(2)
+	var stopped: float = _bearing()
+	await wait_physics_frames(30)
+	assert_almost_eq(_walked(stopped), 0.0, TOLERANCE, "the camera must not still be walking")
+
+
+func test_a_press_on_the_car_does_not_walk_the_camera() -> void:
+	# The other half of the split, and the one the whole design turns on: a press in
+	# the middle of the frame cleans and moves nothing. A band that had crept inward
+	# — or a screen that had gone back to steering from every press — would show up
+	# as a camera that drifts whenever the player washes a panel, which is the
+	# failure that made "one press does both" the wrong answer.
+	await _settle()
+	var before: Vector3 = _camera().global_position
+	_touch(_screen.size * 0.5, true)
+	await wait_physics_frames(30)
+	var strayed: float = before.distance_to(_camera().global_position)
+	_touch(_screen.size * 0.5, false)
+	assert_almost_eq(strayed, 0.0, TOLERANCE, "washing a panel must not walk you round the car")
 
 
 func test_the_eye_keeps_looking_at_the_car_as_it_walks() -> void:

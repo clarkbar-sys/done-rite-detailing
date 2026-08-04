@@ -163,9 +163,12 @@ func report(remaining: float, shine: float) -> void:
 ##
 ## [b]The top corner, because the bottom one is taken.[/b] [ToolBeltHud] lays its
 ## own toggle out at [constant ToolBeltHud.MARGIN] from the bottom left and rolls
-## its icons up out of it, and [MotionPad] owns the bottom-right corner. A board in
-## the bottom corner — which is where this one started — sits straight on top of
-## the belt's [b]T[/b].
+## its icons up out of it. A board in the bottom corner — which is where this one
+## started — sits straight on top of the belt's [b]T[/b].
+##
+## The bottom-right corner used to be a thumb stick's and is now nothing's, which
+## does not make it free: it is inside [ThumbReach]'s steering band, so a board over
+## there would be a debug panel a player walks the camera by tapping.
 ##
 ## [b]The right side, because the board hangs off whichever edge it's flush
 ## with.[/b] The board is wider than the toggle, so its position tracks its own

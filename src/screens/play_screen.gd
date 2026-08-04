@@ -23,12 +23,33 @@
 ## as it took somebody to find this line.
 ##
 ## [b]The other loop this screen owns is movement[/b], and it is the same shape:
-## the pad ([MotionPad]) says which way the player is asking to go, the room
-## ([Garage]) works out what that does to a camera, and neither has heard of the
-## other. That seam has already been cashed in once: the pad was four arrow
-## buttons and is now a thumb stick, and nothing in this file or the room changed
-## — which is the whole reason the thing crossing here is two numbers in
-## [code]-1..1[/code] rather than a button.
+## something says which way the player is asking to go, the room ([Garage]) works
+## out what that does to a camera, and neither has heard of the other. That seam
+## has now been cashed in twice: the control was four arrow buttons, then a thumb
+## stick drawn in the corner, and is now a band round the edge of the glass with
+## nothing drawn at all — and nothing in the room changed for any of it, which is
+## the whole reason the thing crossing here is two numbers in [code]-1..1[/code]
+## rather than a button.
+##
+## [b]Movement and the trigger are now the same press, sorted by where it
+## landed[/b], and this file is the thing that sorts them. [ThumbReach] owns the
+## rule — a band one tap target thick round the edge of the glass steers, and
+## everything inside it aims and fires — and the whole of its argument is in that
+## class. What belongs here is the bookkeeping: a press is asked once, at the
+## instant it goes down, which of the two jobs it has, and it keeps that job until
+## it lifts. So a press that started on the car can be dragged out to the sill, the
+## roofline or clean off the glass and goes on cleaning; a press that started in the
+## band can be pulled back into the middle to settle the shot and goes quiet
+## without letting go. Deciding it fresh on every drag event instead would make the
+## tool cut out halfway down a wing, which is the one thing a player would notice
+## immediately.
+##
+## [b]Two fingers, two jobs, and neither can take the other's.[/b] There is a
+## finger that steers and a finger that aims, tracked separately, so washing while
+## walking is one thumb in the band and one on the paint. A second press competing
+## for a job that is taken is ignored rather than stealing it — two fingers cannot
+## aim one tool or drive one camera, and the alternative is a control that snaps
+## between them.
 ##
 ## [b]Movement is polled and tool changes are not, and that is not an
 ## inconsistency.[/b] Picking a tool happens at an instant, so it is a signal.
@@ -67,11 +88,16 @@
 ## a button, and the GUI system hands the event to [i]it[/i] rather than letting
 ## the event go unhandled. This screen is such a control, so this is where its
 ## taps go. The belt's icons still get their own taps first — they are separate
-## controls and the hit test finds them before it reaches this one — and the
-## motion pad's stick gets in earlier still, by claiming the touches that land on
-## it in [method Node._input], before the GUI pass runs at all. Both of those are
-## the same rule from two directions: a press that belongs to the HUD is not an
-## aim.
+## controls and the hit test finds them before it reaches this one — which is the
+## one remaining case of "a press that belongs to the HUD is not an aim".
+##
+## [b]It used to be two cases, and losing the second one is most of what the
+## redesign bought.[/b] The stick was a full-rect [Control] of its own that
+## claimed the touches landing on it in [method Node._input] and marked them
+## handled before the GUI pass ran at all, because this screen would otherwise
+## have turned them into aims — two controls reading the same touches from two
+## different hooks, each having to know what the other would do with them. There
+## is now one owner of every pointer event in the game, and it is this function.
 ##
 ## [b]The way that is wrong, because it was shipped for an hour and looked
 ## right.[/b] The obvious alternative is to set this root to
@@ -92,7 +118,7 @@
 ## [b]Both fingers work, which took the long way round.[/b] The engine emulates a
 ## mouse from touch — that is what makes the belt's [Button]s work on a phone at
 ## all, and [code]project.godot[/code] says so — but it only emulates the
-## [i]first[/i] finger. So a thumb parked on the pad's stick would eat the
+## [i]first[/i] finger. So a thumb parked in the steering band would eat the
 ## emulation and a second finger on the car would produce no mouse event
 ## whatsoever: walk and aim, the two things a player does at once, would be
 ## mutually exclusive. The fix is to read the touch events themselves and ignore
@@ -100,6 +126,14 @@
 ## [constant InputEvent.DEVICE_ID_EMULATION] is the engine's own mark on an event
 ## it invented. Mouse events that are not emulated are somebody at a desk, and
 ## they are handled too.
+##
+## [b]A held press is a flag, and a flag that never clears is a camera that walks
+## forever with nothing touching the screen.[/b] A finger on the glass when the
+## browser tab is switched away never sends its release, so both flags are dropped
+## on losing focus as well — see [method _notification], which is the same debt the
+## stick used to pay in the same way, now paid once for the steer and the trigger
+## together. The trigger was quietly exempt from that before, which is to say a tab
+## switch mid-wash left the water running.
 ##
 ## [b]And the fourth loop is the bell[/b], which is the same shape read
 ## backwards. The room says a patch of the car finished a step of the job
@@ -158,8 +192,8 @@ const CLOSE_ACTION: String = "tool_belt_close"
 ## on the key; the belt is indexed from 0 and the conversion happens once, below.
 const SLOT_ACTION_PREFIX: String = "tool_slot_"
 
-## Walks the eye left around the car: the keyboard's half of pushing the pad's
-## stick left.
+## Walks the eye left around the car: the keyboard's half of pressing the
+## left-hand edge of the glass.
 const TURN_LEFT_ACTION: String = "camera_left"
 
 ## Walks it right.
@@ -184,10 +218,29 @@ const NO_FINGER: int = -1
 ## "who is aiming" whether that is a finger or a pointer. Also not a touch index
 ## the engine hands out, and distinct from [constant NO_FINGER] — a mouse that
 ## shared the "nobody" value would be released by the first stray touch.
+##
+## One pointer, so at most one of the two jobs: a mouse press is sorted by where it
+## landed exactly like a thumb, and a desk still has the arrow keys for the other
+## half. Uniform on purpose — a movement rule that read differently on a desk and on
+## a phone would be two behaviours to keep true instead of one.
 const MOUSE_FINGER: int = -2
 
 var _belt: ToolBelt = null
+
+## Which pointer is aiming and firing, or [constant NO_FINGER] for none.
 var _finger: int = NO_FINGER
+
+## Which pointer is steering, or [constant NO_FINGER] for none. Separate from
+## [member _finger] rather than one variable with a mode, because the two jobs
+## genuinely happen at once — one thumb in the band, one on the paint — and a single
+## slot would make washing while walking impossible by construction.
+var _steer_finger: int = NO_FINGER
+
+## Where that pointer is, relative to the middle of the glass, in this screen's own
+## coordinates. Meaningless while [member _steer_finger] is [constant NO_FINGER],
+## and zeroed on release rather than left behind, so a stray read cannot report the
+## last direction anybody held.
+var _steer_offset: Vector2 = Vector2.ZERO
 
 ## The running score. Built here rather than read off anything, because unlike
 ## the belt there is nothing else in the game that has one — and unlike the belt
@@ -208,7 +261,6 @@ var _worked: PackedFloat64Array = _fresh_work()
 
 @onready var _garage: Garage = $Garage
 @onready var _hud: ToolBeltHud = $ToolBelt
-@onready var _pad: MotionPad = $MotionPad
 @onready var _readout: Label = $PanelReadout
 @onready var _masks: GrimeDebug = $GrimeDebug
 @onready var _scoreboard: ScoreHud = $ScoreHud
@@ -224,6 +276,12 @@ func _ready() -> void:
 	_garage.aimed.connect(_on_aimed)
 	_garage.grimed.connect(_on_grimed)
 	_masks.debug_tools_toggled.connect(_on_debug_tools_toggled)
+	# A screen that changed shape under a held thumb has moved the middle of the
+	# glass out from under it, and an offset measured against the old middle is not
+	# a direction anybody is asking for any more. The stick dropped its finger on
+	# relayout for the same reason; the band inherits the debt because the band is
+	# derived from the screen's own size.
+	resized.connect(_drop_the_steer)
 	_readout.text = ""
 
 
@@ -234,13 +292,15 @@ func _ready() -> void:
 ## leave the camera coasting on the last thing it heard.
 ##
 ## The two input sources are summed and the room clamps the total, so holding the
-## right arrow key with the stick already pushed right walks at one speed rather
-## than two. [method Input.get_axis] is the engine's own idiom for a held pair and
-## returns the same [code]-1..1[/code] the pad does — the difference being that a
-## key is only ever at an end of that range and a thumb can be anywhere in it.
+## right arrow key with a thumb already in the right-hand band walks at one speed
+## rather than two. [method Input.get_axis] is the engine's own idiom for a held
+## pair and returns the same [code]-1..1[/code] a thumb does — the difference being
+## that a key is only ever at an end of that range and a thumb can be anywhere in
+## it.
 func _process(_delta: float) -> void:
-	var turn: float = _pad.turn() + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
-	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
+	var reached: Vector2 = _steer_input()
+	var turn: float = reached.x + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
+	var lift: float = reached.y + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
 	_garage.steer(turn, lift)
 	var grime: Grime = _garage.grime()
 	# Only while the masks are up. The number costs a walk over twelve panels and
@@ -287,7 +347,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 
-## Every way a pointer can arrive, turned into "aim there" or "stop aiming".
+## Every way a pointer can arrive, turned into "aim there", "walk that way", or
+## "stop".
 ##
 ## The GUI system's own hook rather than the unhandled-input one the keys use —
 ## the class docs above have the measurement that settled which, and why the
@@ -300,10 +361,12 @@ func _unhandled_input(event: InputEvent) -> void:
 ## handled and acting on both would make the second finger a stranger. All of
 ## that reasoning is in the class docs.
 ##
-## No [method Control.accept_event] anywhere in here. Every branch either aims or
-## ignores the event, and the engine already treats a press on a
+## No [method Control.accept_event] anywhere in here. Every branch either acts on
+## the event or ignores it, and the engine already treats a press on a
 ## [code]stop[/code] control as handled — there is nothing left to consume and
-## nothing else in the game listening for a pointer.
+## nothing else in the game listening for a pointer. That is truer than it was:
+## the stick used to be the other listener, and marking events handled on its
+## behalf was the thing that had to happen before the GUI pass ran at all.
 func _gui_input(event: InputEvent) -> void:
 	var touch: InputEventScreenTouch = event as InputEventScreenTouch
 	if touch != null:
@@ -326,18 +389,46 @@ func _gui_input(event: InputEvent) -> void:
 
 ## A finger [param index] going down or coming up at [param at].
 ##
-## [b]The first finger down wins and keeps aiming until it lifts.[/b] A second
-## one landing on the car while the first is still there is ignored rather than
-## taking over — two fingers cannot aim one tool, and the alternative is a tool
-## that snaps between them. And a release only counts from the finger that
-## claimed the aim, so lifting a thumb off the motion pad cannot put the
-## mark away.
+## [b]Where it lands decides what it is for, once.[/b] [method ThumbReach.steers]
+## is asked at the instant of the press and never again for that finger — the class
+## docs have why, and the short version is that a tool which cut out halfway down a
+## wing because the thumb had wandered into the band would be the most obvious bug
+## in the game.
+##
+## [b]The first finger down wins whichever job it took and keeps it until it
+## lifts.[/b] A second one landing in the band while the first is still steering is
+## ignored rather than taking over, and the same for the aim — two fingers cannot
+## drive one camera or aim one tool, and the alternative is a control that snaps
+## between them. A release only counts from the finger that claimed the job, so
+## lifting the steering thumb cannot put the mark away.
 func _finger_moved(index: int, at: Vector2, pressed: bool) -> void:
-	if pressed:
-		if _finger != NO_FINGER:
+	if not pressed:
+		_finger_lifted(index)
+		return
+	# A pointer that already has a job does not get the other one. The engine does
+	# not deliver two presses for one index without a release in between, so this
+	# cannot fire in a real game — it is here because "one pointer, at most one job"
+	# is the invariant everything below reads, and enforcing it in the one place it
+	# could be broken is cheaper than trusting it in four.
+	if index == _finger or index == _steer_finger:
+		return
+	if ThumbReach.steers(at - _middle(), _middle(), ThumbReach.steer_band()):
+		if _steer_finger != NO_FINGER:
 			return
-		_finger = index
-		_garage.aim_at(_on_the_glass(_aim_point(index, at)))
+		_steer_finger = index
+		_steer_offset = at - _middle()
+		return
+	if _finger != NO_FINGER:
+		return
+	_finger = index
+	_garage.aim_at(_on_the_glass(_aim_point(index, at)))
+
+
+## A finger [param index] coming off the glass, whichever job it had. Anything else
+## lifting is a finger that never claimed one.
+func _finger_lifted(index: int) -> void:
+	if index == _steer_finger:
+		_drop_the_steer()
 		return
 	if index != _finger:
 		return
@@ -345,12 +436,80 @@ func _finger_moved(index: int, at: Vector2, pressed: bool) -> void:
 	_garage.release_aim()
 
 
-## The aiming finger sliding to [param at]. Anything else moving is somebody
+## A claimed finger sliding to [param at]. Anything else moving is somebody
 ## else's finger, or a mouse nobody is holding down.
+##
+## No bounds check on the steering half: a thumb that slides off the edge of the
+## glass keeps steering, and [method ThumbReach.input_from] pins what it is asking
+## for at full. Falling quiet at the frame's edge would stop the camera for a
+## movement the player did not mean as a stop — and reaching for the edge of a
+## phone is exactly how a thumb leaves the glass.
 func _finger_dragged(index: int, at: Vector2) -> void:
+	if index == _steer_finger:
+		_steer_offset = at - _middle()
+		return
 	if index != _finger:
 		return
 	_garage.aim_at(_on_the_glass(_aim_point(index, at)))
+
+
+## What the steering thumb is asking for, or nothing when there is not one.
+##
+## Computed from where the finger is rather than kept as a pair of numbers updated
+## on every drag event. There is one source of truth for what the player is asking
+## and it is the finger's position; a mirrored pair is one more thing that can be
+## left holding a direction nobody wants.
+func _steer_input() -> Vector2:
+	if _steer_finger == NO_FINGER:
+		return Vector2.ZERO
+	return ThumbReach.input_from(_steer_offset, _middle(), ThumbReach.steer_band())
+
+
+## The middle of the glass, in this screen's own coordinates — and, because
+## [ThumbReach] measures everything from the middle outward, half the screen as
+## well.
+##
+## Read every press rather than cached in [method Node._ready], for the reason
+## [method _thumb_lift] is: the web build is resized by the browser and rotated by
+## the player, and `window/stretch/aspect` is `expand`, so this screen really does
+## change shape under a running game. A half measured once at startup would put the
+## band down the middle of a rotated phone.
+func _middle() -> Vector2:
+	return size * 0.5
+
+
+## Lets go of the steering thumb, if there is one.
+##
+## Separate from [method _finger_lifted] because two other things need exactly this
+## and none of the rest: a screen that changed shape (see [method Node._ready]) and
+## a window that lost focus (see [method _notification]). Neither has an index to
+## check or an event to answer.
+func _drop_the_steer() -> void:
+	_steer_finger = NO_FINGER
+	_steer_offset = Vector2.ZERO
+
+
+## Both flags let go when the game stops being the thing in front of the player.
+##
+## This is the cost of holding state across frames, paid. A finger on the glass
+## when the browser tab is switched away never sends its release: the camera would
+## still be walking when the player came back, and the trigger would still be
+## spending water on a panel nobody was pointing at. Both notifications, because
+## the application and the window can lose focus separately and either one means
+## the hand is no longer being watched.
+##
+## Guarded on the room existing, because a [Control] is sent notifications from
+## the moment it is constructed and [member _garage] is [code]@onready[/code] —
+## a focus change during the frame this screen is being built would otherwise
+## release an aim through a null.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_APPLICATION_FOCUS_OUT and what != NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		return
+	_drop_the_steer()
+	var aiming: bool = _finger != NO_FINGER
+	_finger = NO_FINGER
+	if aiming and _garage != null:
+		_garage.release_aim()
 
 
 ## Where a pointer [param index] touching down at [param at] is actually aiming.

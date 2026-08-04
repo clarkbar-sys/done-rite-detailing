@@ -1,10 +1,11 @@
 ## A thumb on the glass, turned into movement around a [CameraOrbit].
 ##
-## The mobile-first control scheme is a stick under one thumb — push it left or
-## right to walk around the car, up or down to raise and lower your eye — and this
-## is everything that scheme means once the circle is out of the way: two numbers
-## in [code]-1..1[/code], and what a second of holding them does to an orbit. It
-## was four hold-to-move buttons before that and this file did not change, which
+## The mobile-first control scheme is one thumb on the glass — reach toward the
+## left or right edge to walk around the car, toward the top or bottom to raise and
+## lower your eye — and this is everything that scheme means once the geometry is
+## out of the way: two numbers in [code]-1..1[/code], and what a second of holding
+## them does to an orbit. It was a drawn thumb stick before that and four
+## hold-to-move buttons before that, and this file did not change for either, which
 ## is the point of it taking numbers rather than presses.
 ##
 ## [b]Node-free on purpose[/b] — the STANDARDS.md "Coverage" R3 rule. Holding
@@ -22,10 +23,10 @@ class_name OrbitDrive
 extends RefCounted
 
 ## The strongest a single axis of input can be, and the same number
-## [constant ThumbStick.FULL_INPUT] is at the other end of the chain. Two opposing
-## asks — the left arrow key held while the stick is pushed right — cancel to zero
-## rather than fighting, which falls out of the sum the screen hands over and is
-## asserted rather than assumed.
+## [constant ThumbReach.FULL_INPUT] is at the other end of the chain. Two opposing
+## asks — the left arrow key held while a thumb is in the right-hand band — cancel
+## to zero rather than fighting, which falls out of the sum the screen hands over
+## and is asserted rather than assumed.
 const FULL_INPUT: float = 1.0
 
 ## How fast holding left or right walks the eye around the car, in degrees per
@@ -45,7 +46,8 @@ var max_height: float = 0.0
 
 ## Which way the player is asking to walk: [code]-1[/code] for hard left,
 ## [code]+1[/code] for hard right, [code]0[/code] for a thumb that is off the
-## glass, and anything in between for one that is pushing the stick part way.
+## glass or resting in the middle of it, and anything in between for one that has
+## reached part way out.
 var turn: float = 0.0
 
 ## Which way the player is asking to move their eye: [code]+1[/code] up,
@@ -70,9 +72,9 @@ func _init(
 ## faster than a button can.
 ##
 ## Clamped rather than trusted because the intents are summed before they get
-## here — the pad's stick and the keyboard's arrows are two ways to ask for the
-## same thing, and a player holding both should walk at one speed rather than at
-## two.
+## here — a thumb in the steering band and the keyboard's arrows are two ways to
+## ask for the same thing, and a player holding both should walk at one speed
+## rather than at two.
 func steer(turn_input: float, lift_input: float) -> void:
 	turn = clampf(turn_input, -FULL_INPUT, FULL_INPUT)
 	lift = clampf(lift_input, -FULL_INPUT, FULL_INPUT)

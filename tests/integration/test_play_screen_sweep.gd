@@ -248,8 +248,57 @@ func _touch(at: Vector2, pressed: bool) -> void:
 ## Holds the trigger so that the aim lands at [param at] for a second, without
 ## letting go — so a test can still ask what is marked. [method after_each] lifts
 ## it.
+## Whether a finger at [param thumb] would walk the camera rather than aim the tool.
+##
+## [ThumbReach]'s band — one tap target thick, round the whole edge of the frame —
+## steers, so a press that starts out there is not an aim at all. The points this
+## suite reaches for are metres of clear sky above the roofline, which projects
+## inside the top of that band; [method _put_the_finger] is what deals with it.
+func _steers(thumb: Vector2) -> bool:
+	var half: Vector2 = _screen().size * 0.5
+	return ThumbReach.steers(thumb - half, half, ThumbReach.steer_band())
+
+
+## [param thumb], moved to the nearest place a press is an aim rather than a walk.
+##
+## Clamped rather than recentred, so the finger keeps the x it was aimed at and only
+## loses the height a press cannot start at.
+func _into_the_trigger(thumb: Vector2) -> Vector2:
+	var half: Vector2 = _screen().size * 0.5
+	var quiet: Vector2 = ThumbReach.trigger_axes(half, ThumbReach.steer_band())
+	return half + (thumb - half).clamp(-quiet, quiet)
+
+
+## Slides the finger to [param at] without lifting it.
+func _drag(at: Vector2) -> void:
+	var dragged: InputEventScreenDrag = InputEventScreenDrag.new()
+	dragged.position = at
+	Input.parse_input_event(dragged)
+	Input.flush_buffered_events()
+
+
+## Puts the finger down at [param at], dragging there from inside the frame when
+## [param at] is somewhere a press would steer instead of aim.
+##
+## [b]A press keeps the job it started with for as long as it is down[/b] — see
+## `_finger_moved` in play_screen.gd — so reaching out past the edge of the trigger
+## region by dragging is both what a player does to work a roofline or a sill and
+## the only way a test can ask about a point out there.
+##
+## The intermediate press is directly below the target and is itself a miss over the
+## roof, so nothing on the car is aimed at and no water is spent getting there. That
+## matters to the suites that assert the mud never moved.
+func _put_the_finger(at: Vector2) -> void:
+	if not _steers(at):
+		_touch(at, true)
+		return
+	_touch(_into_the_trigger(at), true)
+	await wait_physics_frames(RESOLVE_FRAMES)
+	_drag(at)
+
+
 func _press(at: Vector2) -> void:
-	_touch(_thumb_for(at), true)
+	await _put_the_finger(_thumb_for(at))
 	await wait_physics_frames(WASH_FRAMES)
 
 

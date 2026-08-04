@@ -13,11 +13,14 @@ or as a Linux binary — from CI. It opens on a title screen with the game
 already being played behind the card — a filthy car being washed, cleaned and
 buffed by nobody, in the bay you are about to stand in — and Start drops you
 straight into that same room, standing beside the car with a tool in your
-hand. A thumb stick in the bottom-right corner walks you around it and raises
-and lowers your eye — push it and you move, at whatever speed you push it, in
-any direction at once; let go and it springs back and you stop. The arrow keys
-and WASD do the same job at a desk. A **T** in the opposite corner rolls out
-the five tools you carry.
+hand. There is nothing drawn on screen to move you: press near the edge of the
+frame and you go that way — sideways to walk around the car, up or down to
+raise and lower your eye, a corner to do both — at whatever speed you reach out
+to, and back to the middle to stop. Press in the middle and you are working on
+the car instead, which is the whole of the scheme: a band one thumb thick round
+the edge of the glass steers, everything inside it cleans, and no press ever
+does both. The arrow keys and WASD do the same job at a desk. A **T** in the
+bottom-left corner rolls out the five tools you carry.
 Press anywhere on the car and the tool in your hand swings to point at it,
 with a red crosshair on the paint where it lands; press past the car and the
 crosshair snaps to the nearest bodywork instead. Holding is aiming, letting go
@@ -154,8 +157,8 @@ panel every twelve seconds, biggest first, and when the last one is finished
 the mud goes back on and it starts again. What makes it worth having is that
 it is not a recording. [`AttractRoutine`](./src/core/attract_routine.gd)
 decides what a person would do next and
-[`AttractWalk`](./src/core/attract_walk.gd) decides how hard they would push
-the stick, and both answers go into the room through the same three doors a
+[`AttractWalk`](./src/core/attract_walk.gd) decides how hard they would reach,
+and both answers go into the room through the same three doors a
 player has — the walk, a press on the glass, and the tool belt. There is no
 demo branch in the trigger, the aim, the standoff or the grime, so the attract
 mode cannot show a wash the game would not have given you, and the day one of
