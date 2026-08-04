@@ -196,6 +196,20 @@ func test_the_stick_is_in_the_corner_the_tool_belt_is_not() -> void:
 	assert_gt(_pad.centre().y, _pad.size.y * 0.5, "and to the bottom corner of it")
 
 
+func test_the_knob_goes_red_under_a_thumb_and_only_under_a_thumb() -> void:
+	# Red is what this palette puts on a thing you press, and the stick is
+	# furniture you rest a thumb on rather than a button you pick — so a red disc
+	# sitting in the corner of every frame would be the loudest thing on a screen
+	# whose actual buttons are in the other corner. Held is the one state where it
+	# means what red means everywhere else in the game: this control is live.
+	# Asserted on the width [method MotionPad._draw] actually uses.
+	assert_eq(_pad.knob_rim_width(), 0.0, "an untouched stick is not asking to be pressed")
+	await _push(MotionPad.RIGHT)
+	assert_gt(_pad.knob_rim_width(), 0.0, "a stick under a thumb says so")
+	await _let_go(MotionPad.RIGHT)
+	assert_eq(_pad.knob_rim_width(), 0.0, "and stops saying it when the thumb comes off")
+
+
 func test_each_mark_points_the_way_it_moves_you() -> void:
 	# The bug this pins is silent and is the whole reason the marks are drawn from
 	# the directions the stick reports: a ring whose top triangle points down is not
