@@ -142,6 +142,12 @@ func _typeset(root: Node) -> Array[Control]:
 	return found
 
 
+## One of the four rules' body paragraphs — any of them, since the type scale is
+## one rule applied to all of them.
+func _a_body() -> Label:
+	return _screen.get_node("%Rules/Walk/Body") as Label
+
+
 ## What [param control] has written on it, whichever of the two it is.
 func _words_of(control: Control) -> String:
 	var label: Label = control as Label
@@ -239,22 +245,74 @@ func test_the_sheet_is_the_size_of_its_own_words_on_a_phone_held_upright() -> vo
 	# anchored to that, so it arrived four times taller than anything printed on
 	# it.
 	#
-	# Asserted against the design height rather than against the screen's,
-	# because that is the actual rule: this screen was laid out for 720 and extra
-	# room goes to the bay behind the sheet, never inside it.
+	# The sheet is now free to be as tall as the phone — that is what growing the
+	# type is for — so what is asserted is that it is the size of its own words
+	# and still on the screen, rather than a fixed number of pixels.
 	get_tree().root.size = PORTRAIT
-	await wait_process_frames(2)
+	await wait_process_frames(3)
 	assert_gt(_screen.size.y, _design_height() * 2.0, "the premise: a much taller screen")
 	var card: PanelContainer = _screen.get_node("%Card") as PanelContainer
+	var column: VBoxContainer = card.get_node("Column") as VBoxContainer
 	assert_lte(
-		card.size.y,
-		_design_height(),
-		"the sheet stretched to the phone instead of staying the size of its own words"
+		card.size.y - column.size.y,
+		SLACK + float(Brand.CARD_INSET * 2),
+		"the sheet is taller than what is printed on it"
 	)
 	# And the whole of it is still on the screen, top and bottom both, rather
 	# than centred by having been pushed off one end.
 	assert_gte(card.get_global_rect().position.y, 0.0)
 	assert_lte(card.get_global_rect().end.y, _screen.size.y)
+
+
+func test_the_type_grows_into_the_room_a_phone_gives_it() -> void:
+	# The point of the whole exercise. At 1280x720 the type is the size the
+	# mockup draws; on a handset that hands this screen nearly four times the
+	# height, the sheet was a readable strip floating in two thousand pixels of
+	# nothing, and the copy was about six CSS pixels tall on the glass.
+	#
+	# Asserted as a ratio against the same label's own landscape size, so it
+	# survives anybody retuning the scene's numbers — the claim is "bigger here
+	# than there", which is the actual promise, and not a font size in pixels.
+	var body: Label = _a_body()
+	var landscape: int = body.get_theme_font_size("font_size")
+	get_tree().root.size = PORTRAIT
+	await wait_process_frames(3)
+	assert_gt(
+		_a_body().get_theme_font_size("font_size"),
+		landscape,
+		"a phone held upright hands this screen the room and the type did not take it"
+	)
+
+
+func test_the_type_goes_back_down_when_the_room_does() -> void:
+	# The failure the base sizes in `_remember` exist for: `_lay_out` runs again
+	# on every resize, and a pass that scaled the previous pass's output rather
+	# than the scene's would ratchet — a window dragged out and back would leave
+	# the type permanently larger than it started.
+	var body: Label = _a_body()
+	var landscape: int = body.get_theme_font_size("font_size")
+	get_tree().root.size = PORTRAIT
+	await wait_process_frames(3)
+	get_tree().root.size = get_tree().root.content_scale_size
+	await wait_process_frames(3)
+	assert_eq(
+		_a_body().get_theme_font_size("font_size"),
+		landscape,
+		"the type did not come back down when the screen did"
+	)
+
+
+func test_the_rules_go_to_one_column_on_a_phone_held_upright() -> void:
+	# Reflow rather than rescale, and the two are not interchangeable: a column
+	# half as wide wraps the same sentence to twice as many lines, so two columns
+	# on a tall screen would grow downwards as fast as the type grew and reach a
+	# readable size no sooner. One column is also the layout the mockup draws —
+	# it did not fit at 720, and this is the shape of screen where it does.
+	var rules: GridContainer = _screen.get_node("%Rules") as GridContainer
+	assert_eq(rules.columns, 2, "a 16:9 screen keeps the two columns")
+	get_tree().root.size = PORTRAIT
+	await wait_process_frames(3)
+	assert_eq(rules.columns, 1, "a phone held upright reads better in one")
 
 
 func test_the_rules_do_not_come_apart_on_a_phone_held_upright() -> void:
