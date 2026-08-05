@@ -31,6 +31,24 @@
 ## second definition of "the player finished something", so there is nothing here
 ## that can disagree with what the player just heard and saw.
 ##
+## [b]Neither half can be farmed, and neither half checks.[/b] There is no way to
+## put a texel back where it was: mud only comes off, the water is the only thing
+## that makes bare paint, and product and shine are only ever spent forwards —
+## [GrimeMap]'s class docs have the whole of it. So a square the player holds every
+## trigger in the game over runs out of things to pay for and stays that way, and
+## both of the numbers this class is paid from, [method GrimeMap.worked] and
+## [signal Grime.patch_finished], are counting a car that only gets cleaner.
+##
+## That was worth writing down when it was not free. The jet used to take product
+## off as well as mud, which made foam, rinse, foam a loop a player could hold on
+## one square for ever, and a score paid for units moved would have paid them for
+## every turn of it; what stopped it was the ledger counting how far the panel had
+## irreversibly got rather than how much had moved across it, and never a cap
+## written here. The rule is gone — [method GrimeMap.wash] has why — and the shape
+## it argued for is the reason nothing in this file had to change with it: a cap
+## would have lived here and would have had to be remembered by the next thing that
+## paid for something.
+##
 ## [b]There is no target, no percentage and no "score out of".[/b] An arcade
 ## score counts up and stops being interesting only when the player does, and
 ## that is the right shape for this game for a reason beyond taste: the car has
@@ -52,10 +70,13 @@
 ## is entirely that the digits move. Nothing downstream divides by these, so the
 ## units cost nothing and buy the thing the feature is for.
 ##
-## [b]The run multiplier is the bell's run.[/b] [Chime] already steps
+## [b]The run multiplier is the chime's run.[/b] [Chime] already steps
 ## [constant Bell.PATCH_RUN_RATIOS] while the player is on a streak of
-## consecutive patches, so the ding climbs a triad up to the octave and then
-## holds. This climbs the same streak on the same clock and with the same
+## consecutive patches, so the ding climbs a C major triad and pays out the whole
+## chord on the rung that caps this multiplier — the patch that stops paying more
+## is the patch that sounds like winning, which is the entire point of putting
+## the two on one ladder. This climbs the same streak on the same clock and with
+## the same
 ## [constant Bell.RUN_RESET_MSEC] gap that ends it — so the note going up and the
 ## multiplier going up are one event with two outputs, and a player who can hear
 ## the top of the ladder is looking at the top of the multiplier. That shared
@@ -217,9 +238,9 @@ func score(stage: GrimeMap.Stage) -> int:
 ## events are.
 ##
 ## Negative or zero [param done] pays nothing rather than taking points back.
-## Work only goes forwards — [method GrimeMap.worked] refuses to count a rinse as
-## progress — so a caller handing this a fall has misread a total, and a score
-## that could go down on a misread would be a bug nobody would look for here.
+## Work only goes forwards — [method GrimeMap.worked] is a total no tool can lower
+## — so a caller handing this a fall has misread a total, and a score that could go
+## down on a misread would be a bug nobody would look for here.
 func work(stage: GrimeMap.Stage, done: float) -> int:
 	if done <= 0.0:
 		return 0

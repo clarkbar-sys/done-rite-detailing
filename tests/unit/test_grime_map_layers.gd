@@ -62,6 +62,20 @@ func _buff_out(at: Vector3, radius: float) -> void:
 		_map.buff(at, Vector3.RIGHT, radius, 0.05)
 
 
+## The whole job on the whole of the right-hand face, all three tools in order.
+##
+## [b]A brush wider than the face, and that is the point of having this as well as
+## the three helpers above.[/b] The brush falls off from the centre of its splash,
+## so a radius that fits inside the tile leaves a fringe the tool is too weak to
+## finish — genuinely unfinished ground, which a second pass is right to be paid
+## for. Only a face taken all the way to saturated can tell "this was already done"
+## from "there was a little more of it to do".
+func _work_a_face_through() -> void:
+	_wash_bare(_middle(), 2.0)
+	_foam_over(_middle(), 2.0)
+	_buff_out(_middle(), 2.0)
+
+
 ## Which patch a point on the right-hand face belongs to, worked out the way the
 ## map does it rather than by knowing the answer.
 func _patch_under(at: Vector3) -> int:
@@ -111,10 +125,11 @@ func test_washing_banks_work_against_the_wash_and_nothing_else() -> void:
 	assert_eq(_map.worked(GrimeMap.Stage.BUFFED), 0.0, "washing banked work against the rag")
 
 
-## The ledger and the mask, counting the same mud two ways. Only true on a panel
-## nobody has foamed — see the rinsing test below for why.
+## The ledger and the mask, counting the same mud two ways. Unconditional now that
+## the jet moves nothing but mud: it was once only true on a panel nobody had
+## foamed, because the water went on moving units after the dirt was gone.
 func test_the_wash_ledger_agrees_with_the_mud_that_actually_left() -> void:
-	_wash_bare(_middle(), 0.3)
+	_work_it_over()
 	var gone: float = (1.0 - _map.remaining()) * float(_map.patches())
 	assert_almost_eq(
 		_map.worked(GrimeMap.Stage.WASHED), gone, TOLERANCE, "the wash ledger and the mask disagree"
@@ -134,19 +149,41 @@ func test_the_buff_ledger_agrees_with_the_shine_on_the_panel() -> void:
 	)
 
 
-## The rule the wage rests on: rinsing your own product off is not work. The jet
-## goes on moving units long after the mud is gone — [method GrimeMap._touch] has
-## why — and paying for those would be paying the player to undo a pass.
-func test_rinsing_product_off_banks_no_work() -> void:
-	_wash_bare(_middle(), 0.2)
-	_foam_over(_middle(), 0.2)
-	var banked: float = _map.worked(GrimeMap.Stage.WASHED)
-	var covered: float = _map.product()
-	_wash_bare(_middle(), 0.2)
-	assert_lt(_map.product(), covered, "the second wash rinsed nothing, so this proves nothing")
-	assert_eq(
-		_map.worked(GrimeMap.Stage.WASHED), banked, "rinsing product off was paid for as work"
-	)
+## The wage's oldest hazard, closed at the source rather than in the ledger: there
+## is no longer a foam/rinse/foam loop to pay for, because the jet takes nothing
+## off a covered spot. The map used to keep a per-patch high-water mark to stop the
+## loop scoring twice, and this is the test that says the mark is not missed —
+## every trigger in the game, held on one square, adds nothing after the first
+## time through.
+##
+## Over a whole face rather than a spot, because "finished" has to mean finished
+## and not finished in the middle — [method _work_a_face_through] has why the
+## distinction is what decides whether this test proves anything.
+func test_working_a_finished_face_over_again_banks_nothing() -> void:
+	_work_a_face_through()
+	var banked: PackedFloat64Array = PackedFloat64Array()
+	for stage: int in GrimeMap.Stage.size():
+		banked.append(_map.worked(stage))
+	assert_gt(banked[GrimeMap.Stage.BUFFED], 0.0, "the face never finished, so this proves nothing")
+	for _turn: int in 3:
+		_work_a_face_through()
+	for stage: int in GrimeMap.Stage.size():
+		assert_almost_eq(
+			_map.worked(stage),
+			banked[stage],
+			TOLERANCE,
+			"stage %d paid for ground it had already paid for" % stage
+		)
+
+
+## And the ledger is not simply frozen after the first pass: ground the player
+## has never covered pays whenever they get to it.
+func test_covering_ground_never_covered_before_banks_work() -> void:
+	_wash_bare(_middle(), 0.4)
+	_foam_over(_middle(), 0.1)
+	var banked: float = _map.worked(GrimeMap.Stage.FOAMED)
+	_foam_over(_middle(), 0.4)
+	assert_gt(_map.worked(GrimeMap.Stage.FOAMED), banked, "a wider pass banked nothing new")
 
 
 ## Never down, whatever order the tools go in — the score reads a difference
@@ -320,25 +357,43 @@ func test_a_patch_is_only_finished_when_it_is_buffed_and_not_when_it_is_clean() 
 	assert_false(_map.is_finished(), "a panel with no shine on it is not finished")
 
 
-# ---- and the water undoes the bottle -------------------------------------------
+# ---- and the water leaves the bottle's work alone ------------------------------
 
 
-func test_the_wash_takes_product_off_as_well_as_mud() -> void:
-	# The lesson the whole ordering exists to teach: spray a panel you have just
-	# treated and you rinse the treatment off, so there is no way to leave the
-	# water till last and still finish. Not a rule written anywhere — the wash
-	# simply draws from both of the buckets that are things lying on the paint.
+func test_the_wash_leaves_the_product_on() -> void:
+	# What the player asked for and what [method GrimeMap.wash] argues: the jet
+	# takes dirt off and touches nothing else lying on the paint. The order of the
+	# job survives it — a cleaner still draws from bare paint and only the water
+	# makes any — so what is dropped is the punishment and not the rule.
 	_wash_bare(_middle(), 0.4)
 	_foam_over(_middle(), 0.4)
-	assert_gt(_map.product_at(_middle(), Vector3.RIGHT), 0.9, "the spot was not covered first")
-	# Held rather than pressed once, for the reason [method _foam_over] records:
-	# the brush falls off from the centre of the splash and the sample sits up to
-	# half a texel off it, so a single call leaves a fraction behind.
-	_wash_bare(_middle(), 0.4)
+	var covered: float = _map.product_at(_middle(), Vector3.RIGHT)
+	assert_gt(covered, 0.9, "the spot was not covered first")
+	# Held rather than pressed once, and at full strength: a jet that took product
+	# off at all would have taken all of it off over forty passes of this.
+	for _sweep: int in 40:
+		_map.wash(_middle(), Vector3.RIGHT, 0.4, 1.0)
 	assert_almost_eq(
-		_map.product_at(_middle(), Vector3.RIGHT), 0.0, TOLERANCE, "the jet left the product on"
+		_map.product_at(_middle(), Vector3.RIGHT),
+		covered,
+		TOLERANCE,
+		"the jet rinsed the product off"
 	)
-	assert_gt(_map.bare_at(_middle(), Vector3.RIGHT), 0.9, "and it did not go back to bare paint")
+
+
+func test_the_wash_over_a_covered_spot_banks_nothing_and_rings_nothing() -> void:
+	# The other side of the same change. The jet on ground with no mud left has
+	# nothing to draw from at all, so it moves no units, pays no wage and reports
+	# no patch — where it used to go on moving product for as long as the trigger
+	# was held, which is what the ledger and the ding both had to be careful about.
+	_wash_bare(_middle(), 2.0)
+	_foam_over(_middle(), 2.0)
+	var banked: float = _map.worked(GrimeMap.Stage.WASHED)
+	var rung: int = 0
+	for _sweep: int in 60:
+		rung += _map.wash(_middle(), Vector3.RIGHT, 2.0, 0.2).size()
+	assert_eq(rung, 0, "washing an already-clean patch rang the bell")
+	assert_eq(_map.worked(GrimeMap.Stage.WASHED), banked, "and it was paid for as work")
 
 
 func test_the_wash_leaves_a_buffed_panel_alone() -> void:
@@ -358,51 +413,58 @@ func test_the_wash_leaves_a_buffed_panel_alone() -> void:
 	)
 
 
-func test_the_wash_takes_the_mud_before_the_product() -> void:
-	# Order rather than a split, because they are the same water. A texel that is
-	# part muddy and part soaped should come clean in the order a jet would take
-	# them off, which also keeps a half-washed panel behaving sensibly under a
-	# player sweeping back and forth over it.
+func test_the_wash_stops_at_the_mud_on_a_part_soaped_texel() -> void:
+	# The clamp doing the work, on the case where both buckets have something in
+	# them. A texel left part muddy and then part soaped has product sitting next to
+	# dirt, and water enough to take twice the mud off takes the mud off and stops
+	# — the source is the dirt, so there is nothing for the surplus to reach.
 	_map.wash(_middle(), Vector3.RIGHT, 0.4, 0.5)
 	_map.foam(_middle(), Vector3.RIGHT, 0.4, 1.0)
 	var mud: float = _map.mud_at(_middle(), Vector3.RIGHT)
 	var product: float = _map.product_at(_middle(), Vector3.RIGHT)
 	assert_gt(mud, 0.1, "the spot should still be part muddy for this to mean anything")
 	assert_gt(product, 0.1, "and part soaped")
-	# Less water than there is mud, so a jet that went for the product first would
-	# be visible as product coming off while mud stayed put.
-	_map.wash(_middle(), Vector3.RIGHT, 0.4, mud * 0.5)
-	assert_lt(_map.mud_at(_middle(), Vector3.RIGHT), mud, "the mud did not come off first")
+	_map.wash(_middle(), Vector3.RIGHT, 0.4, mud * 2.0)
+	assert_almost_eq(_map.mud_at(_middle(), Vector3.RIGHT), 0.0, TOLERANCE, "the mud stayed on")
 	assert_almost_eq(
-		_map.product_at(_middle(), Vector3.RIGHT), product, TOLERANCE, "the product went first"
+		_map.product_at(_middle(), Vector3.RIGHT), product, TOLERANCE, "the surplus took product"
 	)
 
 
-func test_rinsing_product_off_a_clean_patch_rings_nothing() -> void:
-	# The trap the extra guard in [method GrimeMap._touch] exists for. With the mud
-	# already gone the wash goes on moving units, and "this patch has no mud" is
-	# true on every one of them — so a check on the patch's state alone would ring
-	# a bell per tick for as long as the trigger was held.
-	_wash_bare(_middle(), 2.0)
-	_foam_over(_middle(), 2.0)
-	var rung: int = 0
-	for _sweep: int in 60:
-		rung += _map.wash(_middle(), Vector3.RIGHT, 2.0, 0.2).size()
-	assert_eq(rung, 0, "washing product off an already-clean patch rang the bell")
-
-
-func test_a_patch_rinsed_bare_can_be_covered_and_ring_again() -> void:
-	# And the other side of it: the covering ding is allowed to fire twice,
-	# because the player really did do the work twice. What must not repeat is a
-	# bell for a transition that never happened.
+func test_the_jet_cannot_open_a_covered_patch_back_up() -> void:
+	# The ding's old trap, closed at the source. A covered patch used to be one the
+	# jet could strip and the bottle could then cover again, arriving at a state it
+	# had already rung for — so the middle stage's report had to know how far the
+	# patch had ever got. Now there is no way back: the water leaves the coat on, so
+	# a second bottle over the same face finds nothing to draw from and says so.
 	_wash_bare(_middle(), 2.0)
 	var first: int = 0
 	for _sweep: int in 200:
 		first += _map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
 	assert_eq(first, PATCHES * PATCHES, "the face did not come up covered the first time")
+	var covered: float = _map.product()
 	for _sweep: int in 60:
 		_map.wash(_middle(), Vector3.RIGHT, 2.0, 0.2)
+	assert_almost_eq(_map.product(), covered, TOLERANCE, "the jet took the coat back off")
 	var again: int = 0
 	for _sweep: int in 200:
 		again += _map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
-	assert_eq(again, first, "re-covering a rinsed face did not report the same patches")
+	assert_eq(again, 0, "a covered face rang a second time")
+
+
+func test_covering_a_patch_that_was_only_part_done_still_rings() -> void:
+	# And the guard against overcorrecting into a map that rings once and then goes
+	# quiet: a patch that never came up covered has genuinely not finished the pass,
+	# so finishing it later is a first time and rings like one.
+	_wash_bare(_middle(), 2.0)
+	# A brush too narrow to finish any of them: the point is the corner the four
+	# patches of the face meet at, so each gets a quarter of the splash and none
+	# comes up covered.
+	var partial: int = 0
+	for _sweep: int in 200:
+		partial += _map.foam(_middle(), Vector3.RIGHT, 0.3, 0.05).size()
+	assert_eq(partial, 0, "the narrow brush finished a patch, so the wide one below proves nothing")
+	var rung: int = 0
+	for _sweep: int in 400:
+		rung += _map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
+	assert_eq(rung, PATCHES * PATCHES, "covering the face for the first time did not ring")

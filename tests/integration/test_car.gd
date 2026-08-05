@@ -267,6 +267,80 @@ func test_the_real_car_carries_every_kind_the_fixture_stands_in_for() -> void:
 		assert_gt(found, 0, "the real car has no panel of kind %d left" % kind)
 
 
+# ---- trim: seen, never cleaned -------------------------------------------------
+
+
+func test_the_trim_is_on_the_car_but_is_not_a_panel() -> void:
+	# The whole of what the group buys, in one assertion each way: the nodes are
+	# really there in the scene, and Car.panels() really does not report them.
+	# Asserting only the second half would pass just as well on a car that had
+	# lost its underside altogether.
+	var named: Array[String] = []
+	for panel: CSGShape3D in _car.panels():
+		named.append(panel.name)
+	for trim: String in ["Undercarriage", "WheelWells"]:
+		assert_not_null(_car.get_node_or_null(NodePath(trim)), "the car has no %s" % trim)
+		assert_does_not_have(named, trim, "%s is trim and must not be a panel" % trim)
+
+
+func test_marking_a_node_trim_covers_everything_under_it() -> void:
+	# The property that lets `car.tscn` put the group on two combiners instead of
+	# on sixteen brushes. Built here rather than read off the car, because what is
+	# being pinned is _gather's behaviour and not the scene's current shape: a
+	# plain Node3D holding CSG is a grouping somebody could add in the editor
+	# tomorrow, and it has to be coverable by one group too.
+	var before: int = _car.panels().size()
+	var holder: Node3D = Node3D.new()
+	holder.add_to_group(Car.TRIM_GROUP)
+	var shape: CSGBox3D = CSGBox3D.new()
+	holder.add_child(shape)
+	_car.add_child(holder)
+	assert_eq(_car.panels().size(), before, "a trim node hides its children as well as itself")
+	holder.queue_free()
+
+
+func test_the_trim_has_no_collider_for_a_tool_to_find() -> void:
+	# Every panel sets use_collision because a panel is a thing a tool has to be
+	# able to hit. Trim is the exact opposite and the flag is how it says so — a
+	# collider here would let the jet find the exhaust and then have nothing to do
+	# about it, since nothing downstream will give it a map.
+	for trim: String in ["Undercarriage", "WheelWells"]:
+		var node: CSGShape3D = _car.get_node_or_null(NodePath(trim)) as CSGShape3D
+		assert_not_null(node, "the car has no %s" % trim)
+		if node != null:
+			assert_false(node.use_collision, "%s must not be something a tool can hit" % trim)
+
+
+func test_the_trim_stays_inside_the_car_the_rest_of_the_game_measured() -> void:
+	# Car.bounds() is built from panels(), so it cannot see any of this — which
+	# means trim is the one geometry on the car that can grow past the envelope
+	# without a single existing test noticing. The camera's standoff and the
+	# walk's clearances are all cut against that envelope. So it is checked here,
+	# explicitly, rather than left to the test above that only measures panels.
+	var envelope: AABB = _car.bounds()
+	for trim: String in ["Undercarriage", "WheelWells"]:
+		var node: CSGShape3D = _car.get_node_or_null(NodePath(trim)) as CSGShape3D
+		assert_not_null(node, "the car has no %s" % trim)
+		if node != null:
+			var box: AABB = node.global_transform * node.get_aabb()
+			assert_true(envelope.encloses(box), "%s pokes out past the bodywork" % trim)
+
+
+func test_the_grime_does_not_lay_on_the_trim() -> void:
+	# The end the group exists for, asserted at the far end of the chain rather
+	# than at Car.panels() where it is arranged. Grime takes panels() as the whole
+	# of the car, so this is what "can never be cleaned" actually cashes out to:
+	# no map, and so no overlay, and so nothing for a tool to take off.
+	var grime: Grime = Grime.new()
+	add_child_autofree(grime)
+	grime.lay_on(_car)
+	for trim: String in ["Undercarriage", "WheelWells"]:
+		var node: Node = _car.get_node_or_null(NodePath(trim))
+		assert_not_null(node, "the car has no %s" % trim)
+		if node != null:
+			assert_null(grime.map_of(node), "%s must have no grime map" % trim)
+
+
 func test_something_that_is_not_a_panel_is_treated_as_bodywork() -> void:
 	# The caller is [method Garage._spend_the_trigger], holding whatever a raycast
 	# handed back. A null there should pick a tool nobody can use on it, not crash

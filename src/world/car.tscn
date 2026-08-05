@@ -25,6 +25,15 @@ albedo_color = Color(0.62, 0.64, 0.68, 1)
 metallic = 0.8
 roughness = 0.35
 
+; The underside: darker and rougher than the near-black the arches are cut in,
+; because everything down here is road-dirty pressed steel and this is the one
+; part of the car that is never going to be washed. It is a shade off the arch
+; material rather than the same one so that the floor pan and the wheel wells do
+; not read as a single continuous object where they meet.
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trim"]
+albedo_color = Color(0.09, 0.09, 0.1, 1)
+roughness = 0.9
+
 [node name="Car" type="Node3D" unique_id=637623716]
 script = ExtResource("1_1nwee")
 paint = SubResource("StandardMaterial3D_i0fu5")
@@ -259,3 +268,164 @@ radius = 0.2
 height = 0.24
 sides = 12
 material = SubResource("StandardMaterial3D_8vk5q")
+
+; ---- trim: seen, never cleaned ------------------------------------------------
+;
+; Both combiners below are in the "trim" group, which is what keeps them out of
+; Car.panels() — see Car.TRIM_GROUP and Car._gather. The group goes on the
+; combiner and not on each brush: _gather skips a trim node without descending
+; into it, so one line here covers everything underneath.
+;
+; NEITHER SETS use_collision. Every panel above does, because a panel is a thing
+; a tool has to be able to hit; these are the opposite of that, and a collider
+; would let the jet find the exhaust and then have nothing to do about it. The
+; underside is not reachable from a standing player anyway — this is belt and
+; braces, and it is also the cheaper of the two, since a trimesh body per liner
+; would be four concave hulls nobody ever queries.
+;
+; They are also both inside the car's existing envelope, which matters more than
+; it looks: Car.bounds() is built from panels() and so cannot see either of
+; these, and geometry that poked out past the bodywork would be geometry the
+; camera's standoff and the walk's clearances do not know about. The lowest point
+; down here is the muffler at y = -0.60, well above the tyres at -0.70.
+
+[node name="Undercarriage" type="CSGCombiner3D" parent="." unique_id=1700000001 groups=["trim"]]
+
+; The floor pan, which only spans the length between the arches: the tub's own
+; floor is at y = -0.44 and the arch cuts reach inboard to |x| = 0.425, so a pan
+; wide enough to read as a floor is a pan that would slice through both wheel
+; wells if it ran the length of the car. It overlaps the tub floor by a
+; centimetre rather than meeting it, which is the same trick the panels above use
+; on each other.
+[node name="Pan" type="CSGBox3D" parent="Undercarriage" unique_id=1700000002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.46, 0.03)
+size = Vector3(1.62, 0.06, 1.8)
+material = SubResource("StandardMaterial3D_trim")
+
+; And the spine that does run the whole length, narrow enough (|x| = 0.22) to
+; pass inboard of both arches. A transmission tunnel is the shape that lets the
+; underside read as continuous without the pan having to be wide everywhere.
+[node name="Spine" type="CSGBox3D" parent="Undercarriage" unique_id=1700000003]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.465, 0)
+size = Vector3(0.44, 0.07, 3.4)
+material = SubResource("StandardMaterial3D_trim")
+
+; Axles at the wheel centres, reaching 0.72 out to overlap the inner face of each
+; tyre at 0.68. They sit in the wheel wells, which is the one place trim is
+; visible without the player getting under the car — the gap behind a front wheel
+; is a real sightline at standing height.
+[node name="AxleFront" type="CSGCylinder3D" parent="Undercarriage" unique_id=1700000004]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, -0.37, 1.38)
+radius = 0.055
+height = 1.44
+sides = 8
+material = SubResource("StandardMaterial3D_trim")
+
+[node name="AxleRear" type="CSGCylinder3D" parent="Undercarriage" unique_id=1700000005]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, -0.37, -1.32)
+radius = 0.055
+height = 1.44
+sides = 8
+material = SubResource("StandardMaterial3D_trim")
+
+; The exhaust runs down the right of the spine, offset far enough to be seen
+; beside it and close enough in (|x| max 0.345) to clear the arches at 0.425.
+[node name="Exhaust" type="CSGCylinder3D" parent="Undercarriage" unique_id=1700000006]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.3, -0.5, -0.45)
+radius = 0.045
+height = 2.6
+sides = 8
+material = SubResource("StandardMaterial3D_trim")
+
+; The muffler is parked between the pan and the rear axle rather than under
+; either — at z = -0.95 it clears the axle at -1.32 and tucks below the pan,
+; which is where the volume goes on a real car and is also the only place it fits
+; without a union seam running through something else.
+[node name="Muffler" type="CSGCylinder3D" parent="Undercarriage" unique_id=1700000007]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.3, -0.5, -0.95)
+radius = 0.1
+height = 0.55
+sides = 10
+material = SubResource("StandardMaterial3D_trim")
+
+; The inner fenders. One combiner for all four rather than one per wheel, because
+; the cut that makes them half-pipes instead of full tubes is a single box across
+; the whole car — four combiners would need four copies of it.
+;
+; Each liner is a tube: an outer cylinder at r = 0.415 sitting 5 mm inside the
+; r = 0.42 arch that Body subtracts, hollowed to r = 0.35 so the tyre at r = 0.33
+; turns inside it with 2 cm to spare. The 5 mm is the whole reason the radii are
+; not equal — coincident surfaces fight for the pixel, and the arch material is
+; near-black like these, so the gap reads as shadow rather than as a hole. Sides
+; are 16 to match ArchFrontLeft and the rest: same brush count and the same
+; transform basis means the facets line up instead of beating against each other.
+[node name="WheelWells" type="CSGCombiner3D" parent="." unique_id=1700000010 groups=["trim"]]
+
+[node name="LinerFrontLeft" type="CSGCylinder3D" parent="WheelWells" unique_id=1700000011]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.7, -0.3, 1.38)
+radius = 0.415
+height = 0.5
+sides = 16
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="LinerFrontRight" type="CSGCylinder3D" parent="WheelWells" unique_id=1700000012]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.7, -0.3, 1.38)
+radius = 0.415
+height = 0.5
+sides = 16
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="LinerRearLeft" type="CSGCylinder3D" parent="WheelWells" unique_id=1700000013]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.7, -0.3, -1.32)
+radius = 0.415
+height = 0.5
+sides = 16
+material = SubResource("StandardMaterial3D_6fvc7")
+
+[node name="LinerRearRight" type="CSGCylinder3D" parent="WheelWells" unique_id=1700000014]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.7, -0.3, -1.32)
+radius = 0.415
+height = 0.5
+sides = 16
+material = SubResource("StandardMaterial3D_6fvc7")
+
+; The bores. Longer than the liners they hollow (0.54 against 0.50) so they punch
+; clean through both ends rather than leaving a skin at the outboard face.
+[node name="BoreFrontLeft" type="CSGCylinder3D" parent="WheelWells" unique_id=1700000015]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.7, -0.3, 1.38)
+operation = 2
+radius = 0.35
+height = 0.54
+sides = 16
+
+[node name="BoreFrontRight" type="CSGCylinder3D" parent="WheelWells" unique_id=1700000016]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.7, -0.3, 1.38)
+operation = 2
+radius = 0.35
+height = 0.54
+sides = 16
+
+[node name="BoreRearLeft" type="CSGCylinder3D" parent="WheelWells" unique_id=1700000017]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.7, -0.3, -1.32)
+operation = 2
+radius = 0.35
+height = 0.54
+sides = 16
+
+[node name="BoreRearRight" type="CSGCylinder3D" parent="WheelWells" unique_id=1700000018]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.7, -0.3, -1.32)
+operation = 2
+radius = 0.35
+height = 0.54
+sides = 16
+
+; What makes them half-pipes. A liner centred on the axle at y = -0.30 with
+; r = 0.415 reaches down to y = -0.715, which is below the ground the car is
+; parked on — a full tube would hang under the sills in plain view. Everything
+; below y = -0.46 goes, which is 2 cm past the tub floor at -0.44: enough overlap
+; that the liner's bottom edge is hidden behind the body rather than ending in
+; mid-air just inside the arch lip.
+[node name="BelowAxle" type="CSGBox3D" parent="WheelWells" unique_id=1700000019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.76, 0)
+operation = 2
+size = Vector3(2.4, 0.6, 4.6)

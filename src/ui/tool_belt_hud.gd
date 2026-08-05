@@ -1,5 +1,5 @@
-## The tool belt's UI half: a [b]T[/b] in the bottom-left corner that rolls the
-## five tools up out of it, and puts them away again.
+## The tool belt's UI half: a round badge in the bottom-left corner that rolls
+## the five tools up out of it, and puts them away again.
 ##
 ## This is the roll-up and nothing else. It does not own a [ToolBelt], it is
 ## handed one by [method bind], and picking an icon emits [signal tool_selected]
@@ -13,15 +13,18 @@
 ## classes a unit test can construct without a [SceneTree]. The belt is that
 ## tier; the thing that draws it is this one.
 ##
-## [b]The icons are flat 2D shapes, drawn from the catalogue's own fields.[/b]
-## A circle per [constant DetailingTool.Shape.CYLINDER], a square for the box, a
-## bar for the plane, each filled with that tool's [member DetailingTool.albedo]
-## — see [ToolIcon]. The alternative, a [SubViewport] per tool rendering the real
-## mesh, was rejected on cost: that is five more render targets on a page that
-## already has one, to fill a 164 px badge on a phone. Reading `albedo` and
-## `shape` straight off the catalogue is the part that matters, because it is
-## what stops the icon and the mesh in the player's hands from drifting into two
-## different blues.
+## [b]The icons are drawn silhouettes on the brand's own plate.[/b] A round dark
+## badge — [method Brand.badge], which is [method Brand.pill] at a square size,
+## so a belt badge and the Start button are bent by the same arithmetic — with
+## that tool's outline stroked on top of it in a tint derived from its
+## [member DetailingTool.albedo]. See [ToolIcon] for the stroke table and for why
+## a tint rather than the raw albedo.
+##
+## The alternative, a [SubViewport] per tool rendering the real mesh, was
+## rejected on cost: that is five more render targets on a page that already has
+## one, to fill a 164 px badge on a phone. Deriving the colour from the
+## catalogue is the part that matters, because it is what stops the badge and the
+## mesh in the player's hands from drifting into two different blues.
 ##
 ## [b]The corner eats input, and that is the trap.[/b] The play screen draws the
 ## garage through a [SubViewportContainer], which is a canvas item, so this HUD
@@ -57,9 +60,33 @@ const MARGIN: float = 12.0
 ## tool rather than into nothing, and nothing is the better failure.
 const GAP: float = 10.0
 
-## What the toggle says. A letter and not an icon because there is no asset
-## pipeline yet and a glyph the font already has cannot go missing.
-const TOGGLE_TEXT: String = "T"
+## What the corner is called, for a pointer that hovers and for a screen reader.
+## The picture on it is [BeltMark]; this is the word for it.
+const TOGGLE_TOOLTIP: String = "Tools"
+
+## The square every glyph in this file is laid out on, and the only unit the
+## stroke tables below are written in. Points are in [code]0..24[/code] with y
+## running down, the way the screen does, so a table reads the same way it draws
+## — no mental flip between writing a shape and looking at it.
+const GLYPH_GRID: float = 24.0
+
+## How far in from the plate's edge the picture is drawn, as a fraction of the
+## smaller side. The tap target is the whole button; the picture is smaller than
+## the target on purpose, because the target is sized for a fingertip and a
+## 164 px sponge is not a picture, it is a wall.
+##
+## The number is what leaves the glyph inside the disc rather than inside the
+## square: at this inset the glyph's own square is 48% of the plate across, so
+## its corners sit well inside a circle that is 100% of it.
+const GLYPH_INSET: float = 0.26
+
+## Stroke weight, in glyph-grid units — so it scales with the badge instead of
+## being a pixel count that is right at one size and hairline at every other.
+const GLYPH_WIDTH: float = 2.0
+
+## How many segments a glyph circle is bent into. Enough that a tyre is round at
+## 164 px, few enough that the table stays a table.
+const RING_SEGMENTS: int = 16
 
 var _belt: ToolBelt = null
 var _icons: Array[ToolIcon] = []
@@ -68,13 +95,22 @@ var _collapsed_slot: Vector2 = Vector2.ZERO
 var _expanded: bool = false
 var _expansion: float = 0.0
 var _tween: Tween = null
+var _mark: BeltMark = null
 
 @onready var _holder: Control = %Icons
 @onready var _toggle: Button = %Toggle
 
 
 func _ready() -> void:
-	_toggle.text = TOGGLE_TEXT
+	_toggle.tooltip_text = TOGGLE_TOOLTIP
+	# The picture rides on the button rather than being drawn by it, because a
+	# [Button] subclass cannot be named by a .tscn without its own script file and
+	# this one is an inner class. Full-rect and unpickable, so the thing a finger
+	# actually hits is still the button underneath it.
+	_mark = BeltMark.new()
+	_mark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toggle.add_child(_mark)
 	_toggle.pressed.connect(_on_toggle_pressed)
 	# The roll-up is anchored to a corner but laid out by hand (see
 	# [method _relayout]), so it has to be told when the corner moved. `resized`
@@ -127,6 +163,10 @@ func set_expanded(value: bool) -> void:
 		# Shown before the tween rather than after, or the first frame of the
 		# roll-out would have nothing in it to animate.
 		_holder.visible = true
+	# Here rather than in [method _apply_expansion]: the state flips once, the
+	# tween runs eight times, and rebuilding four styleboxes a frame to say the
+	# same thing four frames running is work nobody asked for.
+	_dress_toggle()
 	_animate_to(1.0 if _expanded else 0.0)
 
 
@@ -136,10 +176,20 @@ func toggle() -> void:
 	set_expanded(not _expanded)
 
 
-## The [b]T[/b] itself. For tests, and for anything that wants to point the
+## The corner button itself. For tests, and for anything that wants to point the
 ## player at it.
 func toggle_button() -> Button:
 	return _toggle
+
+
+## The picture on the corner button — three tool heads on a belt line, or an
+## [b]x[/b] while the roll-up is out. Public for the same reason
+## [method ToolIcon.fill_color] is: what the corner is saying is a thing a test
+## can read, and a corner that went on saying "tools" while the tools were
+## already out would be a bug nobody notices in code and everybody notices in a
+## thumb.
+func toggle_mark() -> BeltMark:
+	return _mark
 
 
 ## How many tool icons the roll-up is currently drawing — the size of the belt
@@ -236,6 +286,9 @@ func _relayout() -> void:
 	_toggle.custom_minimum_size = square
 	_toggle.size = square
 	_toggle.position = Vector2(MARGIN, size.y - MARGIN - slot)
+	# After the size is written, never before: a badge is a disc because its
+	# corner radius is half its height, and the height it is half of is this one.
+	_dress_toggle()
 	# The icons start life stacked on the toggle, so the roll-out reads as them
 	# coming out of the corner rather than fading in where they will end up.
 	_collapsed_slot = _toggle.position
@@ -261,6 +314,36 @@ func _relayout() -> void:
 			)
 		)
 	_apply_expansion(_expansion)
+
+
+## Puts the brand on the corner button: a round plate in all four of the states
+## Godot will ask for, and the picture that goes on it.
+##
+## [b]All four, because Godot falls back to the theme for any it is not given[/b]
+## — styling only [code]normal[/code] would leave the hover and the press wearing
+## the engine's grey, which is the one moment the button is being used. The title
+## screen's [method TitleScreen._dress] pays for the same thing in the same coin.
+##
+## [b]Red while the tools are out.[/b] On the site red is what a thing you press
+## wears, and here it is what the thing you have already pressed wears — the
+## equipped badge is red for exactly the same reason. A corner that stayed dark
+## with the roll-up open would be the only part of this HUD not saying what state
+## it is in, and the [b]x[/b] would be doing that work alone.
+func _dress_toggle() -> void:
+	if _toggle == null:
+		return
+	var side: float = _toggle.size.y
+	if side <= 0.0:
+		return
+	var plate: Color = Brand.RED if _expanded else Brand.PANEL
+	_toggle.add_theme_stylebox_override("normal", Brand.badge(plate, side))
+	_toggle.add_theme_stylebox_override(
+		"hover", Brand.badge(plate.lightened(Brand.HOVER_LIFT), side)
+	)
+	_toggle.add_theme_stylebox_override("pressed", Brand.badge(Brand.RED_DARK, side))
+	_toggle.add_theme_stylebox_override("focus", Brand.focus_ring(side))
+	if _mark != null:
+		_mark.set_open(_expanded)
 
 
 func _refresh_selection() -> void:
@@ -304,57 +387,196 @@ func _hide_holder() -> void:
 	_holder.visible = false
 
 
-## One tool's badge: a flat silhouette in that tool's own colour.
+## Draws [param paths] — a glyph in [constant GLYPH_GRID] units — onto
+## [param on], centred inside a control [param within] pixels across, stroked in
+## [param ink].
+##
+## Shared by the badges and the corner mark because they are the same picture
+## problem twice: a table of points on a square grid, scaled to whatever the
+## layout ended up handing the control. Written once so a glyph cannot end up
+## drawn at one weight on the belt and another in the corner.
+##
+## Stroke width scales with the glyph rather than being a fixed pixel count. The
+## design is rendered at about a third on a phone, so a 6 px line drawn at 1280
+## is 2 px in a hand — thin enough to alias away against a lit garage, which is
+## exactly the failure [TouchTarget] documents for tap targets, wearing a
+## different coat.
+static func stroke_glyph(
+	on: CanvasItem, paths: Array[PackedVector2Array], within: Vector2, ink: Color
+) -> void:
+	var side: float = minf(within.x, within.y)
+	if side <= 0.0:
+		return
+	var box: Rect2 = Rect2(Vector2.ZERO, within).grow(-side * GLYPH_INSET)
+	var unit: float = minf(box.size.x, box.size.y) / GLYPH_GRID
+	var origin: Vector2 = box.get_center() - Vector2(GLYPH_GRID, GLYPH_GRID) * unit * 0.5
+	for path: PackedVector2Array in paths:
+		var points: PackedVector2Array = PackedVector2Array()
+		for point: Vector2 in path:
+			points.append(origin + point * unit)
+		on.draw_polyline(points, ink, GLYPH_WIDTH * unit, true)
+
+
+## A closed loop of [constant RING_SEGMENTS] points around [param centre] at
+## [param radius], in glyph-grid units.
+##
+## Circles are tessellated into the same stroke table as everything else rather
+## than drawn with [method CanvasItem.draw_arc], so a glyph is one kind of thing
+## — a list of paths — and the drawing above is one loop over it. At sixteen
+## segments a wheel is a wheel at any size this HUD is rendered at.
+static func glyph_ring(centre: Vector2, radius: float) -> PackedVector2Array:
+	var points: PackedVector2Array = PackedVector2Array()
+	for step: int in RING_SEGMENTS + 1:
+		var angle: float = TAU * float(step) / float(RING_SEGMENTS)
+		points.append(centre + Vector2(cos(angle), sin(angle)) * radius)
+	return points
+
+
+## One tool's badge: the brand's round plate with that tool drawn on it.
 ##
 ## A [Button] rather than a [Control] with [method Control._gui_input], because
 ## what makes a tap work on a phone is the engine turning it into a click and
 ## [BaseButton] handling that — the same path the Start button takes, and the
 ## one the integration test exercises through [code]Input[/code].
 ##
-## [b]Why the shape and not the mesh.[/b] Three of the five tools are cylinders,
-## so three of these are the same circle, and they are told apart by colour —
-## which is what [member DetailingTool.albedo] is documented to be for: the two
-## blues on the belt are deliberately far apart so peripheral vision can do it.
-## Reading [member DetailingTool.extent] to give each cylinder its own aspect
-## ratio was considered and dropped: it makes the badge a scale model of a
-## 0.06 m wand, which at this size is a hairline, and the silhouette stops
-## saying "cylinder" at all.
+## [b]Why a drawn silhouette and not the shape the tool renders as.[/b] The badge
+## used to be [member DetailingTool.shape] — a circle for a cylinder, a square
+## for a box, a bar for a plane — which made three of the five badges the same
+## circle, told apart by colour alone. That is one channel carrying the whole
+## job, and it is the channel that fails first: in sunlight, at a glance, and for
+## roughly one man in twelve. Five silhouettes put the same information in the
+## shape, where it survives all three. The table is points on a grid, drawn in
+## [method _draw] the way the primitives were, so it is still greppable, still
+## diffable, and still costs no asset pipeline.
 ##
-## [b]Dimmed and ringed, not just dimmed.[/b] The spec fades the equipped tool
-## out. Faded on its own is the universal look of a control that is broken, and
-## the one icon you cannot pick — because it is already in your hands — is the
-## one the eye should land on first. So the fill is dimmed as specified and a
-## ring is drawn at full strength around it. The ring is drawn here rather than
-## applied as [member CanvasItem.modulate] precisely so the dimming cannot reach
-## it; a ring that fades with the fill says nothing the fill did not already say.
+## [b]A tint rather than the albedo.[/b] What a tool is made of and what its
+## badge is drawn in stopped being the same number here — see
+## [method Brand.badge_tint] for the whole of that argument. The short version is
+## that the Tire & Engine bottle is near-black on purpose and was therefore
+## invisible on any dark plate, and lightening the badge is the fix that does not
+## touch the bottle in the player's hands.
+##
+## [b]Equipped is a red plate, not a dimmed one.[/b] The old badge faded the tool
+## you were holding and drew a ring round it in a colour nothing else on the belt
+## used. Faded is the universal look of a control that is broken, and the ring
+## was a sixth colour on a five-colour belt. Red is what the site puts on the
+## thing you have pressed, white is the only colour that goes on top of it, and
+## neither is new.
 class ToolIcon:
 	extends Button
 
-	## How much of the fill's alpha survives on the tool you are holding.
-	const DIM_ALPHA: float = 0.35
-
-	## Thickness of the selection ring, in design pixels.
-	const RING_WIDTH: float = 5.0
-
-	## Ring colour. Deliberately not one of the tool colours — it has to read as
-	## "this slot", not as another tool.
-	const RING_COLOR: Color = Color(1.0, 0.95, 0.55, 1.0)
-
-	## How far in from the button's edge the silhouette is drawn, as a fraction
-	## of the smaller side. The tap target is the whole button; the picture is
-	## smaller than the target on purpose, because the target is sized for a
-	## fingertip and a 164 px sponge is not a picture, it is a wall.
-	const SHAPE_INSET: float = 0.28
-
-	## How far in from the button's edge the ring is drawn, same units.
-	const RING_INSET: float = 0.06
-
-	## The proportion of the badge's height a [constant DetailingTool.Shape.PLANE]
-	## bar takes. Low enough to read as "a flat thing", not as a squashed box.
-	const BAR_HEIGHT: float = 0.38
-
 	var _tool: DetailingTool = null
 	var _equipped: bool = false
+
+	## The stroke table: [param id]'s silhouette, as paths on a
+	## [constant GLYPH_GRID]-unit square with y running down the way the screen
+	## does.
+	##
+	## Static and public because it is geometry rather than state, which makes it
+	## checkable without a badge to hang it on —
+	## [code]tests/integration/test_tool_belt_hud.gd[/code] asserts every tool has
+	## one and that none of them draw outside the grid they claim to be on.
+	static func glyph(id: DetailingTool.Id) -> Array[PackedVector2Array]:
+		var paths: Array[PackedVector2Array] = []
+		match id:
+			DetailingTool.Id.POWER_WASH:
+				# A lance out of the bottom-left corner with a pistol grip under
+				# it, and the fan leaving the nozzle.
+				paths.append(PackedVector2Array([Vector2(4, 20), Vector2(16, 8)]))
+				paths.append(PackedVector2Array([Vector2(4, 20), Vector2(7, 23)]))
+				paths.append(PackedVector2Array([Vector2(17, 7), Vector2(22, 2)]))
+				paths.append(PackedVector2Array([Vector2(18, 8.5), Vector2(23, 7)]))
+				paths.append(PackedVector2Array([Vector2(17, 10), Vector2(21, 13)]))
+			DetailingTool.Id.SPONGE:
+				# A block, wider than it is thick — the thing that says "sponge"
+				# and not "dice" — with three suds rising off it.
+				(
+					paths
+					. append(
+						PackedVector2Array(
+							[
+								Vector2(3, 13),
+								Vector2(21, 13),
+								Vector2(21, 20),
+								Vector2(3, 20),
+								Vector2(3, 13),
+							]
+						)
+					)
+				)
+				paths.append(ToolBeltHud.glyph_ring(Vector2(7, 8), 2.6))
+				paths.append(ToolBeltHud.glyph_ring(Vector2(12.5, 5), 3.0))
+				paths.append(ToolBeltHud.glyph_ring(Vector2(17.5, 8.5), 2.2))
+			DetailingTool.Id.DRYING_RAG:
+				# A cloth: square at the top where it is held, rippling at the
+				# bottom where it is not, with a hem stitched across it.
+				(
+					paths
+					. append(
+						PackedVector2Array(
+							[
+								Vector2(4, 5),
+								Vector2(20, 5),
+								Vector2(20, 14),
+								Vector2(16, 18),
+								Vector2(12, 14),
+								Vector2(8, 18),
+								Vector2(4, 14),
+								Vector2(4, 5),
+							]
+						)
+					)
+				)
+				paths.append(PackedVector2Array([Vector2(4, 8.5), Vector2(20, 8.5)]))
+			DetailingTool.Id.WINDOW_CLEANER:
+				# A trigger bottle. The trigger is the half that matters: without
+				# it this is the same bottle as the tire cleaner.
+				(
+					paths
+					. append(
+						PackedVector2Array(
+							[
+								Vector2(7, 12),
+								Vector2(17, 12),
+								Vector2(17, 21),
+								Vector2(7, 21),
+								Vector2(7, 12),
+							]
+						)
+					)
+				)
+				(
+					paths
+					. append(
+						PackedVector2Array(
+							[
+								Vector2(9, 12),
+								Vector2(9, 7),
+								Vector2(15, 7),
+								Vector2(15, 9.5),
+								Vector2(11, 9.5),
+							]
+						)
+					)
+				)
+				paths.append(PackedVector2Array([Vector2(15, 8), Vector2(19, 6)]))
+				paths.append(PackedVector2Array([Vector2(11, 9.5), Vector2(10, 12)]))
+			DetailingTool.Id.TIRE_ENGINE_CLEANER:
+				# A tyre, and the jets going at it. The wheel is what tells this
+				# one apart from the other bottle on the belt, which is why the
+				# bottle is not drawn at all.
+				paths.append(ToolBeltHud.glyph_ring(Vector2(10, 15), 7.0))
+				paths.append(ToolBeltHud.glyph_ring(Vector2(10, 15), 3.0))
+				paths.append(PackedVector2Array([Vector2(17, 4), Vector2(14, 7)]))
+				paths.append(PackedVector2Array([Vector2(21, 6), Vector2(17, 10)]))
+				paths.append(PackedVector2Array([Vector2(23, 11), Vector2(20, 14)]))
+		return paths
+
+	func _ready() -> void:
+		# The plate is a stylebox and a stylebox is built at a size, so it has to
+		# be rebuilt when the layout hands this badge a different one.
+		resized.connect(_dress)
+		_dress()
 
 	## Tells this badge which tool it stands for. Separate from
 	## [method Object._init] because [Button] has its own and a subclass that
@@ -362,6 +584,7 @@ class ToolIcon:
 	func carry(shown: DetailingTool) -> void:
 		_tool = shown
 		tooltip_text = shown.display_name
+		_dress()
 		queue_redraw()
 
 	## Marks this badge as the tool in the player's hands.
@@ -369,43 +592,113 @@ class ToolIcon:
 		if value == _equipped:
 			return
 		_equipped = value
+		_dress()
 		queue_redraw()
 
-	## The colour [method _draw] fills the silhouette with — the tool's own
-	## albedo, dimmed when it is the one being held.
+	## The colour the plate under the glyph is filled with: [constant Brand.RED]
+	## for the tool in your hands, [constant Brand.PANEL] for the rest.
 	##
-	## Public because it is what the integration test asserts on. Asserting on
-	## the value the drawing code actually uses, rather than on a flag that is
-	## supposed to make it use that value, is the difference between a test that
-	## pins the behaviour and one that pins the bookkeeping.
+	## Public because it is what the integration test asserts on. Asserting on the
+	## value the drawing code actually uses, rather than on a flag that is supposed
+	## to make it use that value, is the difference between a test that pins the
+	## behaviour and one that pins the bookkeeping.
+	func plate_color() -> Color:
+		return Brand.RED if _equipped else Brand.PANEL
+
+	## The colour [method _draw] strokes the silhouette in: white on the equipped
+	## plate, and otherwise this tool's own colour lifted until it can be seen
+	## against the plate. Same reasoning as [method plate_color].
 	func fill_color() -> Color:
 		if _tool == null:
 			return Color(0.0, 0.0, 0.0, 0.0)
-		var fill: Color = _tool.albedo
-		fill.a = DIM_ALPHA if _equipped else 1.0
-		return fill
+		if _equipped:
+			return Brand.WHITE
+		return Brand.badge_tint(_tool.albedo)
 
-	## Thickness of the ring [method _draw] puts around this badge, or zero when
-	## there is no ring. Same reasoning as [method fill_color].
-	func ring_width() -> float:
-		return RING_WIDTH if _equipped else 0.0
+	## Puts the round plate on, in all four of the states Godot will ask for. Any
+	## state left unstyled falls back to the engine's grey rectangle — which is
+	## what this whole pass is here to get rid of, so leaving `hover` out would
+	## reintroduce it for exactly as long as a thumb is on the badge.
+	func _dress() -> void:
+		var side: float = size.y
+		if side <= 0.0:
+			return
+		var plate: Color = plate_color()
+		add_theme_stylebox_override("normal", Brand.badge(plate, side))
+		add_theme_stylebox_override("hover", Brand.badge(plate.lightened(Brand.HOVER_LIFT), side))
+		add_theme_stylebox_override("pressed", Brand.badge(Brand.RED_DARK, side))
+		add_theme_stylebox_override("focus", Brand.focus_ring(side))
 
 	func _draw() -> void:
 		if _tool == null:
 			return
-		var side: float = minf(size.x, size.y)
-		var box: Rect2 = Rect2(Vector2.ZERO, size).grow(-side * SHAPE_INSET)
-		var inner: float = minf(box.size.x, box.size.y)
-		var fill: Color = fill_color()
-		match _tool.shape:
-			DetailingTool.Shape.CYLINDER:
-				draw_circle(box.get_center(), inner * 0.5, fill)
-			DetailingTool.Shape.BOX:
-				var square: Vector2 = Vector2(inner, inner)
-				draw_rect(Rect2(box.get_center() - square * 0.5, square), fill)
-			DetailingTool.Shape.PLANE:
-				var bar: Vector2 = Vector2(box.size.x, box.size.y * BAR_HEIGHT)
-				draw_rect(Rect2(box.get_center() - bar * 0.5, bar), fill)
-		var width: float = ring_width()
-		if width > 0.0:
-			draw_rect(Rect2(Vector2.ZERO, size).grow(-side * RING_INSET), RING_COLOR, false, width)
+		ToolBeltHud.stroke_glyph(self, glyph(_tool.id), size, fill_color())
+
+
+## The picture on the corner button: three tool heads on a belt line, and an
+## [b]x[/b] while the roll-up is out.
+##
+## [b]Why the corner stopped being a letter.[/b] It was a [b]T[/b], chosen
+## because a glyph the font already has cannot go missing. What it could do
+## instead was mean nothing — a T on a dark square is initialism, not an icon,
+## and it said the same thing whether the tools were out or not. The mark says
+## what the corner is for while it is closed and what pressing it will do while
+## it is open, which is the one job a toggle has.
+##
+## A [Control] rather than more drawing inside [ToolBeltHud] because the corner
+## button moves, and a picture that lived in the HUD's own [method _draw] would
+## have to be told where the button went. Anchored to it instead, and
+## [constant Control.MOUSE_FILTER_IGNORE] so the thing a finger hits is still the
+## button underneath.
+class BeltMark:
+	extends Control
+
+	var _open: bool = false
+
+	## The stroke table for both faces of the corner: the tools, or the [b]x[/b].
+	## Static and public for the reason [method ToolIcon.glyph] is.
+	static func glyph(open: bool) -> Array[PackedVector2Array]:
+		var paths: Array[PackedVector2Array] = []
+		if open:
+			paths.append(PackedVector2Array([Vector2(7, 7), Vector2(17, 17)]))
+			paths.append(PackedVector2Array([Vector2(17, 7), Vector2(7, 17)]))
+			return paths
+		paths.append(PackedVector2Array([Vector2(3, 17), Vector2(21, 17)]))
+		paths.append(ToolBeltHud.glyph_ring(Vector2(6.5, 11), 2.7))
+		(
+			paths
+			. append(
+				PackedVector2Array(
+					[
+						Vector2(9.5, 8),
+						Vector2(14.5, 8),
+						Vector2(14.5, 14),
+						Vector2(9.5, 14),
+						Vector2(9.5, 8),
+					]
+				)
+			)
+		)
+		paths.append(ToolBeltHud.glyph_ring(Vector2(17.5, 11), 2.7))
+		return paths
+
+	func _ready() -> void:
+		resized.connect(queue_redraw)
+
+	## Whether the corner is currently saying [i]close[/i] rather than
+	## [i]tools[/i].
+	func is_open() -> bool:
+		return _open
+
+	## Flips the mark. Idempotent, so the HUD can assert the state it wants rather
+	## than track the one it is in.
+	func set_open(value: bool) -> void:
+		if value == _open:
+			return
+		_open = value
+		queue_redraw()
+
+	func _draw() -> void:
+		# White on both plates: it is 15:1 on the dark one and the only colour the
+		# brand puts on top of the red one.
+		ToolBeltHud.stroke_glyph(self, glyph(_open), size, Brand.WHITE)
