@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.9.0...v1.10.0) (2026-08-05)
+
+
+### Features
+
+* **audio:** ring a casino payout chime, in C, instead of a hotel bell ([#122](https://github.com/clarkbar-sys/done-rite-detailing/issues/122)) ([a883dae](https://github.com/clarkbar-sys/done-rite-detailing/commit/a883dae181854592f652b12e82f3fd20d258cf7a))
+* **world:** let the power wash take the dirt and leave the product ([#125](https://github.com/clarkbar-sys/done-rite-detailing/issues/125)) ([1192281](https://github.com/clarkbar-sys/done-rite-detailing/commit/1192281541c2a1a66580570e32d57f4bec71461b))
+
 ## [1.9.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.8.0...v1.9.0) (2026-08-04)
 
 
