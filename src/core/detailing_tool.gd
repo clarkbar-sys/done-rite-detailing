@@ -15,6 +15,14 @@
 ## the size [i]are[/i] the design decision, they are readable here rather than
 ## buried in a mesh nobody can diff, and a real model drops in later without
 ## moving anything else.
+##
+## [b]Two of them have now dropped in, and nothing else moved.[/b] The spray
+## bottles carry a [member model] — a glTF exported out of
+## [code]src-models/[/code] — and [ToolModel] fits it into exactly the
+## [member extent] box the cylinder occupied. So this table still decides how big
+## a bottle is, the roll-up still draws its icon from the same row, and the three
+## tools with no model in their row are still primitives. What a model brings that
+## a primitive could not is a texture, which is the whole reason to have one.
 class_name DetailingTool
 extends RefCounted
 
@@ -72,6 +80,25 @@ var metallic: float
 ## smudge, and a mirror-smooth cloth is not a cloth.
 var roughness: float
 
+## The modelled mesh this tool is drawn by in the player's hands, as a
+## [code]res://[/code] path, or [code]""[/code] for a tool still drawn as the
+## primitive above. This is the "a real model drops in later" the class docs
+## promise, arriving for the two spray bottles.
+##
+## [b]Everything above still applies to a tool that has one.[/b] [ToolModel]
+## fits the mesh into exactly the [member extent] box the primitive occupied, so
+## the size is still this table's to decide and the roll-up icon is still drawn
+## from the same numbers as the thing in your hands. What a model does replace is
+## the surface: it brings its own texture, so [member albedo], [member metallic]
+## and [member roughness] stop painting the mesh and go on describing it — which
+## is what the roll-up reads them for, and why they are not deleted for a tool
+## that has a model.
+##
+## A path rather than a [PackedScene] because this is data: the catalogue is
+## built by a unit test with no renderer behind it, and a [code]preload[/code]
+## here would drag two meshes and their textures into every one of those runs.
+var model: String
+
 
 func _init(
 	tool_id: Id,
@@ -80,7 +107,8 @@ func _init(
 	proxy_extent: Vector3,
 	proxy_albedo: Color,
 	proxy_metallic: float,
-	proxy_roughness: float
+	proxy_roughness: float,
+	proxy_model: String = ""
 ) -> void:
 	id = tool_id
 	display_name = name_shown
@@ -89,6 +117,7 @@ func _init(
 	albedo = proxy_albedo
 	metallic = proxy_metallic
 	roughness = proxy_roughness
+	model = proxy_model
 
 
 ## The five tools, in belt order.
@@ -138,8 +167,9 @@ static func catalogue() -> Array[DetailingTool]:
 			0.9
 		)
 	)
-	# A spray bottle. The other blue on the belt, and deliberately a long way
-	# from the rag's: lighter, greener, and a different silhouette besides.
+	# A spray bottle, and the first tool on the belt to be a modelled mesh rather
+	# than a primitive. The colour is what the roll-up draws it in and is unchanged
+	# — the other blue on the belt, deliberately a long way from the rag's.
 	tools.append(
 		DetailingTool.new(
 			Id.WINDOW_CLEANER,
@@ -148,11 +178,13 @@ static func catalogue() -> Array[DetailingTool]:
 			Vector3(0.10, 0.26, 0.10),
 			Color(0.16, 0.66, 0.92),
 			0.0,
-			0.35
+			0.35,
+			"res://assets/models/cleaning_spray/window_cleaner.glb"
 		)
 	)
-	# Near-black rather than black: a true 0,0,0 takes no light at all, so it
-	# would read as a hole in the frame instead of a bottle.
+	# The same bottle in a different livery, and the same note about its colour:
+	# near-black rather than black, because a true 0,0,0 icon takes no light at
+	# all and reads as a hole in the badge instead of as a bottle.
 	tools.append(
 		DetailingTool.new(
 			Id.TIRE_ENGINE_CLEANER,
@@ -161,7 +193,8 @@ static func catalogue() -> Array[DetailingTool]:
 			Vector3(0.11, 0.30, 0.11),
 			Color(0.09, 0.09, 0.10),
 			0.0,
-			0.5
+			0.5,
+			"res://assets/models/cleaning_spray/tire_cleaner.glb"
 		)
 	)
 	return tools

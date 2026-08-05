@@ -75,6 +75,17 @@ func _material(proxy: MeshInstance3D) -> StandardMaterial3D:
 	return proxy.material_override as StandardMaterial3D
 
 
+## The material actually painting [param proxy], wherever it came from: the
+## catalogue's override for a tool built out of a primitive, and the import's own
+## for a tool built out of a model. What a question about how a tool [i]looks[/i]
+## has to ask, now that those are two different places.
+func _painting(proxy: MeshInstance3D) -> StandardMaterial3D:
+	var override: StandardMaterial3D = _material(proxy)
+	if override != null:
+		return override
+	return proxy.mesh.surface_get_material(0) as StandardMaterial3D
+
+
 ## Every proxy that is currently drawing. The list, not the count, so a failure
 ## says which two are on screen together rather than just that two are.
 func _showing() -> Array[MeshInstance3D]:
@@ -172,6 +183,20 @@ func test_every_proxy_is_the_shape_and_size_the_catalogue_gives_it() -> void:
 		var proxy: MeshInstance3D = _view_model().proxy_for(tool.id)
 		match tool.shape:
 			DetailingTool.Shape.CYLINDER:
+				# Measured off the mesh's own box, because two of the three cylinders on
+				# the belt are modelled bottles rather than a [CylinderMesh] — see
+				# [ToolModel], which fits one into exactly this box. The box is the
+				# question worth asking of both: it is what the clearances further down
+				# are measured against, and a [CylinderMesh] of this extent fills it
+				# exactly.
+				var barrel: AABB = proxy.get_aabb()
+				assert_almost_eq(barrel.size.y, tool.extent.y, TOLERANCE, tool.display_name)
+				assert_almost_eq(barrel.size.x, tool.extent.x, TOLERANCE, "x is a width")
+				assert_almost_eq(barrel.size.z, tool.extent.z, TOLERANCE, "z is a depth")
+				if not tool.model.is_empty():
+					continue
+				# And a tool with no model is still built from the primitive the
+				# catalogue names, rather than from whatever else happens to fit the box.
 				var cylinder: CylinderMesh = proxy.mesh as CylinderMesh
 				assert_not_null(cylinder, "%s is a cylinder" % tool.display_name)
 				if cylinder == null:
@@ -202,6 +227,8 @@ func test_every_proxy_is_the_shape_and_size_the_catalogue_gives_it() -> void:
 
 func test_every_proxy_wears_the_catalogues_surface() -> void:
 	for tool: DetailingTool in DetailingTool.catalogue():
+		if not tool.model.is_empty():
+			continue
 		var material: StandardMaterial3D = _material(_view_model().proxy_for(tool.id))
 		assert_not_null(material, "%s needs a material of its own" % tool.display_name)
 		if material == null:
@@ -211,13 +238,31 @@ func test_every_proxy_wears_the_catalogues_surface() -> void:
 		assert_almost_eq(material.roughness, tool.roughness, TOLERANCE, tool.display_name)
 
 
+func test_a_modelled_tool_wears_its_own_skin_instead() -> void:
+	# The one thing a modelled tool does not take from the catalogue. An override
+	# is what [method ViewModel._build] would otherwise paint on, and painting a
+	# flat catalogue colour over a texture is throwing away the entire reason the
+	# bottle was modelled. Asserted from both sides: no override, and a real
+	# texture underneath where the override would have been.
+	for tool: DetailingTool in DetailingTool.catalogue():
+		if tool.model.is_empty():
+			continue
+		var proxy: MeshInstance3D = _view_model().proxy_for(tool.id)
+		assert_null(_material(proxy), "%s must not be painted over" % tool.display_name)
+		var skin: StandardMaterial3D = proxy.mesh.surface_get_material(0) as StandardMaterial3D
+		assert_not_null(skin, "%s: the import's own material" % tool.display_name)
+		if skin == null:
+			continue
+		assert_not_null(skin.albedo_texture, "%s: and its texture" % tool.display_name)
+
+
 func test_the_power_wash_is_the_only_metal_on_the_belt() -> void:
 	# Silver is a material, not a colour: at metallic 0 the same grey cylinder is
 	# light plastic. The room's red toolboxes sit at 0.2, so "more than that" is
 	# the bar, and everything else on the belt is a bottle or a rag and is not
 	# metal at all.
 	for tool: DetailingTool in DetailingTool.catalogue():
-		var metallic: float = _material(_view_model().proxy_for(tool.id)).metallic
+		var metallic: float = _painting(_view_model().proxy_for(tool.id)).metallic
 		if tool.id == DetailingTool.Id.POWER_WASH:
 			assert_gt(metallic, 0.5, "the wand has to read as metal")
 		else:
