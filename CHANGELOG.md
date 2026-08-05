@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.10.0...v1.11.0) (2026-08-05)
+
+
+### Features
+
+* **screens:** put a menu, and one screen of rules, between the title card and the bay ([#130](https://github.com/clarkbar-sys/done-rite-detailing/issues/130)) ([f699984](https://github.com/clarkbar-sys/done-rite-detailing/commit/f6999847a3b3e572ebc018dda648722a3b32cabe))
+* **world:** give the car an underside nobody has to wash ([#128](https://github.com/clarkbar-sys/done-rite-detailing/issues/128)) ([788617a](https://github.com/clarkbar-sys/done-rite-detailing/commit/788617abb0131270d12a8939b70959dce017545a))
+
 ## [1.10.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.9.0...v1.10.0) (2026-08-05)
 
 
