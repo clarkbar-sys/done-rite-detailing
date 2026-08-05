@@ -111,14 +111,30 @@ const FILTHY: float = 1.0
 ## buys. The totals below count these rather than fractions — see the class docs.
 const UNITS: int = 255
 
-## The smallest brush, in pixels of radius. A touch whose splash is smaller than
+## The smallest brush, in texels of radius. A touch whose splash is smaller than
 ## a texel would otherwise round to nothing and the player would hold the trigger
 ## on a spot that never changes — which reads as a broken tool rather than as a
 ## mask that is too coarse for the range they are standing at.
+##
+## Three quarters of a texel and not half of one, because what has to be reached
+## is the [i]centre[/i] of the texel the hit landed in and the hit can land in a
+## corner of it: half a texel diagonally is [code]0.707[/code] of one, so this is
+## the smallest floor that always covers it. It is spent as
+## [member _finest] — the same number in metres — now that the brush measures
+## distance in metres rather than in texels.
 const FINEST_BRUSH: float = 0.75
 
 var _box: AABB
 var _tile_pixels: int
+## The smallest radius, in metres, [method _brush] will work at — see
+## [constant FINEST_BRUSH], which is this in texels.
+##
+## Measured off the box's [i]longest[/i] axis rather than per face, so it is one
+## number computed once instead of six recomputed a tick. Conservative in the
+## only direction that matters: on a face whose texels are finer than that it
+## floors the brush wider than it strictly had to, and the floor is only ever
+## reached by a tool aimed at a panel too big for the mask it carries.
+var _finest: float
 var _patches_across: int
 var _patches_down: int
 var _image: Image = null
@@ -152,6 +168,11 @@ var _dirty: bool = false
 func _init(panel_box: AABB, tile_pixels: int, patches_per_tile: int) -> void:
 	_box = panel_box
 	_tile_pixels = maxi(tile_pixels, 1)
+	# Floored at [constant BoxProjection.FLATNESS] rather than trusted: a map built
+	# against a box with no size at all would otherwise leave the brush a radius of
+	# zero to divide by.
+	var widest: float = maxf(_box.size.x, maxf(_box.size.y, _box.size.z))
+	_finest = maxf(FINEST_BRUSH * widest / float(_tile_pixels), BoxProjection.FLATNESS)
 	var per_tile: int = maxi(patches_per_tile, 1)
 	_patches_across = BoxProjection.COLUMNS * per_tile
 	_patches_down = BoxProjection.ROWS * per_tile
@@ -405,39 +426,147 @@ func buff(point: Vector3, normal: Vector3, radius_metres: float, amount: float) 
 ## across and stops at the source, and the softness is spent on the shape of the
 ## brush across its radius instead, where it does not cost the player an ending.
 ##
-## [b]The brush stops at the edge of its face.[/b] Pixels are only touched inside
-## the tile the point landed in, so a wash held on the very edge of the bonnet
-## does not bleed round onto the wing — and equally does not reach round it, so
-## the last centimetre of a corner takes a second press from the other side. The
-## honest fix is to paint by world-space distance across every face whose normal
-## faces the water, which is a loop over more tiles and the same arithmetic; it
-## is not worth it until somebody notices the corner.
+## [b]A ball of a radius in metres, not a disc of a radius in texels.[/b] The
+## brush visits every face the tool is not behind and keeps the pixels whose own
+## place on the box is within [param radius_metres] of [param point] — so it
+## reaches round the corner of a panel onto the faces beside it, and a press at
+## the edge of the bonnet finishes the edge instead of leaving a strip that can
+## only be had from somewhere else.
+##
+## [b]This is the fix the previous version of these docs described and declined
+## to write.[/b] It read: "the brush stops at the edge of its face ... so the last
+## centimetre of a corner takes a second press from the other side. The honest fix
+## is to paint by world-space distance across every face whose normal faces the
+## water, which is a loop over more tiles and the same arithmetic; it is not worth
+## it until somebody notices the corner." Somebody noticed the corner. It is that
+## loop and that same arithmetic, and the prediction that it would be cheap held:
+## five of the six faces are usually rejected outright or reduced to a rectangle
+## the distance test empties, so a press still costs about what it did.
+##
+## [b]Every face the tool is not behind, which includes the ones it is edge-on
+## to.[/b] The test is [code]outward.dot(normal) >= 0[/code], and the
+## [code]=[/code] is the entire point rather than a boundary case nobody thought
+## about: the faces beside the one being worked are exactly perpendicular to it on
+## a box, so a strict [code]>[/code] rejects precisely the faces the corner needed
+## and this becomes the old behaviour spelled out at greater length. What the
+## comparison does keep out is the far side — the underside of a bonnet being
+## washed from above, the inside of a door — which is the one thing a ball of
+## paint must not reach through the panel to touch.
+##
+## [b]Distance is measured in metres, between two places on the box.[/b]
+## [method BoxProjection.point_on_face] is what turns a pixel back into a place;
+## the falloff is then the same [code]1 - (d/r)²[/code] curve as before, just over
+## a distance that means something. It has to be metres rather than tile
+## coordinates because two faces' tiles are measured along different axes and over
+## different spans, so "half a tile away" is a different distance on each of them
+## and the six could not be compared at all.
+##
+## [b]With one exception, on the face the tool actually hit.[/b] There the
+## distance drops the face's own axis and is measured in the plane. A hit is on
+## the [i]mesh[/i] and the box is drawn around the mesh, so a point on anything
+## that is not a flat slab — a tapered nose, a wheel, a mirror — sits some way
+## inside its own box, and charging the brush for that gap would make a curved
+## panel take a bigger tool to clean than a flat one at the same range. That gap
+## is [method BoxProjection.tile_uv]'s clamping argument in the other direction,
+## and it is deliberately still paid on the [i]other[/i] faces, where it is not a
+## measurement error but the real distance the brush has to cover to get round the
+## corner.
 func _brush(
 	point: Vector3, normal: Vector3, radius_metres: float, amount: float, stage: Stage
 ) -> PackedInt32Array:
 	var finished: PackedInt32Array = PackedInt32Array()
 	if amount <= 0.0:
 		return finished
-	var face: BoxProjection.Face = BoxProjection.face_for(normal)
-	var tile: Vector2 = BoxProjection.tile_uv(_box, point, face)
-	var reach: Vector2 = _brush_pixels(face, radius_metres)
-	var centre: Vector2 = tile * float(_tile_pixels)
-	var origin: Vector2i = _tile_origin(face)
-	var from: Vector2i = _corner(centre - reach)
-	var to: Vector2i = _corner(centre + reach)
-	for y: int in range(from.y, to.y + 1):
-		for x: int in range(from.x, to.x + 1):
-			var away: Vector2 = (Vector2(x, y) + Vector2(0.5, 0.5) - centre) / reach
-			var falloff: float = 1.0 - away.length_squared()
-			if falloff <= 0.0:
-				continue
-			_touch(origin + Vector2i(x, y), amount * falloff, stage, finished)
+	var radius: float = maxf(radius_metres, _finest)
+	for face: BoxProjection.Face in BoxProjection.ALL_FACES:
+		_brush_face(face, point, normal, radius, amount, stage, finished)
 	# Uploaded once per call and only when a pixel actually moved: a trigger held
 	# on a spot that is already done should not cost a texture upload a tick.
 	if _dirty:
 		_texture.update(_image)
 		_dirty = false
 	return finished
+
+
+## One face's worth of [method _brush]: the pixels of [param face] that lie
+## within [param radius] of [param point], appending to [param finished] as they
+## finish patches.
+##
+## Returns nothing and touches [member _image] directly, rather than handing back
+## a list for the caller to apply, because the whole point of the six calls is
+## that they write into one atlas and one set of totals.
+##
+## [b]The rectangle is a bound and the distance test is the shape.[/b]
+## [method BoxProjection.tile_radius] gives how far [param radius] reaches along
+## each of the face's two axes, which cannot be smaller than the ball's footprint
+## on it — so the loop is guaranteed to see every pixel that could qualify, and
+## the pixels it sees that do not are dropped by the same falloff that was always
+## doing the shaping.
+##
+## [b]Two things keep the six faces from costing six times as much, and both are
+## about the web build.[/b] [GrimeMap]'s class docs are careful that a brush costs
+## work proportional to itself rather than to the texture, and going from one face
+## to six is exactly the change that quietly gives that up.
+##
+## [i]A face the ball cannot reach at all is dropped before the loop.[/i] Every
+## pixel of a face is on that face's plane, so the gap between the hit and that
+## plane is a floor under the distance to every one of them — one subtraction
+## says "no pixel here can qualify" for a whole tile. It is what makes the usual
+## press cheap: a wash in the middle of a door is more than its own radius from
+## all four edges of the panel, so five faces cost a comparison each and the sixth
+## costs exactly what it always did. The faces that survive it are the ones the
+## brush is genuinely lapping over, which is the work this was widened to do.
+##
+## [i]And the pixel-to-place arithmetic is done three times per face, not once
+## per pixel.[/i] A tile is a flat grid on a flat plane, so the corner it starts
+## at and the step one pixel takes along each of its axes are all
+## [method BoxProjection.point_on_face] is needed for; the inner loop is then two
+## multiplies and an add. Derived from that function rather than written out again
+## here, so there is still one answer to where a texel is and this is an
+## arrangement of it rather than a second copy.
+func _brush_face(
+	face: BoxProjection.Face,
+	point: Vector3,
+	normal: Vector3,
+	radius: float,
+	amount: float,
+	stage: Stage,
+	finished: PackedInt32Array
+) -> void:
+	var outward: Vector3 = BoxProjection.face_normal(face)
+	if outward.dot(normal) < 0.0:
+		return
+	var span: float = float(_tile_pixels)
+	var corner: Vector3 = BoxProjection.point_on_face(_box, Vector2.ZERO, face)
+	# Zero on the face the hit is on, and the real gap on the other five — see
+	# [method _brush]'s note on why a hit sits inside its own box. Written into
+	# [code]away[/code] below rather than compared with, so the one line covers both
+	# the face being worked and the faces being lapped onto.
+	var depth: float = 0.0
+	if face != BoxProjection.face_for(normal):
+		depth = (corner - point).dot(outward)
+		if absf(depth) >= radius:
+			return
+	var axis: int = BoxProjection.face_axis(face)
+	var across: Vector3 = (
+		(BoxProjection.point_on_face(_box, Vector2(1.0, 0.0), face) - corner) / span
+	)
+	var down: Vector3 = (BoxProjection.point_on_face(_box, Vector2(0.0, 1.0), face) - corner) / span
+	var reach: Vector2 = BoxProjection.tile_radius(_box, face, radius) * span
+	var centre: Vector2 = BoxProjection.tile_uv(_box, point, face) * span
+	var origin: Vector2i = _tile_origin(face)
+	var from: Vector2i = _corner(centre - reach)
+	var to: Vector2i = _corner(centre + reach)
+	var bounds: float = radius * radius
+	for y: int in range(from.y, to.y + 1):
+		var row: Vector3 = corner + down * (float(y) + 0.5) - point
+		for x: int in range(from.x, to.x + 1):
+			var away: Vector3 = row + across * (float(x) + 0.5)
+			away[axis] = depth
+			var falloff: float = 1.0 - away.length_squared() / bounds
+			if falloff <= 0.0:
+				continue
+			_touch(origin + Vector2i(x, y), amount * falloff, stage, finished)
 
 
 ## Moves units between two buckets of one pixel and keeps the totals honest about
@@ -561,16 +690,6 @@ func _fraction(total: int) -> float:
 	if _full <= 0:
 		return 0.0
 	return float(total) / float(_full)
-
-
-## The brush's radius in pixels on each axis, never smaller than
-## [constant FINEST_BRUSH].
-func _brush_pixels(face: BoxProjection.Face, radius_metres: float) -> Vector2:
-	var radius: Vector2 = BoxProjection.tile_radius(_box, face, radius_metres)
-	return Vector2(
-		maxf(radius.x * float(_tile_pixels), FINEST_BRUSH),
-		maxf(radius.y * float(_tile_pixels), FINEST_BRUSH),
-	)
 
 
 ## The top-left pixel of a face's tile in the atlas.

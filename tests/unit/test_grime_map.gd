@@ -91,21 +91,24 @@ func test_washing_takes_mud_off_where_the_water_lands() -> void:
 	assert_lt(_map.remaining(), 1.0, "and the total noticed")
 
 
-func test_washing_one_face_leaves_the_others_alone() -> void:
+func test_washing_one_face_never_reaches_the_far_side_of_the_panel() -> void:
 	# The property the six-plane projection exists for, asserted on the thing that
 	# actually stores it rather than on the arithmetic that places it.
-	_wash_it_clean(_middle(), 0.6)
+	#
+	# The faces *beside* the one being washed are a different question and no longer
+	# have this answer: the brush is a ball of a radius in metres and it reaches
+	# round an edge onto them, which is what
+	# [code]tests/unit/test_grime_map_reach.gd[/code] is about. The face behind the
+	# one being washed is not reachable at any radius whatsoever — water does not
+	# come out of the other side of a door — and that is what is left here. Two
+	# metres of brush on a panel that is twenty centimetres thick, so nothing but
+	# the facing test is keeping it off.
+	_wash_it_clean(_middle(), 2.0)
 	assert_almost_eq(
 		_map.mud_at(Vector3(-0.1, 0.6, 0.0), Vector3.LEFT),
 		GrimeMap.FILTHY,
 		TOLERANCE,
 		"the other flank was washed too"
-	)
-	assert_almost_eq(
-		_map.mud_at(Vector3(0.0, 1.2, 0.0), Vector3.UP),
-		GrimeMap.FILTHY,
-		TOLERANCE,
-		"the top was washed too"
 	)
 
 
@@ -147,9 +150,19 @@ func test_a_spot_can_be_washed_all_the_way_to_nothing() -> void:
 func test_finishing_a_patch_is_reported_once() -> void:
 	var rung: int = _wash_it_clean(_middle(), 2.0)
 	assert_gt(rung, 0, "nothing was ever reported clean")
-	# Every patch of the face, and no patch twice — a bell that rang on every tick
-	# the patch was already clean would be a slot machine with the arm stuck down.
-	assert_eq(rung, PATCHES * PATCHES, "a patch rang more than once, or one never rang")
+	# Every patch that came clean, and no patch twice — a bell that rang on every
+	# tick the patch was already clean would be a slot machine with the arm stuck
+	# down.
+	#
+	# Counted off the mask rather than written down as one face's worth. How many
+	# patches a two-metre brush ends up reaching is a fact about the brush — it
+	# reaches round edges now — and this is a test about the bell, which should go
+	# on saying "once each" whatever the brush's shape turns out to be.
+	var clean: int = 0
+	for patch: int in _map.patches():
+		if _map.is_patch_clean(patch):
+			clean += 1
+	assert_eq(rung, clean, "a patch rang more than once, or one never rang")
 
 
 func test_a_patch_that_has_rung_stays_clean() -> void:
@@ -171,10 +184,13 @@ func test_a_patch_index_nobody_has_is_not_clean() -> void:
 func test_the_whole_panel_is_only_done_when_every_face_is() -> void:
 	# Six faces on a box and the player can only ever reach some of them, which
 	# is why the ding rides on patches. This is the honest question still
-	# answering honestly: one face washed is not a washed panel.
+	# answering honestly, and the reason it still has an answer is the far side:
+	# however wide the brush is and however long it is held, a press from out here
+	# cannot paint through the panel onto the flank behind it, so there is always a
+	# face left that no amount of washing from this side finishes.
 	_wash_it_clean(_middle(), 2.0)
-	assert_false(_map.is_clean(), "one face of six is not a clean panel")
-	assert_between(_map.remaining(), 0.5, 0.99, "and the total is most of the way still dirty")
+	assert_false(_map.is_clean(), "a panel with a face nobody washed is not a clean panel")
+	assert_gt(_map.remaining(), 0.0, "and the mud on that face is still in the total")
 
 
 # ---- the totals stay honest ---------------------------------------------------

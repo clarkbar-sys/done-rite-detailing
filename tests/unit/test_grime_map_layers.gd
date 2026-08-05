@@ -62,6 +62,26 @@ func _buff_out(at: Vector3, radius: float) -> void:
 		_map.buff(at, Vector3.RIGHT, radius, 0.05)
 
 
+## How many different patches are named in [param rung].
+##
+## What "the ding rings once each" is asserted with below, in place of the count
+## of one face's patches these tests used to compare against. The brush is a ball
+## of a radius in metres and no longer stops at the edge of the face it started on
+## — [code]tests/unit/test_grime_map_reach.gd[/code] is that — so how many patches
+## a two-metre splash ends up reaching is a fact about the brush, and a number
+## written down here would be this file asserting the brush's shape by accident.
+##
+## Reporting the same patch twice is still exactly the bug worth catching: a bell
+## that rang on every tick a patch was already finished would be a slot machine
+## with the arm stuck down. That is what this catches, and it catches it whatever
+## the splash turns out to cover.
+func _distinct(rung: PackedInt32Array) -> int:
+	var seen: Dictionary = {}
+	for patch: int in rung:
+		seen[patch] = true
+	return seen.size()
+
+
 ## The whole job on the whole of the right-hand face, all three tools in order.
 ##
 ## [b]A brush wider than the face, and that is the point of having this as well as
@@ -326,10 +346,11 @@ func test_covering_a_patch_is_reported_once() -> void:
 	# it — and it cannot fire twice, because a patch in that state has nothing left
 	# for a cleaner to draw from.
 	_wash_bare(_middle(), 2.0)
-	var rung: int = 0
+	var rung: PackedInt32Array = PackedInt32Array()
 	for _sweep: int in 200:
-		rung += _map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
-	assert_eq(rung, PATCHES * PATCHES, "a patch rang more than once, or one never rang")
+		rung.append_array(_map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05))
+	assert_gt(rung.size(), 0, "nothing was ever reported covered")
+	assert_eq(rung.size(), _distinct(rung), "a patch rang more than once")
 
 
 func test_finishing_a_patch_outright_is_reported_once() -> void:
@@ -339,7 +360,16 @@ func test_finishing_a_patch_outright_is_reported_once() -> void:
 	var rung: int = 0
 	for _sweep: int in 200:
 		rung += _map.buff(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
-	assert_eq(rung, PATCHES * PATCHES, "a patch rang more than once, or one never rang")
+	# Against the patches that actually came out finished, which the last stage is
+	# the one stage that can be asked directly. Both halves of "once each" in one
+	# comparison: a patch that rang twice makes this too high and one that never
+	# rang makes it too low.
+	var finished: int = 0
+	for patch: int in _map.patches():
+		if _map.is_patch_finished(patch):
+			finished += 1
+	assert_gt(rung, 0, "nothing was ever reported finished")
+	assert_eq(rung, finished, "a patch rang more than once, or one never rang")
 	assert_true(_map.is_patch_finished(_patch_under(_middle())), "and the patch does not say so")
 
 
@@ -438,10 +468,11 @@ func test_the_jet_cannot_open_a_covered_patch_back_up() -> void:
 	# patch had ever got. Now there is no way back: the water leaves the coat on, so
 	# a second bottle over the same face finds nothing to draw from and says so.
 	_wash_bare(_middle(), 2.0)
-	var first: int = 0
+	var first: PackedInt32Array = PackedInt32Array()
 	for _sweep: int in 200:
-		first += _map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
-	assert_eq(first, PATCHES * PATCHES, "the face did not come up covered the first time")
+		first.append_array(_map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05))
+	assert_gt(first.size(), 0, "the face did not come up covered the first time")
+	assert_eq(first.size(), _distinct(first), "and a patch rang twice on the way there")
 	var covered: float = _map.product()
 	for _sweep: int in 60:
 		_map.wash(_middle(), Vector3.RIGHT, 2.0, 0.2)
@@ -464,7 +495,8 @@ func test_covering_a_patch_that_was_only_part_done_still_rings() -> void:
 	for _sweep: int in 200:
 		partial += _map.foam(_middle(), Vector3.RIGHT, 0.3, 0.05).size()
 	assert_eq(partial, 0, "the narrow brush finished a patch, so the wide one below proves nothing")
-	var rung: int = 0
+	var rung: PackedInt32Array = PackedInt32Array()
 	for _sweep: int in 400:
-		rung += _map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05).size()
-	assert_eq(rung, PATCHES * PATCHES, "covering the face for the first time did not ring")
+		rung.append_array(_map.foam(_middle(), Vector3.RIGHT, 2.0, 0.05))
+	assert_gt(rung.size(), 0, "covering the face for the first time did not ring")
+	assert_eq(rung.size(), _distinct(rung), "and a patch rang twice on the way there")

@@ -65,6 +65,63 @@ func test_a_normal_on_the_seam_lands_on_one_side_of_it() -> void:
 	assert_eq(BoxProjection.face_for(seam), BoxProjection.Face.RIGHT)
 
 
+# ---- which way it points ------------------------------------------------------
+
+
+func test_every_face_is_named_by_its_own_normal() -> void:
+	# The round trip, over all six rather than over the three that are easy to get
+	# right. `face_normal` exists so a brush can ask "is the tool in front of this
+	# face" as a dot product, and a normal that named a different face than the one
+	# it was asked for would put that answer on the wrong tile.
+	for face: BoxProjection.Face in BoxProjection.ALL_FACES:
+		assert_eq(
+			BoxProjection.face_for(BoxProjection.face_normal(face)),
+			face,
+			"face %d does not point out of itself" % face
+		)
+
+
+func test_opposite_faces_point_opposite_ways() -> void:
+	# The property the brush's facing test rests on: the far side of a panel is the
+	# one thing a ball of paint must not reach through the bodywork to touch, and it
+	# is excluded by this dot product being negative and by nothing else.
+	var up: Vector3 = BoxProjection.face_normal(BoxProjection.Face.TOP)
+	var down: Vector3 = BoxProjection.face_normal(BoxProjection.Face.BOTTOM)
+	assert_almost_eq(up.dot(down), -1.0, TOLERANCE)
+
+
+func test_the_faces_beside_one_are_edge_on_to_it() -> void:
+	# And this is why that test is `>= 0` rather than `> 0`. On a box the four faces
+	# around a face are exactly perpendicular to it, so a strict comparison would
+	# reject precisely the faces a brush has to reach onto to get round a corner.
+	var up: Vector3 = BoxProjection.face_normal(BoxProjection.Face.TOP)
+	for face: BoxProjection.Face in BoxProjection.ALL_FACES:
+		if face == BoxProjection.Face.TOP or face == BoxProjection.Face.BOTTOM:
+			continue
+		assert_almost_eq(
+			up.dot(BoxProjection.face_normal(face)), 0.0, TOLERANCE, "face %d is not edge-on" % face
+		)
+
+
+func test_a_face_lies_on_the_axis_its_tile_does_not_measure() -> void:
+	for face: BoxProjection.Face in BoxProjection.ALL_FACES:
+		var axes: Vector2i = BoxProjection.tile_axes(face)
+		var axis: int = BoxProjection.face_axis(face)
+		assert_ne(axis, axes.x, "face %d measures along its own axis" % face)
+		assert_ne(axis, axes.y, "face %d measures along its own axis" % face)
+
+
+func test_every_face_is_listed_exactly_once() -> void:
+	# `ALL_FACES` is what saves every caller from counting to `FACES` and casting an
+	# int back into the enum, so a list that had dropped one would silently stop a
+	# brush ever reaching that face.
+	assert_eq(BoxProjection.ALL_FACES.size(), BoxProjection.FACES)
+	var seen: Dictionary = {}
+	for face: BoxProjection.Face in BoxProjection.ALL_FACES:
+		seen[face] = true
+	assert_eq(seen.size(), BoxProjection.FACES, "a face is listed twice")
+
+
 # ---- where on the face --------------------------------------------------------
 
 
@@ -98,6 +155,58 @@ func test_each_face_measures_along_the_two_axes_that_are_not_its_own() -> void:
 	assert_eq(
 		BoxProjection.tile_axes(BoxProjection.Face.FRONT), Vector2i(Vector3.AXIS_X, Vector3.AXIS_Y)
 	)
+
+
+# ---- and back off it again ----------------------------------------------------
+
+
+func test_a_tile_coordinate_goes_back_to_the_point_it_came_from() -> void:
+	# The round trip that lets a brush measure in metres: a texel is turned back
+	# into a place on the box, and the distance between two of those places is a
+	# distance a radius in metres can be compared against. A projection that did not
+	# invert would put the falloff somewhere other than where the paint goes.
+	var at: Vector3 = Vector3(0.1, 0.5, 1.0)
+	var face: BoxProjection.Face = BoxProjection.Face.RIGHT
+	var back: Vector3 = BoxProjection.point_on_face(
+		FLANK, BoxProjection.tile_uv(FLANK, at, face), face
+	)
+	assert_almost_eq(back, at, Vector3.ONE * TOLERANCE)
+
+
+func test_a_point_on_a_face_is_on_that_face() -> void:
+	# The face's own axis is pinned to the side of the box the face is, whatever the
+	# tile coordinate says — which is what stops a texel of the left flank being
+	# measured as though it sat on the right one.
+	for face: BoxProjection.Face in BoxProjection.ALL_FACES:
+		var axis: int = BoxProjection.face_axis(face)
+		var outward: Vector3 = BoxProjection.face_normal(face)
+		var side: float = FLANK.position[axis]
+		if outward[axis] > 0.0:
+			side += FLANK.size[axis]
+		for tile: Vector2 in [Vector2.ZERO, Vector2(0.5, 0.5), Vector2.ONE]:
+			var point: Vector3 = BoxProjection.point_on_face(FLANK, tile, face)
+			assert_almost_eq(point[axis], side, TOLERANCE, "face %d came off its plane" % face)
+
+
+func test_the_middle_of_a_tile_is_the_middle_of_its_face() -> void:
+	var middle: Vector3 = BoxProjection.point_on_face(
+		CUBE, Vector2(0.5, 0.5), BoxProjection.Face.TOP
+	)
+	assert_almost_eq(middle, Vector3(0.0, 0.5, 0.0), Vector3.ONE * TOLERANCE)
+
+
+func test_two_texels_a_tile_apart_are_the_box_apart_in_metres() -> void:
+	# What the whole inversion is for. The flank is four metres along Z and one and
+	# a half up Y, so the two edges of its tile are those distances apart — which is
+	# the thing that cannot be read off a tile coordinate, because half a tile is a
+	# different distance on each axis and a different distance again on every other
+	# face.
+	var face: BoxProjection.Face = BoxProjection.Face.RIGHT
+	var near: Vector3 = BoxProjection.point_on_face(FLANK, Vector2.ZERO, face)
+	var along: Vector3 = BoxProjection.point_on_face(FLANK, Vector2(1.0, 0.0), face)
+	var up: Vector3 = BoxProjection.point_on_face(FLANK, Vector2(0.0, 1.0), face)
+	assert_almost_eq(near.distance_to(along), 4.0, TOLERANCE, "along the panel")
+	assert_almost_eq(near.distance_to(up), 1.5, TOLERANCE, "up it")
 
 
 # ---- and where in the atlas ---------------------------------------------------

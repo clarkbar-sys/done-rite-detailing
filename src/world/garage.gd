@@ -165,7 +165,14 @@
 ## [i]The panel it names is real.[/i] Every piece of the [Car] is a CSG root with
 ## its own collider, so the hit comes back as [code]"Hood"[/code] or
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
-## grime work needs and the reason [signal aimed] carries a name at all.
+## readout needs and the reason [signal aimed] carries a name at all.
+##
+## [i]And it names where the player is pointing, not what the tool is touching.[/i]
+## A tool is a ball of a radius in metres and a car's panels butt up against each
+## other, so a press near a seam works both sides of it — see
+## [method _spend_the_trigger], which asks [method Grime.panels_within] rather
+## than taking the collider's word for it. The readout still says one panel,
+## because "which panel am I pointed at" still has one answer.
 ##
 ## [i]And a press that misses by a hair is caught before any of that.[/i] The aim
 ## is answered in three tiers, each strictly wider than the one above it, and
@@ -989,19 +996,57 @@ func _sight_the_aim(surface: Vector3, outward: Vector3, held: DetailingTool) -> 
 ## does not work at all teaches them to pick up the other bottle, which is the
 ## thing worth learning.
 ##
+## [b]Every panel the tool reaches, not the one the ray hit.[/b] The collider that
+## came back names where the player is pointing; it does not bound what a ball of
+## water a fifth of a metre across is landing on. A car's panels butt up against
+## each other, so a press anywhere near a seam — a door against a wing, a wheel
+## inside its arch, a mirror on its stalk — is physically on both sides of it, and
+## spending the trigger on one of them left the other with a strip of mud that no
+## aim could reach: the brush was never pointed wrongly, it was simply not allowed
+## to leave the map it started in. [method Grime.panels_within] is what the press
+## asks instead, and [method GrimeMap._brush] is the same widening one level down,
+## across the faces of a single panel.
+##
+## The collider is still what [method _resolve_aim] names the panel by. Where the
+## player is pointing and what the tool is touching are two questions, and this is
+## the only one of them that was ever about more than one panel.
 func _spend_the_trigger(found: Dictionary, held: DetailingTool.Id, delta: float) -> void:
 	if _grime == null or not _grime.is_laid() or not found.get("surface", false):
 		return
 	# Read out into typed locals rather than passed straight through: a
 	# [Dictionary] hands back [Variant], and this project's warning levels treat
 	# handing one to a typed parameter as an error rather than as a cast.
-	var panel: Node = found["collider"]
 	var surface: Vector3 = found["position"]
 	var outward: Vector3 = found["normal"]
 	# How wide the brush is comes from [method _reach_of] rather than from the
-	# export named on each branch below, so that the patch this works on and the
-	# window [AimSweep] opened to find it are one number rather than two.
+	# export named on each branch below, so that the patch this works on, the panels
+	# it is allowed to reach and the window [AimSweep] opened to find it are one
+	# number rather than three.
 	var reach: float = _reach_of(held)
+	for panel: CSGShape3D in _grime.panels_within(surface, reach):
+		_spend_on(panel, surface, outward, reach, held, delta)
+
+
+## What one tool does to one of the panels it is touching — the routing half of
+## [method _spend_the_trigger], applied per panel rather than once per press.
+##
+## [b]Which is the whole reason it is its own function.[/b] The one rule up there
+## that reads the panel is the cleaner's, and a press that spans a seam is exactly
+## where it stops being a property of the press: a sponge held on the join between
+## a door and its window is right about the door and wrong about the glass, in one
+## press, and it has to foam the paint and leave the window alone. So the surface
+## check is asked once per panel, which is the only place it was ever a question.
+##
+## The two tools that work anywhere are unchanged by that and are still first, in
+## the same order, for [method _spend_the_trigger]'s reasons.
+func _spend_on(
+	panel: CSGShape3D,
+	surface: Vector3,
+	outward: Vector3,
+	reach: float,
+	held: DetailingTool.Id,
+	delta: float
+) -> void:
 	if held == DetailingTool.Id.POWER_WASH:
 		_grime.wash(panel, surface, outward, reach, wash_per_second * delta)
 		return

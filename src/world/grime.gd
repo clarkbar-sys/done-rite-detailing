@@ -157,6 +157,42 @@ func flash_of(panel: Node) -> PatchFlash:
 	return _flashes[index]
 
 
+## Every panel a brush of [param radius_metres] held at [param world_point] can
+## reach, in the order [method map_of] indexes them.
+##
+## [b]A press works more than one panel, and this is what says which.[/b] A car's
+## panels sit against each other and a tool is a ball of a radius in metres — so a
+## jet held on the seam between a door and a wing is on both of them, and one held
+## in a wheel arch is on the arch and the wheel. Answering with the single panel a
+## ray happened to hit is what left those seams permanently half done: the mud a
+## centimetre the other side of the gap belonged to a map the press never opened,
+## and no amount of aiming at it helped, because the aim was never the part that
+## was wrong. [method GrimeMap._brush] is the same fix one level down, across the
+## faces of one panel.
+##
+## [b]Sphere against grown box, which is the cheap over-answer.[/b]
+## [method AABB.grow] pushes every face out by the radius and the test is then a
+## point in a box, so a ball near a corner of a panel counts as reaching it when
+## it is really up to a corner's worth further away. That is deliberate: the
+## panels this over-collects are the ones whose maps then paint nothing, because
+## [method GrimeMap._brush] measures the real distance to every texel it
+## considers. Being generous here costs an empty loop over one map; being tight
+## would risk dropping a panel that had work on it, and the cost of that is a seam
+## nobody can finish.
+##
+## [b]In world space, unlike everything else this class takes.[/b] The three tools
+## below convert into a panel's own space because a brush has one panel to be in;
+## this is the question asked [i]before[/i] there is a panel to convert into, so
+## the boxes come out to meet the point rather than the other way round.
+func panels_within(world_point: Vector3, radius_metres: float) -> Array[CSGShape3D]:
+	var reached: Array[CSGShape3D] = []
+	for panel: CSGShape3D in _panels:
+		var box: AABB = panel.global_transform * panel.get_aabb()
+		if box.grow(radius_metres).has_point(world_point):
+			reached.append(panel)
+	return reached
+
+
 ## How much of the car's mud is still on it, as [code]0..1[/code], across every
 ## panel equally rather than weighted by area.
 ##

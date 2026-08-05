@@ -55,6 +55,22 @@ enum Face {
 ## have to keep multiplying to it.
 const FACES: int = 6
 
+## The six of them, in that same atlas order, so a caller that has to visit every
+## face can iterate rather than count to [constant FACES] and cast an [int] back
+## into a [enum Face].
+##
+## [method GrimeMap._brush] is why it exists: a brush that reaches round a corner
+## has no single face to work on any more, so it asks each of them in turn
+## whether the tool is pointed at it.
+const ALL_FACES: Array[Face] = [
+	Face.RIGHT,
+	Face.LEFT,
+	Face.TOP,
+	Face.BOTTOM,
+	Face.FRONT,
+	Face.BACK,
+]
+
 ## Tiles across the atlas.
 const COLUMNS: int = 3
 
@@ -85,6 +101,45 @@ static func face_for(normal: Vector3) -> Face:
 	if size.y >= size.z:
 		return Face.TOP if normal.y >= 0.0 else Face.BOTTOM
 	return Face.FRONT if normal.z >= 0.0 else Face.BACK
+
+
+## The axis a face lies on, as an index into a [Vector3] — the one axis that is
+## [i]not[/i] in [method tile_axes], because a face is flat along its own.
+static func face_axis(face: Face) -> int:
+	if face == Face.RIGHT or face == Face.LEFT:
+		return Vector3.AXIS_X
+	if face == Face.TOP or face == Face.BOTTOM:
+		return Vector3.AXIS_Y
+	return Vector3.AXIS_Z
+
+
+## Which way a face points out of its box, in the box's own space.
+##
+## The inverse of [method face_for] for the six normals that are exactly on an
+## axis, and the thing that makes "is this face turned toward the tool" a dot
+## product rather than a table. [method GrimeMap._brush] is what wanted it: a
+## brush that reaches round a corner has to decide, per face, whether the tool
+## is in front of it or behind it, and the answer is the sign of
+## [code]outward.dot(normal)[/code] and nothing else.
+##
+## Spelled out rather than derived from the enum's ordering. The order does pair
+## each axis positive-then-negative, so [code]int(face) % 2[/code] would answer
+## it — but that ordering exists to lay the atlas out (see [method atlas_uv]),
+## and a second meaning read out of it is a second thing that breaks silently
+## when the tiles are rearranged.
+static func face_normal(face: Face) -> Vector3:
+	match face:
+		Face.RIGHT:
+			return Vector3.RIGHT
+		Face.LEFT:
+			return Vector3.LEFT
+		Face.TOP:
+			return Vector3.UP
+		Face.BOTTOM:
+			return Vector3.DOWN
+		Face.FRONT:
+			return Vector3.BACK
+	return Vector3.FORWARD
 
 
 ## The two axes of the box that a face's tile is measured along, as indices into
@@ -118,6 +173,37 @@ static func tile_uv(box: AABB, point: Vector3, face: Face) -> Vector2:
 		_along(box, point, axes.x),
 		_along(box, point, axes.y),
 	)
+
+
+## Where on the box a tile coordinate sits, in the box's own space: [method
+## tile_uv] run backwards and put back onto the face's own plane.
+##
+## [b]What it is for is measuring, not sampling.[/b] Every other function here
+## turns a place into a texel; this turns a texel back into a place, which is
+## what lets a brush ask how far apart two texels actually are in metres instead
+## of in tile coordinates. [method GrimeMap._brush] is the caller, and the
+## difference matters most exactly where the tile coordinates are least
+## comparable: across two faces, whose tiles are measured along different axes
+## and are not the same size in metres.
+##
+## The face's own axis is pinned to whichever side of the box the face is —
+## [code]position + size[/code] for the three positive faces and
+## [code]position[/code] for the three negative ones — so the answer is always on
+## the box's surface rather than somewhere inside it.
+##
+## Not clamped, unlike [method tile_uv], because there is nothing to clamp: a
+## tile coordinate is already [code]0..1[/code] by construction, and a caller
+## that hands in something outside it is asking about a point off the face and
+## should get one.
+static func point_on_face(box: AABB, tile: Vector2, face: Face) -> Vector3:
+	var axes: Vector2i = tile_axes(face)
+	var axis: int = face_axis(face)
+	var outward: Vector3 = face_normal(face)
+	var point: Vector3 = Vector3.ZERO
+	point[axes.x] = box.position[axes.x] + tile.x * box.size[axes.x]
+	point[axes.y] = box.position[axes.y] + tile.y * box.size[axes.y]
+	point[axis] = box.position[axis] + (box.size[axis] if outward[axis] > 0.0 else 0.0)
+	return point
 
 
 ## A tile coordinate placed into the whole atlas, so it can be sampled or written
