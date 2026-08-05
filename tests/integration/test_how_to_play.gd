@@ -16,9 +16,35 @@
 ## intended: a rules screen is a fixed amount of room, and the moment a sentence
 ## no longer fits, somebody has to decide between the sentence and the type size
 ## rather than find out in a browser.
+##
+## [b]The other two are here because they were found in a browser, on a phone,
+## after this screen had already shipped once.[/b]
+## [method test_the_font_can_draw_every_word] pins the glyphs: this project
+## ships no font of its own, so everything is drawn in Godot's built-in Open
+## Sans, and a character it does not have is not an error — it is a tofu box on
+## a released build. [method test_the_sheet_fits_a_phone_held_upright] pins the
+## shape: the design is 16:9 and stretched "expand", so a portrait handset hands
+## this screen nearly four times the height it was laid out against, and every
+## other assertion in this file was made at exactly 1280x720, where that cannot
+## show up.
 extends GutTest
 
 const HOW_TO_PLAY: String = "res://src/screens/how_to_play.tscn"
+
+## A portrait handset, in real pixels: a Pixel-class 1080x2340, which
+## project.godot's "expand" resolves to 1280x2773 design pixels. The number that
+## matters is the aspect, not the model — anything much taller than 16:9 puts
+## this screen in the shape the bug needed.
+const PORTRAIT: Vector2i = Vector2i(1080, 2340)
+
+## How much taller than its own content the sheet is allowed to be.
+##
+## Zero would be the honest number and is not quite reachable: a
+## [GridContainer] row is as tall as its tallest cell, so the shorter rule in
+## each row leaves a few pixels under it whatever the screen is. This is loose
+## enough for that and nowhere near loose enough for the two thousand pixels of
+## nothing the shipped version had.
+const SLACK: float = 32.0
 
 ## The design the layout is built against, from project.godot. Read rather than
 ## written down here for [method TouchTarget.design_width]'s reason: a copy of
@@ -99,6 +125,31 @@ func _labels(root: Node) -> Array[Label]:
 	return found
 
 
+## Everything under [param root] that draws words: the labels [i]and[/i] the
+## buttons.
+##
+## The distinction cost a shipped bug. [method _labels] is the right tool for
+## anything about the copy — colours, wrapping, clipping — because the copy is
+## labels. It is the wrong tool for anything about the font, because a [Button]
+## draws text too and the two glyphs this project could not draw were both on
+## one.
+func _typeset(root: Node) -> Array[Control]:
+	var found: Array[Control] = []
+	for child: Node in root.get_children():
+		if child is Label or child is Button:
+			found.append(child as Control)
+		found.append_array(_typeset(child))
+	return found
+
+
+## What [param control] has written on it, whichever of the two it is.
+func _words_of(control: Control) -> String:
+	var label: Label = control as Label
+	if label != null:
+		return label.text
+	return (control as Button).text
+
+
 func test_the_screen_is_a_game_screen() -> void:
 	assert_not_null(_screen, "the rules screen must instantiate as a GameScreen")
 
@@ -152,6 +203,98 @@ func test_the_buttons_are_the_last_thing_and_are_on_it() -> void:
 		_design_height(),
 		"the way out of the rules screen is off the bottom of it"
 	)
+
+
+func test_the_font_can_draw_every_word() -> void:
+	# The bug this pins, measured rather than imagined: the bottom two buttons
+	# shipped reading "◀ Main Menu" and "Play ▶", and Godot's built-in Open Sans
+	# has no geometric shapes block, so both arrows drew as tofu boxes on a real
+	# phone. A missing glyph is not an error and not a warning — it is a rectangle
+	# in a released build, and nothing else in this project would ever mention it.
+	#
+	# The buttons *and* the labels, and the buttons are the reason this comment
+	# says so: the first version of this test walked the labels only, which is
+	# every word on the screen except the two that were actually broken.
+	var typeset: Array[Control] = _typeset(_screen)
+	assert_gt(typeset.size(), 10, "the rules screen should be mostly words")
+	for control: Control in typeset:
+		var font: Font = control.get_theme_font("font")
+		var words: String = _words_of(control)
+		for i: int in words.length():
+			var glyph: int = words.unicode_at(i)
+			assert_true(
+				font.has_char(glyph),
+				(
+					"%s wants U+%04X (%s), which %s cannot draw"
+					% [control.name, glyph, char(glyph), font.get_font_name()]
+				)
+			)
+
+
+func test_the_sheet_is_the_size_of_its_own_words_on_a_phone_held_upright() -> void:
+	# The other thing that shipped. The design is 1280x720 and project.godot
+	# stretches it "expand", so a portrait handset does not get a letterboxed
+	# strip — it gets the design width and as much extra design *height* as its
+	# aspect asks for, which for a 1080x2340 phone is 1280x2773. The card was
+	# anchored to that, so it arrived four times taller than anything printed on
+	# it.
+	#
+	# Asserted against the design height rather than against the screen's,
+	# because that is the actual rule: this screen was laid out for 720 and extra
+	# room goes to the bay behind the sheet, never inside it.
+	get_tree().root.size = PORTRAIT
+	await wait_process_frames(2)
+	assert_gt(_screen.size.y, _design_height() * 2.0, "the premise: a much taller screen")
+	var card: PanelContainer = _screen.get_node("%Card") as PanelContainer
+	assert_lte(
+		card.size.y,
+		_design_height(),
+		"the sheet stretched to the phone instead of staying the size of its own words"
+	)
+	# And the whole of it is still on the screen, top and bottom both, rather
+	# than centred by having been pushed off one end.
+	assert_gte(card.get_global_rect().position.y, 0.0)
+	assert_lte(card.get_global_rect().end.y, _screen.size.y)
+
+
+func test_the_rules_do_not_come_apart_on_a_phone_held_upright() -> void:
+	# The half of that bug a card-sized assertion cannot see, and the half that
+	# was actually visible: the slack was absorbed *inside* the column by the
+	# rules grid, which packs its rows at the top. So the four rules sat under
+	# the header, the strip and the buttons sat at the bottom of the phone, and
+	# there were two thousand pixels of black between them — with the card and
+	# the column both perfectly full the whole time.
+	get_tree().root.size = PORTRAIT
+	await wait_process_frames(2)
+	var rules: GridContainer = _screen.get_node("%Rules") as GridContainer
+	var strip: HBoxContainer = _screen.get_node("%Strip") as HBoxContainer
+	var written: float = 0.0
+	for cell: Node in rules.get_children():
+		var control: Control = cell as Control
+		if control != null:
+			written = maxf(written, control.get_global_rect().end.y)
+	assert_lte(
+		strip.get_global_rect().position.y - written,
+		SLACK,
+		"the rules and the passes came apart — there is a hole in the middle of the sheet"
+	)
+
+
+func test_nothing_is_clipped_on_a_phone_held_upright_either() -> void:
+	# The sheet is narrower per column in portrait than the arithmetic in
+	# how_to_play.gd was done against? It is not — "expand" keeps the design
+	# width — but the sheet is now sized to its own content rather than to the
+	# screen, and a container that computes its own height is exactly the kind
+	# that can compute one line too few. So the clipping gate is run again in the
+	# shape that made the sizing conditional.
+	get_tree().root.size = PORTRAIT
+	await wait_process_frames(2)
+	for label: Label in _labels(_screen):
+		assert_eq(
+			label.get_visible_line_count(),
+			label.get_line_count(),
+			"%s is clipped on a portrait phone" % label.name
+		)
 
 
 # ---- the brand ----------------------------------------------------------------
