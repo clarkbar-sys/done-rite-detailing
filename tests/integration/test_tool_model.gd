@@ -39,6 +39,11 @@ const SQUARE_ON: float = 0.999
 ## a special case, which is the point of testing at it.
 const LOPSIDED: Vector3 = Vector3(0.1, 1.0, 0.1)
 
+## A path with nothing behind it, for the one test that asks what a missing model
+## does. Under [code]assets/models/[/code] rather than somewhere obviously fake so
+## that it is the same kind of path a typo in the catalogue would produce.
+const NOWHERE: String = "res://assets/models/nothing_here.glb"
+
 
 ## Every tool in the catalogue that names a model. Read off the catalogue rather
 ## than listed here, so the third bottle is covered by these tests on the day it
@@ -206,6 +211,13 @@ func test_a_model_that_is_not_there_is_an_empty_proxy_rather_than_a_broken_belt(
 	# built in [method ViewModel._ready] — is the title screen never loading, and
 	# it is worth the two lines to not have to tell those two apart from a bug
 	# report.
-	var missing: ToolModel = ToolModel.new("res://assets/models/nothing_here.glb", Vector3.ONE)
+	var missing: ToolModel = ToolModel.new(NOWHERE, Vector3.ONE)
 	autofree(missing)
 	assert_null(missing.mesh, "a model that is not there draws nothing")
+	# The other half, and the reason it is asserted rather than ignored: silence
+	# here would be a tool that is invisible for a reason nobody can find. The
+	# loader says the file is missing and the class says which path asked for it,
+	# and asserting both is also what tells GUT these two errors were the point of
+	# the test rather than a fault in it.
+	assert_engine_error_count(1, "the loader has to say the file is not there")
+	assert_push_error(NOWHERE, "and the class has to say what it was looking for")
