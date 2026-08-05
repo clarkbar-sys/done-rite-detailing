@@ -129,6 +129,64 @@ func test_every_proxy_is_big_enough_to_see() -> void:
 			assert_gt(tool_carried.extent.y, 0.0, "%s has no height" % tool_carried.display_name)
 
 
+func test_the_spray_bottles_are_drawn_by_a_model_and_the_rest_are_not() -> void:
+	# Which tools have art and which are still primitives, said once here so that
+	# nothing downstream has to keep its own list. The three without a model are
+	# not an oversight — [ViewModel] draws them from [member DetailingTool.shape]
+	# and will go on doing so until somebody exports them.
+	var modelled: Array[DetailingTool.Id] = [
+		DetailingTool.Id.WINDOW_CLEANER, DetailingTool.Id.TIRE_ENGINE_CLEANER
+	]
+	for tool_carried: DetailingTool in _tools:
+		assert_eq(
+			not tool_carried.model.is_empty(),
+			modelled.has(tool_carried.id),
+			"%s: drawn by a model?" % tool_carried.display_name
+		)
+
+
+func test_every_model_a_tool_names_is_really_there() -> void:
+	# A path typed into a table is a path nobody runs until the tool is equipped,
+	# and a missing one draws nothing at all — see [ToolModel], which refuses to
+	# take the belt down over it. This is the check that turns "the bottle is
+	# invisible" into a failing test instead of a bug report.
+	for tool_carried: DetailingTool in _tools:
+		if tool_carried.model.is_empty():
+			continue
+		assert_true(
+			ResourceLoader.exists(tool_carried.model),
+			"%s names %s, which is not there" % [tool_carried.display_name, tool_carried.model]
+		)
+
+
+func test_no_two_tools_are_drawn_by_the_same_model() -> void:
+	# The two bottles are the same geometry in two liveries and are two separate
+	# exports because of it. One path used twice would be two identical bottles,
+	# which is the readability budget [member DetailingTool.albedo] documents,
+	# spent silently.
+	var named: Array[String] = []
+	for tool_carried: DetailingTool in _tools:
+		if tool_carried.model.is_empty():
+			continue
+		assert_false(named.has(tool_carried.model), "%s shares a model" % tool_carried.display_name)
+		named.append(tool_carried.model)
+
+
+func test_a_tool_is_a_primitive_unless_it_says_otherwise() -> void:
+	# The default matters: every caller that built a tool before models existed
+	# still builds one that renders exactly as it did.
+	var built: DetailingTool = DetailingTool.new(
+		DetailingTool.Id.SPONGE,
+		"Test Tool",
+		DetailingTool.Shape.BOX,
+		Vector3.ONE,
+		Color.WHITE,
+		0.0,
+		0.5
+	)
+	assert_eq(built.model, "", "a tool with no model named is drawn by its primitive")
+
+
 func test_a_tool_keeps_what_it_was_built_with() -> void:
 	var built: DetailingTool = DetailingTool.new(
 		DetailingTool.Id.SPONGE,
@@ -137,8 +195,10 @@ func test_a_tool_keeps_what_it_was_built_with() -> void:
 		Vector3(1.0, 2.0, 3.0),
 		Color(0.1, 0.2, 0.3),
 		0.4,
-		0.5
+		0.5,
+		"res://nowhere.glb"
 	)
+	assert_eq(built.model, "res://nowhere.glb")
 	assert_eq(built.id, DetailingTool.Id.SPONGE)
 	assert_eq(built.display_name, "Test Tool")
 	assert_eq(built.shape, DetailingTool.Shape.BOX)

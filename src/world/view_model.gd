@@ -18,6 +18,14 @@
 ## here is only the part the catalogue has no opinion about: how a hand holds the
 ## thing.
 ##
+## [b]Two of the five are modelled meshes now, and the sentence above is why that
+## changed nothing.[/b] The spray bottles name a [member DetailingTool.model] and
+## are built by [ToolModel], which fits the exported mesh into exactly the
+## [member DetailingTool.extent] box the [CylinderMesh] filled — same size, same
+## origin, same box every clearance below is measured against. The one thing a
+## modelled tool does not take from the catalogue is its surface, because it
+## arrives wearing a texture and [method _build] would otherwise paint over it.
+##
 ## [b]The hand is one place; the tool turns in it.[/b] The offset into the corner
 ## of the frame belongs to the anchor and is set in [code]garage.tscn[/code] — it
 ## is where your hand is, and your hand does not move when you swap tools. What
@@ -431,7 +439,13 @@ func _build(tool: DetailingTool, carry: ToolCarry) -> MeshInstance3D:
 	# than numbered, so the remote scene tree during a debug session says which
 	# one is showing without anybody counting children.
 	proxy.name = tool.display_name.replace("&", "").replace(" ", "")
-	proxy.material_override = _material_for(tool)
+	# A tool that brings its own model brings its own surface with it, and an
+	# override is exactly the thing that would hide it — a flat catalogue colour
+	# painted over the texture that was the reason to model the bottle at all. The
+	# catalogue's colour still describes that tool; see [member DetailingTool.model]
+	# for who goes on reading it.
+	if tool.model.is_empty():
+		proxy.material_override = _material_for(tool)
 	proxy.transform = carry.rest_pose()
 	# Asked of the carry rather than of the tool's id: which tools emit something
 	# is a fact about how they are used, and it is the carry that already holds
@@ -445,13 +459,23 @@ func _build(tool: DetailingTool, carry: ToolCarry) -> MeshInstance3D:
 ## The node [param tool] is drawn by, with the primitive the catalogue asks for
 ## already in it.
 ##
-## One exception, and it is the rag: a [ClothRag] is a [MeshInstance3D] that
-## builds and re-builds its own mesh from a simulated sheet. Everything about it
-## that the catalogue has an opinion on — the size, the plane it starts as, the
-## material it wears — is unchanged, which is why the swap can be this small.
+## Two exceptions, and both of them are still exactly the catalogue's shape and
+## size — which is what lets a line be added here rather than anywhere else.
+##
+## The rag: a [ClothRag] is a [MeshInstance3D] that builds and re-builds its own
+## mesh from a simulated sheet. Everything about it that the catalogue has an
+## opinion on — the size, the plane it starts as, the material it wears — is
+## unchanged, which is why the swap can be this small.
+##
+## The two spray bottles: a [ToolModel] is a [MeshInstance3D] carrying a mesh
+## exported out of Blender, fitted into the same [member DetailingTool.extent] box
+## the [CylinderMesh] filled. Asked by whether the tool names a model rather than
+## by its id, so the third bottle is a row in the catalogue and not an edit here.
 func _instance_for(tool: DetailingTool) -> MeshInstance3D:
 	if tool.id == DetailingTool.Id.DRYING_RAG:
 		return ClothRag.new(Vector2(tool.extent.x, tool.extent.z))
+	if not tool.model.is_empty():
+		return ToolModel.new(tool.model, tool.extent)
 	var proxy: MeshInstance3D = MeshInstance3D.new()
 	proxy.mesh = _mesh_for(tool)
 	return proxy
