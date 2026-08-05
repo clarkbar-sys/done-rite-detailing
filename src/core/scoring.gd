@@ -31,18 +31,23 @@
 ## second definition of "the player finished something", so there is nothing here
 ## that can disagree with what the player just heard and saw.
 ##
-## [b]Neither half can be farmed, and neither half checks.[/b] The jet takes
-## product off as well as mud — deliberately, because a jet that could be used at
-## any point in the job would teach the player nothing — so foam, rinse, foam is a
-## loop a player can hold on one square for ever. A score paid for units moved
-## would pay them for every turn of it. Nothing here guards against that and
-## nothing here needs to: both of the numbers this class is paid from,
-## [method GrimeMap.worked] and [signal Grime.patch_finished], count how far the
-## panel has irreversibly got rather than how much has moved across it, so the
-## loop is worth exactly zero on the second turn and every turn after. That is a
-## property of the ledger being asked rather than of a rule written here, which is
-## the shape worth keeping: a cap on what a patch may pay would live in this file
-## and would have to be remembered by the next thing that pays for something.
+## [b]Neither half can be farmed, and neither half checks.[/b] There is no way to
+## put a texel back where it was: mud only comes off, the water is the only thing
+## that makes bare paint, and product and shine are only ever spent forwards —
+## [GrimeMap]'s class docs have the whole of it. So a square the player holds every
+## trigger in the game over runs out of things to pay for and stays that way, and
+## both of the numbers this class is paid from, [method GrimeMap.worked] and
+## [signal Grime.patch_finished], are counting a car that only gets cleaner.
+##
+## That was worth writing down when it was not free. The jet used to take product
+## off as well as mud, which made foam, rinse, foam a loop a player could hold on
+## one square for ever, and a score paid for units moved would have paid them for
+## every turn of it; what stopped it was the ledger counting how far the panel had
+## irreversibly got rather than how much had moved across it, and never a cap
+## written here. The rule is gone — [method GrimeMap.wash] has why — and the shape
+## it argued for is the reason nothing in this file had to change with it: a cap
+## would have lived here and would have had to be remembered by the next thing that
+## paid for something.
 ##
 ## [b]There is no target, no percentage and no "score out of".[/b] An arcade
 ## score counts up and stops being interesting only when the player does, and
@@ -233,9 +238,9 @@ func score(stage: GrimeMap.Stage) -> int:
 ## events are.
 ##
 ## Negative or zero [param done] pays nothing rather than taking points back.
-## Work only goes forwards — [method GrimeMap.worked] refuses to count a rinse as
-## progress — so a caller handing this a fall has misread a total, and a score
-## that could go down on a misread would be a bug nobody would look for here.
+## Work only goes forwards — [method GrimeMap.worked] is a total no tool can lower
+## — so a caller handing this a fall has misread a total, and a score that could go
+## down on a misread would be a bug nobody would look for here.
 func work(stage: GrimeMap.Stage, done: float) -> int:
 	if done <= 0.0:
 		return 0

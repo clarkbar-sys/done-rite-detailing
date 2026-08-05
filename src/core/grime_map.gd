@@ -34,9 +34,8 @@
 ## Bare paint is the remainder and is not stored, because storing it would be a
 ## fourth number that has to agree with the other three. Every tool moves units
 ## from one bucket to another and never creates or destroys any, so the four
-## always sum to [constant UNITS] — [method wash] takes mud [i]and product[/i] to
-## bare, [method foam] takes bare to product, [method buff] takes product to
-## shine.
+## always sum to [constant UNITS] — [method wash] takes mud to bare,
+## [method foam] takes bare to product, [method buff] takes product to shine.
 ##
 ## [b]That conservation is the game's rules, not an accounting convenience.[/b]
 ## It is what makes the job layered without a single line of sequencing logic:
@@ -45,10 +44,18 @@
 ##   texel has none. The jet has to make some first.
 ## - You cannot shine what you never foamed, because [method buff] draws from
 ##   product. A rag on bare paint moves nothing.
-## - And you cannot leave the water till last, because [method wash] takes the
-##   product off with the mud. The order is the only order that finishes a panel.
+## - And the water is only ever the first pass, because it is the only thing that
+##   makes bare paint and nothing anywhere puts mud back. A jet over a panel
+##   somebody has already treated finds no mud and moves nothing at all.
 ## - "Finished" is one number — every unit in blue — and it is reachable only by
 ##   having gone through the other two.
+##
+## [b]And the units only travel one way round.[/b] Mud falls, bare paint is made
+## by the water and spent by a bottle, product is spent by the rag, and nothing
+## takes shine off — so no bucket a tool fills can be emptied back to where it
+## came from. That is newer than the rest of this file: the jet used to draw
+## product off with the mud, and [method wash] has why it no longer does and what
+## the bookkeeping here stopped needing when it stopped.
 ##
 ## The alternative was three independent channels with a rule written next to
 ## each about what it is allowed to do to the others. This is the same rules
@@ -123,11 +130,6 @@ var _worked: PackedFloat64Array = PackedFloat64Array()
 var _mud: PackedInt32Array = PackedInt32Array()
 var _product: PackedInt32Array = PackedInt32Array()
 var _shine: PackedInt32Array = PackedInt32Array()
-## The high-water mark of how much of each patch has ever been covered — product
-## plus shine, which is the pair [method _stage_finished] asks about. It is the
-## one total here that a tool cannot lower, and [method _touch] has why the
-## middle pass needs one when the other two do not.
-var _covered: PackedInt32Array = PackedInt32Array()
 var _capacity: PackedInt32Array = PackedInt32Array()
 var _full: int = 0
 var _mud_total: int = 0
@@ -238,26 +240,21 @@ func shine() -> float:
 ## and a caller that pays per patch can pay for part of one without knowing how
 ## big a texel is.
 ##
-## [b]Only ever up, and only for work that went forwards.[/b] The wash moves mud
-## to bare and, once the mud is gone, product to bare as well — rinsing your own
-## foam off. Only the mud counts: undoing a pass is not doing one, and a number
-## that went up while the player made the car worse would be paying them for it.
-##
-## [b]The other side of that is the middle pass, and it is subtler.[/b] Every unit
-## of product the bottle lays down is honest work at the moment it lands, but the
-## jet can take it off again, so the same texel can be covered any number of
-## times. Counting units laid would therefore be counting a loop: foam, rinse,
-## foam, for ever, on one square, for the same points each time and with the car
-## no nearer done. So what is counted is how far each patch has ever got rather
-## than how much has ever been moved — [method _touch] has the mechanism — and
-## re-covering ground the player has already been paid for is worth nothing. The
-## last pass needs no such care: nothing takes shine off, so it is its own
-## high-water mark.
+## [b]Only ever up, and every unit that moves is a unit that went forwards.[/b]
+## That is a property of the tools rather than of the counting, and it is worth
+## saying plainly because it used not to be true. While the jet took product off
+## as well as mud, foam → rinse → foam was a loop the player could hold on one
+## square for ever, laying fresh product each turn with the car no nearer done —
+## so this total defended itself by counting how far each patch had ever got
+## rather than how much had ever crossed it, and kept a per-patch high-water mark
+## to do it with. [method wash] no longer takes product off. Nothing now empties a
+## bucket back into the one it came from, so each of the three totals is its own
+## high-water mark and the memory has gone with the rule that needed it.
 ##
 ## The property all three then share is the one a wage can be paid from: this is
-## what the panel has [i]irreversibly[/i] had done to it, so a player who undoes a
-## pass and redoes it is back where they started on the ledger as well as on the
-## paint.
+## what the panel has [i]irreversibly[/i] had done to it, which is now simply what
+## has been done to it — there is no longer any way to make a car worse, so there
+## is nothing for a ledger that only goes forwards to disagree with.
 ##
 ## [b]A float where every other total on this class is an integer[/b], and the
 ## class docs above are emphatic about why those are integers — so this is worth
@@ -337,26 +334,37 @@ func bare_at(point: Vector3, normal: Vector3) -> float:
 	return clampf(1.0 - pixel.r - pixel.g - pixel.b, 0.0, 1.0)
 
 
-## Takes [param amount] off the panel around [param point], over a brush of
+## Takes [param amount] of mud off the panel around [param point], over a brush of
 ## [param radius_metres], for a surface facing [param normal] — all three in the
 ## panel's own space. What it takes off becomes bare paint.
 ##
-## [b]Mud first, and then the product under it.[/b] Water does not politely stop
-## at the dirt, and a jet that left a soaped window alone would be a jet the
-## player could safely use at any point in the job — which is exactly the lesson
-## worth teaching. Spraying a panel you have just treated rinses the treatment
-## off, so the order stops being advice and becomes the only order that gets a
-## panel finished: wash, then the bottle, then the cloth.
+## [b]Mud, and nothing else lying on the paint.[/b] The jet used to draw the
+## product off with the dirt, on the argument that water does not politely stop at
+## what you want it to and that a tool usable at any point in the job teaches the
+## player nothing: spray a window you have just cleaned and it went back to bare
+## glass, so the order stopped being advice.
 ##
-## [b]Shine is deliberately left alone.[/b] The same argument does not reach it.
-## Wax is not something lying on the paint waiting to be rinsed away, and more to
-## the point, a stray jet across a finished wing undoing work the player has
-## already done three passes on is a punishment for imprecision rather than a
-## rule they can learn. A finished panel stays finished.
+## [b]The order did not rest on it, and the cost was not paid by the player who
+## was out of order.[/b] What actually sequences the job is the buckets —
+## [method foam] draws from bare paint and only the water makes any, so the water
+## is the first pass whether or not it can undo the second, and a jet over a panel
+## that has already been treated now simply finds no mud and moves nothing. Who
+## the rule was really charging was the player working panel by panel: the jet's
+## brush is the widest in the game and a car's panels sit against each other, so
+## washing the door took the edge off the wing beside it that they had soaped a
+## minute ago. That is an aim off by a tool's width, not a pass done in the wrong
+## order.
+##
+## [b]Which is the argument shine was already exempted on.[/b] A stray jet costing
+## the player work they have already done is a punishment for imprecision rather
+## than a rule anybody can learn — and that was as true of the coat of foam laid
+## ten seconds ago as of the wax under it. Exempting one bucket and not the other
+## was the part that never held up; both are exempt now, and the water is the one
+## pass that can only ever help.
 ##
 ## Returns the patches this call washed clean — clean of [i]mud[/i], which is the
-## transition the bell is about. Rinsing product off a patch whose mud has long
-## gone reports nothing, for the reason [method _touch] records.
+## transition the bell is about. A patch whose mud has long gone reports nothing,
+## because there is nothing left there for the jet to move at all.
 func wash(point: Vector3, normal: Vector3, radius_metres: float, amount: float) -> PackedInt32Array:
 	return _brush(point, normal, radius_metres, amount, Stage.WASHED)
 
@@ -368,9 +376,9 @@ func wash(point: Vector3, normal: Vector3, radius_metres: float, amount: float) 
 ## Held on a half-washed spot it covers the washed half and stops.
 ##
 ## Returns the patches this call covered completely: no mud left and no bare paint
-## left either, so there is nothing more a bottle can do to them. Once each, ever
-## — a patch rinsed bare and covered again is a patch coming back to where it had
-## already been, and [method _touch] has why that is neither scored nor rung for.
+## left either, so there is nothing more a bottle can do to them. Once each, ever,
+## and nothing has to remember which — a covered patch has no bare paint for a
+## second coat to draw from, and nothing puts any back.
 func foam(point: Vector3, normal: Vector3, radius_metres: float, amount: float) -> PackedInt32Array:
 	return _brush(point, normal, radius_metres, amount, Stage.FOAMED)
 
@@ -457,23 +465,11 @@ func _touch(at: Vector2i, amount: float, stage: Stage, finished: PackedInt32Arra
 	if moved <= 0:
 		return
 	var patch: int = _patch_at(at)
-	# Only the wash reports on having moved a particular bucket rather than on the
-	# patch's state alone — see below, where it is checked.
-	var stripped: int = 0
 	match stage:
 		Stage.WASHED:
-			# Mud first and then whatever product is under the jet. Order rather than
-			# a split, because they are the same water: a texel that is half muddy
-			# and half soaped gets the mud taken off first and the foam after, which
-			# is what a jet does and what makes a half-washed panel behave sensibly.
-			stripped = mini(moved, mud)
-			var rinsed: int = moved - stripped
-			mud -= stripped
-			foamed -= rinsed
-			_mud[patch] -= stripped
-			_mud_total -= stripped
-			_product[patch] -= rinsed
-			_product_total -= rinsed
+			mud -= moved
+			_mud[patch] -= moved
+			_mud_total -= moved
 		Stage.FOAMED:
 			foamed += moved
 			_product[patch] += moved
@@ -496,55 +492,25 @@ func _touch(at: Vector2i, amount: float, stage: Stage, finished: PackedInt32Arra
 		)
 	)
 	_dirty = true
-	# How much of this touch was progress rather than motion, which is the one
-	# number the rest of this function is about: the ledger below is paid from it
-	# and the ding below that fires on it.
+	# Every unit that reaches here is progress, and that is the tools' doing rather
+	# than this function's. No tool empties a bucket back into the one it came from
+	# — [method worked] has the argument and [method wash] the change that bought it
+	# — so a touch that moved anything moved its patch forwards by exactly that
+	# much. This used to be a second number worked out per stage, with a per-patch
+	# high-water mark behind it to stop the foam/rinse/foam loop paying twice; there
+	# is no loop left to stop, and the arithmetic that survives is the arithmetic
+	# that was always doing the work.
 	#
-	# [b]Each pass is asked the question its own arithmetic can answer.[/b] The
-	# wash counts the mud it actually stripped and not the product it rinsed off
-	# afterwards, because undoing a pass is not doing one. The buff counts
-	# everything it moved, because shine is the one bucket nothing empties — see
-	# [method wash] on why the jet leaves it alone — so every unit of it is new
-	# ground by construction.
-	#
-	# [b]The middle pass is the one that needs a memory, and it is the whole point
-	# of [member _covered].[/b] Product is not conserved forwards: the jet takes it
-	# back off, which is deliberate and is what makes the order of the job
-	# learnable. But it means foam → rinse → foam is a loop that lays fresh product
-	# on the same texel for ever, so counting units laid would pay a player to hold
-	# two triggers alternately on one square and never finish the car. What is
-	# scored instead is the furthest that patch has ever got, so re-covering ground
-	# already credited earns exactly nothing and covering new ground earns the same
-	# as it always did. Arithmetic that cannot be gamed rather than a cap on what a
-	# patch may pay — the distinction is issue #83's.
-	var forwards: int = moved
-	match stage:
-		Stage.WASHED:
-			forwards = stripped
-		Stage.FOAMED:
-			var covered: int = _product[patch] + _shine[patch]
-			forwards = maxi(covered - _covered[patch], 0)
-			_covered[patch] = maxi(_covered[patch], covered)
 	# Banked against the capacity of the patch it happened on, so a unit of work is
 	# a fraction of *this* patch and not of an average one — the grid does not have
 	# to divide the atlas evenly for the arithmetic to be right, which is the same
 	# thing [method _seed_the_totals] keeps capacities per patch for.
-	if forwards > 0 and _capacity[patch] > 0:
-		_worked[int(stage)] += float(forwards) / float(_capacity[patch])
-	# Reported on the transition and only once, without a flag to remember it by.
-	#
-	# [b]Progress is what makes it a transition[/b], which is why this rides the
-	# same number the ledger does rather than asking the patch's state alone. A
-	# patch that has just been foamed or buffed has nothing left in that stage's
-	# source bucket, so every later touch returns above and never reaches here; a
-	# patch whose mud is gone does not, because the jet goes on moving product, and
-	# "this patch has no mud" would be true on every one of those touches and ring
-	# a bell each time. Nor does a patch that was rinsed and covered again, which
-	# is finished by the same test that was true the first time and is not a thing
-	# the player has newly done. Both cases are the same case: nothing went
-	# forwards, so nothing happened worth ringing for.
-	if forwards <= 0:
-		return
+	if _capacity[patch] > 0:
+		_worked[int(stage)] += float(moved) / float(_capacity[patch])
+	# Reported on the transition and only once, without a flag to remember it by. A
+	# patch that has finished a stage has nothing left in that stage's source bucket
+	# and nothing refills it, so every later touch is stopped by the clamp above and
+	# never reaches here. The transition rings once because it can only happen once.
 	if _stage_finished(patch, stage):
 		finished.append(patch)
 
@@ -560,10 +526,10 @@ func _source(stage: Stage, mud: int, foamed: int, buffed: int) -> int:
 			return UNITS - mud - foamed - buffed
 		Stage.BUFFED:
 			return foamed
-	# The wash draws from both of the buckets that are things lying on the paint,
-	# and from neither of the two that are the paint. Shine is deliberately not in
-	# here — see [method wash].
-	return mud + foamed
+	# The wash draws from the dirt and from nothing else. Product and shine are both
+	# things the player put there, and [method wash] has why the water is not
+	# allowed to take either of them back.
+	return mud
 
 
 ## Whether [param patch] has just finished [param stage].
@@ -650,7 +616,6 @@ func _seed_the_totals() -> void:
 	_mud.resize(count)
 	_product.resize(count)
 	_shine.resize(count)
-	_covered.resize(count)
 	_capacity.resize(count)
 	var widths: PackedInt32Array = _spans(_image.get_width(), _patches_across)
 	var heights: PackedInt32Array = _spans(_image.get_height(), _patches_down)
@@ -663,7 +628,6 @@ func _seed_the_totals() -> void:
 			_mud[patch] = units
 			_product[patch] = 0
 			_shine[patch] = 0
-			_covered[patch] = 0
 			_full += units
 	_mud_total = _full
 	_product_total = 0

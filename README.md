@@ -51,11 +51,17 @@ finished. What keeps those three in order is not a rule anybody wrote down: a
 texel divides its surface between mud, product, shine and bare paint, and each
 tool moves units from one of those to another. So a sponge on a muddy wing has
 no bare paint to draw from and a rag on a dry one has no product, and neither
-needs refusing. Nor can you leave the water till last — the jet takes the
-product off with the mud, so spraying a window you have just cleaned rinses it
-back to bare glass. It leaves a buffed panel alone, though: wax is not something
-lying on the paint, and a stray jet costing you three passes of work would be a
-punishment for imprecision rather than a rule anybody can learn. [`src/core/grime_map.gd`](./src/core/grime_map.gd) has the
+needs refusing. Nor can you leave the water till last, for the same reason and
+not for a separate one: a bottle draws from bare paint and the jet is the only
+thing that makes any, so the water is the first pass whether or not it is allowed
+to undo the second. It is not. The jet used to rinse the product off with the
+mud, which taught the order at the price of charging you for it every time you
+washed a door and caught the wing you had just soaped — the widest brush in the
+game, on panels that sit against each other. A stray jet costing you a pass of
+work is a punishment for imprecision rather than a rule anybody can learn, which
+was already the argument for leaving a buffed panel alone, and it turns out to
+be the same argument one bucket further down. So water now takes the dirt and
+nothing else. [`src/core/grime_map.gd`](./src/core/grime_map.gd) has the
 argument at length.
 
 And you can hear it now. Start rings a counter bell, and every patch that comes
@@ -124,8 +130,9 @@ the trigger is down. And finishing a patch pays a bonus on top of that. The wage
 and the tip. A wash is worth least, the cleaner more, the drying rag most,
 because a buffed patch is one somebody washed and foamed first and the last pass
 is paying for the ground it stands on — one tariff, both halves, so a patch's
-worth of work pays exactly what that patch's completion does. Rinsing your own
-product back off is not work and is not paid for.
+worth of work pays exactly what that patch's completion does. Neither half can be
+farmed, and neither half checks: no tool puts a texel back where it was, so a
+square you hold every trigger in the game over runs out of things to pay for.
 
 Clean without pausing and the bonuses multiply: the run that already climbs the
 ding's pitch climbs the multiplier too, off the same constant and up to the same
