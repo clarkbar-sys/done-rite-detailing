@@ -22,6 +22,15 @@
 ## are touching something. Nothing here consumes that yet; [method panels] is
 ## how it will, and the grime that is coming needs a surface it can name.
 ##
+## [b]And some of it is not a panel at all.[/b] [code]Undercarriage[/code] and
+## [code]WheelWells[/code] sit in [constant TRIM_GROUP], which keeps them out of
+## [method panels] and so out of the grime, out of the colliders a tool can hit,
+## and out of the attract loop's running order. They are there to be looked at and
+## for nothing else — a floor pan, an exhaust and two axles under the sills, a
+## liner inside each arch — because a car with nothing under it reads as a prop
+## the moment the camera drops, and a player who can scrub the inside of a wheel
+## arch is being sold work the game has no opinion about finishing.
+##
 ## The second is that the boolean it costs was never wanted. The operations that
 ## shape a car are all [i]within[/i] a panel — the arches cut the tub, the rakes
 ## cut the greenhouse — because that is what a panel is: the part of the car
@@ -83,6 +92,21 @@ const PAINT_COLORS: Array[Color] = [
 	Color(0.45, 0.30, 0.18),  # Bronze
 ]
 
+## The group that marks a node as trim: geometry the player can see and can never
+## clean.
+##
+## [b]Why it is here and not in [Surface].[/b] The other two groups this car uses
+## — [constant Surface.GLASS_GROUP] and [constant Surface.WHEEL_GROUP] — each name
+## a [enum Surface.Kind], which is to say they answer "which bottle treats this".
+## Trim answers a question one step earlier, and answers it in a different
+## currency: it is not a surface with an awkward cleaner, it is not a surface.
+## Filing it beside the other two would leave [Surface] — a class whose first line
+## is "what a panel of the car is made of" — holding a constant that means "this
+## is not a panel", and would make the file that carries the rules of the job the
+## file you open to add a mud flap. So it lives next to [method panels], which is
+## the only thing that reads it.
+const TRIM_GROUP: String = "trim"
+
 ## The body's paint. [code]Body/Profile[/code], [code]Body/Plan[/code],
 ## [code]Hood/Panel[/code], [code]Deck/Panel[/code], [code]Roof/Panel[/code]
 ## and [code]Cabin/Shell[/code] all point at this same [StandardMaterial3D] in
@@ -106,6 +130,11 @@ func _ready() -> void:
 ## The recursion stops at a root on purpose: the brushes underneath are the
 ## subtractions and intersections that shape it, they are [CSGShape3D]s too, and
 ## a cutting box parked two metres outside the car is emphatically not a panel.
+##
+## [constant TRIM_GROUP] is the one thing that overrules the root test — see
+## [method _gather]. Everything downstream of here takes this list as the whole of
+## the car it has to deal with, so a panel left out of it has no grime, no map, no
+## turn in the attract loop and no cleaner, which is exactly what trim wants.
 func panels() -> Array[CSGShape3D]:
 	var found: Array[CSGShape3D] = []
 	_gather(self, found)
@@ -173,8 +202,22 @@ func bounds() -> AABB:
 
 ## Depth-first for CSG roots, descending through plain [Node3D]s so panels can
 ## be grouped in the editor, and never through a root into its own brushes.
+##
+## [b]Trim is skipped whole.[/b] A node in [constant TRIM_GROUP] is neither
+## collected nor descended into, so marking one combiner covers every brush under
+## it and marking a plain [Node3D] covers everything it holds — one group on one
+## node rather than the same group repeated across nine cylinders, which is the
+## version somebody forgets half of.
+##
+## The exclusion is here and not in [method kind_of] because it is not a kind. A
+## trim node that reached [method Grime.lay_on] would be handed a map and an
+## overlay and would be washable from that moment on, whatever [method kind_of]
+## said about it; the only way for a thing to have no cleaner is for it never to
+## have been a panel.
 func _gather(node: Node, found: Array[CSGShape3D]) -> void:
 	for child: Node in node.get_children():
+		if child.is_in_group(TRIM_GROUP):
+			continue
 		var shape: CSGShape3D = child as CSGShape3D
 		if shape != null:
 			found.append(shape)

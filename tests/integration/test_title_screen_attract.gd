@@ -32,7 +32,17 @@ const PASS_FRAMES: int = 60
 
 ## Enough ticks for the room to have resolved the demo's first press into a mark
 ## and spent something on it.
+##
+## Counted from [signal Garage.grimed] and not from [method GutTest.before_each],
+## because physics frames are the wrong clock for the wait that comes first — see
+## [method before_each].
 const RESOLVE_FRAMES: int = 4
+
+## How long [method before_each] will wait for the room to lay its masks before
+## giving up and letting the assertions report what they find. Generous: the wait
+## is one process frame in a room that has just built a car, and a second is
+## twenty times the worst build measured on the slowest machine this runs on.
+const GRIME_TIMEOUT: float = 1.0
 
 ## Long enough for a quarter turn of the car to have finished rather than nearly
 ## finished. At [member Garage.turn_degrees_per_second] the first 50° of it are
@@ -62,6 +72,21 @@ func before_each() -> void:
 	# Before the first `await`, which is the frame the room builds its demo in. See
 	# the class docs on why this one number is not the shipped one.
 	_garage().attract_seconds_per_pass = QUICK_PASS
+	# WAIT FOR THE SIGNAL, NOT FOR A COUNT OF PHYSICS FRAMES. Everything below
+	# needs the masks to be on the car and the demo's running order to have been
+	# taken up, and both of those happen in `Garage._lay_on_the_grime` one *process*
+	# frame after `_ready`. Physics frames do not measure that: when a frame runs
+	# long — and the frame this room is built in is the longest one it will ever
+	# have, a car's worth of CSG and a grove — the engine catches up by running
+	# several physics ticks inside a single iteration of the main loop, so all four
+	# of RESOLVE_FRAMES can pass before `process_frame` has been emitted once.
+	#
+	# Found the honest way: adding trim to `car.tscn` put about 3 ms on that build
+	# and two tests here started failing with `is_laid()` false, while the same
+	# suite passed on its own. `test_play_screen_wash.gd` makes the same wait and
+	# has never flaked, because it counts process frames. This counts neither and
+	# waits for the room to say so.
+	await wait_for_signal(_garage().grimed, GRIME_TIMEOUT)
 	await wait_physics_frames(RESOLVE_FRAMES)
 
 
