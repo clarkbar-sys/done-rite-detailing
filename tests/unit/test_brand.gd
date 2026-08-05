@@ -125,7 +125,60 @@ func test_a_card_is_lifted_off_the_page() -> void:
 	assert_gt(box.shadow_offset.y, 0.0, "and the light comes from above, as it does on the site")
 
 
+# ---- the quiet pill: the second button on a screen ---------------------------
+
+
+func test_a_quiet_pill_is_still_a_pill() -> void:
+	# The shape is the whole reason it is not a card: a menu's second button has
+	# to read as a button, and what says "button" in this vocabulary is the
+	# round end.
+	for height: float in HEIGHTS:
+		var box: StyleBoxFlat = Brand.quiet_pill(Brand.PANEL, height)
+		var radius: int = roundi(height / 2.0)
+		assert_eq(box.corner_radius_top_left, radius, "a %s-tall quiet pill is not round" % height)
+		assert_eq(box.corner_radius_bottom_right, radius, "on every corner")
+
+
+func test_a_quiet_pill_is_the_cards_colour_and_not_a_new_one() -> void:
+	# The point of the shape existing at all. If this ever comes back something
+	# other than what it was handed, the palette has grown a third fill nobody
+	# transcribed from the site.
+	assert_eq(Brand.quiet_pill(Brand.PANEL, HEIGHT).bg_color, Brand.PANEL)
+	assert_eq(Brand.quiet_pill(Brand.INK, HEIGHT).bg_color, Brand.INK)
+
+
+func test_a_quiet_pill_has_the_lit_edge_a_card_has() -> void:
+	# Without it a dark shape over a lit garage is a hole cut in the room rather
+	# than a button sitting on it — [method Brand.card]'s argument, applied to
+	# the thing you press instead of the thing you look at.
+	var box: StyleBoxFlat = Brand.quiet_pill(Brand.PANEL, HEIGHT)
+	assert_eq(box.border_color, Brand.LINE, "a quiet pill's edge is --line")
+	assert_gt(box.border_width_top, 0, "and it has to actually be drawn")
+
+
+func test_white_is_readable_on_a_quiet_pill() -> void:
+	# Both pills carry white type, and only one of them was ever checked for it.
+	# --panel is much darker than --red, so this passes comfortably; it is here
+	# because "comfortably" is a measurement and not an impression.
+	assert_gte(
+		Brand.contrast_ratio(Brand.WHITE, Brand.PANEL),
+		Brand.BADGE_CONTRAST,
+		"the second button's label has to be readable too"
+	)
+
+
 # ---- the badge, and the contrast arithmetic underneath it --------------------
+
+
+func test_a_badge_is_a_quiet_pill_at_a_square_size() -> void:
+	# The relationship, asserted rather than left to the doc comment: a badge is
+	# one shape away from the menu's second button, and if the two ever stop
+	# agreeing it is because somebody gave one of them its own edge.
+	var badge: StyleBoxFlat = Brand.badge(Brand.PANEL, BADGE_SIDE)
+	var quiet: StyleBoxFlat = Brand.quiet_pill(Brand.PANEL, BADGE_SIDE)
+	assert_eq(badge.bg_color, quiet.bg_color)
+	assert_eq(badge.border_color, quiet.border_color)
+	assert_eq(badge.corner_radius_top_left, quiet.corner_radius_top_left)
 
 
 func test_a_badge_is_a_disc() -> void:

@@ -1,0 +1,282 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/screens/how_to_play.gd" id="1_howtoplay"]
+[ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
+
+[node name="HowToPlay" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_howtoplay")
+
+; The same room every other screen shows, on the same four switches. Mostly
+; covered by the card in front of it — see how_to_play.gd for what that costs
+; and what it buys.
+[node name="Garage" parent="." instance=ExtResource("2_garage")]
+orbiting = false
+first_person = true
+walkaround = true
+attracting = true
+
+; At least 16 px of room left showing on every side, so the card reads as a
+; sheet held up in the bay rather than a new screen that replaced it.
+[node name="Frame" type="MarginContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+; What stops the sheet stretching to whatever shape the screen is.
+;
+; The design is 1280x720 and project.godot stretches it "expand", which means a
+; portrait phone does not get a letterboxed 16:9 strip — it gets the design
+; width and as many extra design pixels of *height* as its aspect asks for. An
+; emulated 1080x2340 handset resolves to 1280x2773, nearly four times the height
+; this screen was laid out against. A card anchored to that is a card with two
+; thousand pixels of nothing in the middle of it, which is exactly what shipped
+; and what this row exists to prevent.
+;
+; The card takes its own height and this row centres what is left over, so the
+; extra goes to the room above and below the sheet rather than inside it. On a
+; 16:9 screen there is nothing to give away and the layout is the one the mockup
+; shows.
+;
+; It takes both properties, and that is worth writing down because only one of
+; them looks like it should be enough: `alignment` is what centres a child along
+; a BoxContainer's own axis, and the card's `size_flags_vertical = 4`
+; (SHRINK_CENTER) is what stops it filling in the first place. Set on its own,
+; the size flag centres the card horizontally — the cross axis — and leaves it
+; pinned to the top of the screen, which is how this was first written and what
+; the render showed.
+[node name="Sheet" type="VBoxContainer" parent="Frame"]
+layout_mode = 2
+alignment = 1
+
+[node name="Card" type="PanelContainer" parent="Frame/Sheet"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="Column" type="VBoxContainer" parent="Frame/Sheet/Card"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+; A flow row and not an HBoxContainer, because the type on this screen is not a
+; fixed size — how_to_play.gd grows it to use the height a tall screen hands
+; over. At the sizes a portrait phone gets, "HOW TO PLAY" plus the caption is
+; wider than the sheet, and an HBoxContainer answers that by squashing its
+; children past their own minimums. A flow row wraps the caption onto its own
+; line instead, which is what it should do anyway.
+[node name="Header" type="HFlowContainer" parent="Frame/Sheet/Card/Column"]
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 2
+
+[node name="Title" type="Label" parent="Frame/Sheet/Card/Column/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 38
+text = "HOW TO"
+
+[node name="TitleAccent" type="Label" parent="Frame/Sheet/Card/Column/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 38
+text = "PLAY"
+
+; Baseline-ish rather than top-aligned: a 20 px caption hung off the top of a
+; 38 px heading reads as a mistake.
+[node name="Subtitle" type="Label" parent="Frame/Sheet/Card/Column/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 6
+theme_override_font_sizes/font_size = 20
+text = "one screen, no scrolling — read it, then press Play"
+
+[node name="Rule" type="ColorRect" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 3)
+layout_mode = 2
+
+; Two columns rather than four stacked rows. how_to_play.gd has the arithmetic:
+; in one column this copy wraps to roughly forty lines and either the type or
+; the buttons has to give.
+[node name="Rules" type="GridContainer" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 10
+columns = 2
+
+[node name="Walk" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Walk"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "WALK ROUND THE CAR"
+
+[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Walk"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Push the stick, bottom right, and you move at the speed you push it — let go and you stop. It raises and lowers your eye too. W/A/S/D or the arrow keys at a desk."
+autowrap_mode = 3
+
+[node name="Press" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Press"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "PRESS THE PAINT"
+
+[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Press"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Press anywhere on the car and the tool in your hand swings to point at it, red crosshair where it lands. Holding is working, letting go stops. On a phone the aim sits a thumb's width above your finger, so you can see it."
+autowrap_mode = 3
+
+[node name="Belt" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Belt"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "FIVE TOOLS ON THE BELT"
+
+[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Belt"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Tap T, bottom left, to roll the belt out: power wash, sponge, window cleaner, tyre & engine cleaner, drying rag. The wrong bottle for a surface does nothing at all."
+autowrap_mode = 3
+
+[node name="Paid" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Paid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "GET PAID FOR IT"
+
+[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Paid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Every scrap of dirt pays the moment it comes off, and finishing a patch pays a bonus on top. Keep cleaning without a pause and the bonus multiplies — the ding climbs with it."
+autowrap_mode = 3
+
+; The three passes, in the order a panel goes through them, as a strip rather
+; than a fifth rule: this is one sentence about the whole job and the four above
+; are four separate things you can do.
+[node name="Strip" type="HBoxContainer" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Water" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Strip"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Water"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "1. WATER"
+
+[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Water"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "takes the mud off — any panel, one patch at a time."
+autowrap_mode = 3
+
+[node name="Bottle" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Strip"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Bottle"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "2. BOTTLE"
+
+[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Bottle"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "onto the bare paint: sponge on body, cleaner on glass, tyre cleaner on wheels."
+autowrap_mode = 3
+
+[node name="Rag" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Strip"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Rag"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "3. RAG"
+
+[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Rag"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "buffs the product out, which is the only way a panel is finished."
+autowrap_mode = 3
+
+; Left and right only, and deliberately not top or bottom: a pill carries a
+; 30 px glow (Brand.PILL_SHADOW_SIZE), so a button flush with the card's inner
+; edge throws red past the card's border. Ten pixels is enough to keep the glow
+; on the sheet, and taking it horizontally costs the column no height it needs
+; for the copy.
+[node name="ButtonRow" type="MarginContainer" parent="Frame/Sheet/Card/Column"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_right = 10
+
+; Both exits on one row, at opposite ends, so the screen can be left either way
+; round without either button being the one you find by accident.
+;
+; Guillemets and not the mockup's ◀ / ▶. This project ships no font of its own,
+; so every label is drawn in Godot's built-in Open Sans, and Open Sans has no
+; geometric shapes block — U+25C0 and U+25B6 come out as tofu boxes, which is
+; what shipped and what test_the_font_can_draw_every_word pins. U+00AB and
+; U+00BB are Latin-1, present in anything, and point the same way. Both are held
+; at 164 design px in their short dimension — TouchTarget.min_design_size() for
+; this design on a 375 px screen — which is what stops the layout borrowing
+; height from them when the copy above wants more.
+[node name="Buttons" type="HBoxContainer" parent="Frame/Sheet/Card/Column/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="MainMenu" type="Button" parent="Frame/Sheet/Card/Column/ButtonRow/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(340, 164)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "«  Main Menu"
+
+[node name="Spacer" type="Control" parent="Frame/Sheet/Card/Column/ButtonRow/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Play" type="Button" parent="Frame/Sheet/Card/Column/ButtonRow/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 164)
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "Play  »"

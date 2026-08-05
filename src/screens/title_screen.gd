@@ -40,13 +40,24 @@
 ## same bargain the bell already made and the same one the README already
 ## describes the game as making.
 ##
-## Start does not cut it off. It asks for a fade — see
-## [method GameScreen.stop_music] — and the [Bandstand] that honours it hangs off
-## the host, because this screen is freed before the first frame of that fade.
+## Start does not cut it off, and no longer asks for it to go at all. The theme
+## is meant to carry across the menu and fade as the game opens, so the fade
+## moved to the press that opens the game — see [code]src/screens/main_menu.gd[/code].
+## The [Bandstand] hangs off the host, so it plays straight through the swap
+## that frees this screen.
 ##
-## Start leads straight into [PlayGameState] — there is no menu screen between
-## the title card and the game, on purpose. A player who has already seen the
-## title has nothing left to decide before the room they're about to work in.
+## The counter bell moved with it, for the plainer reason: it is
+## [constant Bell.Voice.START], it means the job starts, and pressing Start no
+## longer starts a job. What this press still does is unlock the audio — that is
+## [method _input] above, on the same press, and it is why the theme coming up is
+## the answer the player gets rather than silence.
+##
+## [b]Start leads to [MainMenuGameState], not to the game.[/b] It used to lead
+## straight into [PlayGameState], on the argument that a player who has seen the
+## title has nothing left to decide. That was true while there was nothing else
+## to offer them; there is now a screen of rules, and a title card is the wrong
+## place to hang a second door off. So the card became a door into the menu, and
+## the menu is where the choice lives.
 ##
 ## The build label is the day-0 screen this project started as, moved intact
 ## into a state of its own — the same text CI's smoke run and the integration
@@ -131,42 +142,29 @@ static func _is_gesture(event: InputEvent) -> bool:
 	return false
 
 
-## Puts the brand on: the frame around the logo and the four faces of the pill.
+## Puts the brand on: the frame around the logo, and the pill.
 ##
-## Every [Button] state gets its own box because Godot falls back to the theme's
-## for any it is not given, so styling only `normal` would leave a hover and a
-## press wearing the default grey — the one moment the button is being used.
+## The four faces of the pill are [method GameScreen.dress_loud]'s job, and it is
+## on the base class rather than here because there are three screens with
+## buttons on them now — see that method for the fallback this project keeps
+## walking into.
 func _dress() -> void:
 	_logo_card.add_theme_stylebox_override("panel", Brand.card())
-	var height: float = _start.custom_minimum_size.y
-	_start.add_theme_stylebox_override("normal", Brand.pill(Brand.RED, height))
-	_start.add_theme_stylebox_override(
-		"hover", Brand.pill(Brand.RED.lightened(Brand.HOVER_LIFT), height)
-	)
-	_start.add_theme_stylebox_override("pressed", Brand.pill(Brand.RED_DARK, height))
-	_start.add_theme_stylebox_override("focus", Brand.focus_ring(height))
-	for role: String in [
-		"font_color", "font_hover_color", "font_pressed_color", "font_focus_color"
-	]:
-		_start.add_theme_color_override(role, Brand.WHITE)
+	dress_loud(_start)
 
 
-## The bell, the theme stepping aside, then the game.
+## Straight to the menu, with the theme left playing and nothing rung.
 ##
-## The order does not matter to the sound — the host owns both the [Chime] and
-## the [Bandstand], and both outlive this screen, which is the reason each is
-## asked for rather than played here — but it matters to what the press is
-## [i]for[/i]. A browser will not let a page make a noise until somebody has
-## touched it, so this is the press that unlocks audio for the whole game as well
-## as the one that starts it. [Chime] has the rest of that argument.
+## [b]Both of the things this used to do went with the game.[/b] The bell and the
+## fade now fire on the menu's Play, because that is where the job starts and
+## where the music is supposed to step aside; a title card that dinged and then
+## faded the theme on its way into a menu would announce an ending at the point a
+## player was still choosing.
 ##
-## The fade is asked for [i]before[/i] the transition, and that ordering is the
-## one thing here worth not moving: [method request_transition] frees this screen
-## synchronously, so a fade requested after it would be emitted from a node on
-## its way out. It survives either way — the signal is already connected to the
-## host — but the version that reads correctly is the one that does not rely on
-## that.
+## What is left is one line, and the press it sits on is still the important one:
+## a browser will not let a page make a noise until somebody has touched it, so
+## this is where audio is unlocked for the whole game. That happens in
+## [method _input], on the same press, and it is the reason the theme comes up as
+## the menu opens rather than into silence. [Chime] has the rest of that argument.
 func _on_start_pressed() -> void:
-	ring_bell(Bell.Voice.START)
-	stop_music()
-	request_transition(PlayGameState.new())
+	request_transition(MainMenuGameState.new())

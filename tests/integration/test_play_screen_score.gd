@@ -61,10 +61,20 @@ func after_each() -> void:
 	get_tree().root.size = _window_size_before
 
 
-## Presses Start and waits for the room behind the play screen to be ready.
+## Walks in through the front door and waits for the room behind the play screen
+## to be ready.
+##
+## Two presses rather than one: Start opens the menu and the menu's Play opens
+## the game. Still in through the front door, and still the reason it is done
+## this way — `main.gd` is the only thing that loads a screen, so the play screen
+## here is whatever the buttons put under the host rather than something this
+## test instanced behind the game's back.
 func _start() -> void:
 	var title: GameScreen = _host().get_child(0) as GameScreen
 	(title.get_node("%Start") as Button).pressed.emit()
+	await wait_process_frames(1)
+	var menu: GameScreen = _host().get_child(0) as GameScreen
+	(menu.get_node("%Play") as Button).pressed.emit()
 	await wait_process_frames(SETTLE_FRAMES)
 
 

@@ -207,23 +207,39 @@ static func card() -> StyleBoxFlat:
 	return box
 
 
-## A round plate in [param fill], [param side] design pixels across: what a
-## picture is printed on when the picture is the whole control.
+## The same pill in [param fill], with [method card]'s hairline around it: what a
+## button wears when it is [i]not[/i] the one obvious thing to press.
 ##
-## [b]It is a pill, and that is not a shortcut.[/b] [method pill] sets every
-## corner to half the height, so asking for one at a square size gives a circle
-## by the same arithmetic that gives the Start button its round ends — one shape
-## in this file, two aspect ratios. A separate "circle" builder would be a second
-## definition of the same corner, free to drift.
+## [b]Still two shapes.[/b] The site draws everything out of a red pill and a
+## dark card, and that vocabulary has nothing to say the moment a screen offers
+## two buttons at once — which is what a menu is. So this is the card's fill and
+## the card's edge in the pill's shape, rather than a third colour invented for
+## the occasion. The alternative is a second red pill, which is defensible and is
+## what the site does, and it flattens the choice: two accents on one screen give
+## the eye nowhere to land.
 ##
-## The hairline is [method card]'s, for [method card]'s reason: this is something
-## you look at as well as press, and without a lit edge a dark disc over a dark
-## garage is a hole rather than a plate.
-static func badge(fill: Color, side: float) -> StyleBoxFlat:
-	var box: StyleBoxFlat = pill(fill, side)
+## The hairline is not decoration. A dark shape over a lit garage with no lit
+## edge is a hole cut in the room rather than a button sitting on it — the same
+## failure [method card] exists for, and the same fix.
+static func quiet_pill(fill: Color, height: float) -> StyleBoxFlat:
+	var box: StyleBoxFlat = pill(fill, height)
 	box.set_border_width_all(1)
 	box.border_color = LINE
 	return box
+
+
+## A round plate in [param fill], [param side] design pixels across: what a
+## picture is printed on when the picture is the whole control.
+##
+## [b]It is a quiet pill, and that is not a shortcut.[/b] [method pill] sets every
+## corner to half the height, so asking for one at a square size gives a circle
+## by the same arithmetic that gives the Start button its round ends — one shape
+## in this file, two aspect ratios — and the hairline a badge needs is the one
+## [method quiet_pill] already puts there, for the same reason. A separate
+## "circle" builder would be a second definition of the same corner, free to
+## drift; a separate hairline would be a second definition of the same edge.
+static func badge(fill: Color, side: float) -> StyleBoxFlat:
+	return quiet_pill(fill, side)
 
 
 ## [param albedo] as it should be [i]drawn on a badge[/i]: the tool's own colour,

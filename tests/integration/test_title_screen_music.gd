@@ -126,32 +126,28 @@ func test_the_theme_is_only_ever_asked_for_once() -> void:
 	assert_eq(_asked, 1, "the screen kept asking")
 
 
-func test_start_asks_for_a_fade_rather_than_a_stop() -> void:
-	# The brief, in one assertion: the music steps aside over three seconds
-	# instead of being cut off on the press.
+func test_start_leaves_the_theme_playing() -> void:
+	# The brief, in one assertion. The fade used to fire here, back when Start
+	# opened the game; it now fires on the menu's Play, because the theme is
+	# supposed to carry across the menu and step aside as the bay opens. A title
+	# card that faded the music on its way into a menu would announce an ending
+	# at the point a player was still choosing.
+	#
+	# The [Bandstand] hangs off the host, not off this screen, so it survives the
+	# swap that frees this one and there is nothing here that has to hand it
+	# over. `tests/integration/test_main_menu.gd` is where the fade is asserted
+	# now.
 	(_screen.get_node("%Start") as Button).pressed.emit()
-	assert_eq(_faded.size(), 1, "Start did not ask for the music to go")
-	assert_almost_eq(_faded[0], Bandstand.FADE_SECONDS, 0.001, "Start cut the music dead")
+	assert_eq(_faded.size(), 0, "Start took the music with it into the menu")
 
 
-func test_start_asks_for_the_fade_before_it_asks_to_leave() -> void:
-	# The ordering in `_on_start_pressed`. `request_transition` frees this screen
-	# synchronously, so a fade asked for afterwards would be emitted from a node
-	# on its way out — it survives either way, because the host is already
-	# connected, but the version that does not rely on that is the one that
-	# should stay.
-	var order: Array[String] = []
-	_screen.music_stop_requested.connect(func(_seconds: float) -> void: order.append("fade"))
-	_screen.transition_requested.connect(func(_state: GameState) -> void: order.append("leave"))
-	(_screen.get_node("%Start") as Button).pressed.emit()
-	assert_eq(order, ["fade", "leave"] as Array[String])
-
-
-func test_a_press_that_never_started_the_music_still_asks_for_the_fade() -> void:
+func test_a_press_that_started_the_music_leaves_it_playing_too() -> void:
 	# Somebody who clicks Start as their very first act: the press starts the
-	# theme on the way down and ends it on the way up. The fade is asked for
-	# unconditionally and the host no-ops it if there is nothing playing, which
-	# is one rule instead of two.
-	assert_eq(_asked, 0)
+	# theme on the way down and hands over on the way up, with the theme still
+	# going. The same as above and worth its own line, because "the press that
+	# unlocked the audio" and "the press that leaves" are the same press here and
+	# only here.
+	await _send(_click())
+	assert_eq(_asked, 1, "the premise")
 	(_screen.get_node("%Start") as Button).pressed.emit()
-	assert_eq(_faded.size(), 1)
+	assert_eq(_faded.size(), 0, "the theme must carry into the menu it just unlocked")
