@@ -11,9 +11,13 @@ Done Rite Detailing is an in-development game: a Godot 4 project that
 type-checks, boots headlessly, and exports a playable build — in your browser,
 or as a Linux binary — from CI. It opens on a title screen with the game
 already being played behind the card — a filthy car being washed, cleaned and
-buffed by nobody, in the bay you are about to stand in — and Start drops you
-straight into that same room, standing beside the car with a tool in your
-hand. A thumb stick in the bottom-right corner walks you around it and raises
+buffed by nobody, in the bay you are about to stand in. Start opens a menu over
+that same bay, still working away behind it: **Play** drops you into the room,
+standing beside the car with a tool in your hand, and **How to Play** is one
+screen of rules — four things you can do and the three passes a panel goes
+through — with its own way straight into the game, so reading first costs you
+nothing. The theme carries across all of it and fades as the bay opens.
+A thumb stick in the bottom-right corner walks you around the car and raises
 and lowers your eye — push it and you move, at whatever speed you push it, in
 any direction at once; let go and it springs back and you stop. The arrow keys
 and WASD do the same job at a desk. A **T** in the opposite corner rolls out

@@ -1,9 +1,25 @@
 ## Base for the [Control] that a [GameState] presents.
 ##
-## Every screen shares exactly one thing: a way to hand control back. It asks
+## Every screen shares one thing above all: a way to hand control back. It asks
 ## for the state it wants next and stops there — the host
 ## ([code]src/main/main.gd[/code]) owns the [GameStateMachine] and does the
 ## swapping, so no screen ever loads, frees or even names another screen.
+##
+## [b]And, since there are three screens with buttons on them, one way to dress
+## a button.[/b] [method dress_loud] and [method dress_quiet] are here rather
+## than repeated per screen because the rule they encode is a trap and not a
+## preference: Godot falls back to the theme's stylebox for any button state it
+## is not given, so a screen that overrides only [code]normal[/code] leaves hover
+## and pressed wearing the default grey — the two moments the button is actually
+## being used. Written out once, that is a rule; written out three times, it is
+## three chances to forget one.
+##
+## They live on the screen tier rather than in [Brand] deliberately.
+## [code]src/core/[/code] is the Node-free tier (STANDARDS.md "Coverage", R3) and
+## [Brand] is the shapes and the colours — things a unit test can build and
+## measure with no [SceneTree] anywhere. Putting a [Button] in its signature
+## would be the first Node in that file. What [Brand] hands out is still every
+## colour and every corner below; this only puts them on.
 class_name GameScreen
 extends Control
 
@@ -58,3 +74,58 @@ func request_music() -> void:
 ## compiler reason [method request_transition] is one.
 func stop_music(seconds: float = Bandstand.FADE_SECONDS) -> void:
 	music_stop_requested.emit(seconds)
+
+
+## Dresses [param button] as the answer to the screen it is on: the red pill,
+## white type, and a face for every state.
+##
+## There is at most one of these per screen, and that is the whole point of the
+## colour — [constant Brand.RED] is the site's one accent, worn by the thing the
+## visitor is meant to press and by nothing else.
+static func dress_loud(button: Button) -> void:
+	var height: float = button.custom_minimum_size.y
+	_wear(
+		button,
+		Brand.pill(Brand.RED, height),
+		Brand.pill(Brand.RED.lightened(Brand.HOVER_LIFT), height),
+		Brand.pill(Brand.RED_DARK, height)
+	)
+
+
+## Dresses [param button] as the other thing on the screen: the card's colour in
+## the pill's shape, so it reads as a button without competing with the red one.
+##
+## Pressed goes to [constant Brand.INK] rather than lightening, because a dark
+## button that brightens under the thumb is a dark button that looks like it is
+## turning on. Hover lifts and press sinks, which is the direction the red pill
+## already moves in.
+static func dress_quiet(button: Button) -> void:
+	var height: float = button.custom_minimum_size.y
+	_wear(
+		button,
+		Brand.quiet_pill(Brand.PANEL, height),
+		Brand.quiet_pill(Brand.PANEL.lightened(Brand.HOVER_LIFT), height),
+		Brand.quiet_pill(Brand.INK, height)
+	)
+
+
+## Puts [param normal], [param hover] and [param pressed] on [param button],
+## along with the focus ring and white type, and leaves nothing to the theme.
+##
+## The height every shape is cut to is [member Control.custom_minimum_size], not
+## [member Control.size]: this runs in [method Node._ready], before the first
+## layout pass, where a button's real size is still zero. The scene states the
+## size it wants and this reads that — which is also why the scene files below
+## give every button a [code]custom_minimum_size[/code] even where a container
+## would have stretched it anyway.
+static func _wear(
+	button: Button, normal: StyleBoxFlat, hover: StyleBoxFlat, pressed: StyleBoxFlat
+) -> void:
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", Brand.focus_ring(button.custom_minimum_size.y))
+	for role: String in [
+		"font_color", "font_hover_color", "font_pressed_color", "font_focus_color"
+	]:
+		button.add_theme_color_override(role, Brand.WHITE)

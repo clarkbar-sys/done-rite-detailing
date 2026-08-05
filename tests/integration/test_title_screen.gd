@@ -153,14 +153,19 @@ func test_every_face_of_start_is_dressed() -> void:
 		)
 
 
-func test_start_asks_for_the_play_state() -> void:
+func test_start_asks_for_the_menu() -> void:
 	# Through the button's own signal rather than by calling the handler, so a
 	# connection dropped in `_ready()` fails here rather than in the browser.
+	#
+	# It used to lead straight into [PlayGameState], and the reason it no longer
+	# does is that there is now a second thing to offer — the rules — and a title
+	# card is the wrong place to hang a second door off.
 	_start_button().pressed.emit()
 	assert_eq(_requested.size(), 1, "Start must request exactly one transition")
 	if _requested.size() != 1:
 		return
-	assert_true(_requested[0] is PlayGameState, "Start must lead straight into the game")
+	assert_true(_requested[0] is MainMenuGameState, "Start must open the menu")
+	assert_false(_requested[0] is PlayGameState, "and must not open the game itself")
 
 
 func test_it_asks_for_nothing_on_its_own() -> void:
@@ -168,12 +173,17 @@ func test_it_asks_for_nothing_on_its_own() -> void:
 	assert_eq(_rung.size(), 0, "and must not make a noise before it is touched")
 
 
-func test_start_rings_the_counter_bell() -> void:
-	# Through the button's own signal, like the transition above: the ding is
-	# wired in `_ready()` and a connection dropped there is silent everywhere
-	# except here.
+func test_start_no_longer_rings_the_counter_bell() -> void:
+	# The ding moved to the menu's Play along with the music's fade.
+	# [constant Bell.Voice.START] means the job starts, and pressing Start no
+	# longer starts a job — see `tests/integration/test_main_menu.gd`, which is
+	# where the same assertion now lives in the positive.
+	#
+	# The press is still the one that unlocks the browser's audio; what answers
+	# it is the theme coming up, which is
+	# `tests/integration/test_title_screen_music.gd`'s.
 	_start_button().pressed.emit()
-	assert_eq(_rung, [Bell.Voice.START] as Array[Bell.Voice], "Start must ding once")
+	assert_eq(_rung.size(), 0, "the bell belongs to the press that starts the job")
 
 
 # ---- touch: the phone-shaped half of "does Start work" -----------------------
@@ -197,10 +207,10 @@ func _tap(at: Vector2) -> void:
 	Input.flush_buffered_events()
 
 
-func test_a_tap_on_start_asks_for_the_play_state() -> void:
+func test_a_tap_on_start_asks_for_the_menu() -> void:
 	_tap(_start_button().get_global_rect().get_center())
 	await wait_process_frames(1)
-	assert_eq(_requested.size(), 1, "a tap on Start must ask for the game")
+	assert_eq(_requested.size(), 1, "a tap on Start must ask for the menu")
 
 
 func test_start_is_big_enough_for_a_finger() -> void:
@@ -213,13 +223,17 @@ func test_start_is_big_enough_for_a_finger() -> void:
 	assert_gte(start.size.y, minimum, "Start is too short to hit on a phone")
 
 
-func test_a_tap_on_start_rings_the_counter_bell() -> void:
-	# The phone-shaped half of the ding. This is the press a browser unlocks audio
-	# on — see [Chime] — so "a tap on Start dings" is the promise the rest of the
-	# game's sound rides on rather than a flourish on the button.
+func test_a_tap_on_start_unlocks_the_audio_without_ringing() -> void:
+	# The phone-shaped half of the press that used to ding. This is still the
+	# gesture a browser unlocks audio on — see [Chime] — and what it now answers
+	# with is the theme rather than the counter bell, so the promise the rest of
+	# the game's sound rides on is `music_requested` and not `bell_requested`.
+	var asked: Array[int] = []
+	_screen.music_requested.connect(func() -> void: asked.append(1))
 	_tap(_start_button().get_global_rect().get_center())
 	await wait_process_frames(1)
-	assert_eq(_rung.size(), 1, "a tap on Start must ding")
+	assert_eq(asked.size(), 1, "a tap on Start must still unlock the audio")
+	assert_eq(_rung.size(), 0, "but must not ring a job that has not started")
 
 
 func test_a_tap_just_outside_start_asks_for_nothing() -> void:

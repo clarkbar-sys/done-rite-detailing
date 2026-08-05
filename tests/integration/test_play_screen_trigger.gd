@@ -25,7 +25,7 @@
 ## Measured the hard way: a version of this feature passed a suite of its own
 ## while doing nothing whatsoever in the real game, because the press was landing
 ## in [code]%ScreenHost[/code] a layer below. So this one boots the real scene and
-## walks in through the title card's Start button, the way a player does.
+## walks in the way a player does — the title card's Start, then the menu's Play.
 extends GutTest
 
 const MAIN: String = "res://src/main/main.tscn"
@@ -77,6 +77,11 @@ func before_each() -> void:
 	# something this test instanced behind the game's back.
 	var title: GameScreen = _host().get_child(0) as GameScreen
 	(title.get_node("%Start") as Button).pressed.emit()
+	await wait_process_frames(2)
+	# Start opens the menu; the menu's Play opens the game. Two presses rather
+	# than one since #91 put a menu between the title card and the bay.
+	var menu: GameScreen = _host().get_child(0) as GameScreen
+	(menu.get_node("%Play") as Button).pressed.emit()
 	await wait_process_frames(2)
 
 

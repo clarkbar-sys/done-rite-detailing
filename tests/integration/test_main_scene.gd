@@ -9,10 +9,19 @@
 ## the whole project and fails on any logged error — it proves the game starts.
 ## This proves it starts *on the title screen* and walks from there into the
 ## game, which a clean boot says nothing about.
+##
+## [b]The walk is four screens long now, and this is the only suite that takes
+## it.[/b] Each screen's own suite instantiates that screen alone and asserts
+## what it [i]asks[/i] for, because a screen on its own has no host to answer it.
+## Whether the ask is answered — whether the host is wired to those signals at
+## all, and whether the scene it swaps in is the one the state named — is only
+## visible from here.
 extends GutTest
 
 const MAIN_SCENE: String = "res://src/main/main.tscn"
 const TITLE_SCREEN: String = "res://src/screens/title_screen.tscn"
+const MAIN_MENU: String = "res://src/screens/main_menu.tscn"
+const HOW_TO_PLAY: String = "res://src/screens/how_to_play.tscn"
 const PLAY_SCREEN: String = "res://src/screens/play_screen.tscn"
 
 var _main: Control = null
@@ -73,12 +82,28 @@ func _touch() -> void:
 	await wait_process_frames(1)
 
 
-## Presses Start on whatever is on screen and lets the swap happen.
-func _press_start() -> void:
+## Presses the button called [param unique_name] on whatever is on screen, and
+## lets the swap happen.
+##
+## Through the button's own [signal BaseButton.pressed] and through the real
+## mounted screen, so a handler that was never connected fails here — and by
+## unique name, so the press is aimed at the control the scene file marked rather
+## than at a node path this file would have to keep in step with three layouts.
+func _press(unique_name: String) -> void:
 	var host: Control = _main.get_node("%ScreenHost") as Control
-	var start: Button = host.get_child(0).get_node("%Start") as Button
-	start.pressed.emit()
+	var button: Button = host.get_child(0).get_node("%%%s" % unique_name) as Button
+	button.pressed.emit()
 	await wait_process_frames(1)
+
+
+## Title card to menu: the first press of every walk below.
+func _press_start() -> void:
+	await _press("Start")
+
+
+## Menu to game, which is where the bell and the fade live now.
+func _press_play() -> void:
+	await _press("Play")
 
 
 func test_the_scene_instantiates_as_a_control() -> void:
@@ -90,12 +115,42 @@ func test_it_boots_into_the_title_screen() -> void:
 	assert_eq(_current_screen_path(), TitleScreenGameState.SCENE_PATH, "the state decides this")
 
 
-func test_start_swaps_the_title_screen_for_the_game() -> void:
-	# The whole walk, through the real button: title -> game. There is no menu
-	# screen in between — Start leads straight into play.
+func test_start_swaps_the_title_screen_for_the_menu() -> void:
 	await _press_start()
+	assert_eq(_current_screen_path(), MAIN_MENU)
+	assert_eq(_current_screen_path(), MainMenuGameState.SCENE_PATH, "the state decides this")
+
+
+func test_the_walk_from_the_title_card_to_the_game() -> void:
+	# The short way through, press by press, on the real host: title -> menu ->
+	# game. Each screen's own suite proves it asks for the next state; this is
+	# the only place that proves the asking gets answered.
+	await _press_start()
+	assert_eq(_current_screen_path(), MAIN_MENU, "Start must open the menu")
+	await _press_play()
 	assert_eq(_current_screen_path(), PLAY_SCREEN)
 	assert_eq(_current_screen_path(), PlayGameState.SCENE_PATH, "the state decides this")
+
+
+func test_the_long_way_round_through_the_rules_and_back() -> void:
+	# The other half of the flow, and the only loop in it: a player who reads
+	# first has to be able to get back to where they were.
+	await _press_start()
+	await _press("HowToPlay")
+	assert_eq(_current_screen_path(), HOW_TO_PLAY)
+	assert_eq(_current_screen_path(), HowToPlayGameState.SCENE_PATH, "the state decides this")
+	await _press("MainMenu")
+	assert_eq(_current_screen_path(), MAIN_MENU, "Main Menu must lead back to the menu")
+
+
+func test_the_rules_screen_can_start_the_game_itself() -> void:
+	# The reason that screen has a Play on it at all: somebody who came to learn
+	# starts from where they are rather than walking back to press the same word
+	# again.
+	await _press_start()
+	await _press("HowToPlay")
+	await _press_play()
+	assert_eq(_current_screen_path(), PLAY_SCREEN, "Play on the rules screen must open the game")
 
 
 func test_the_game_is_silent_until_it_is_touched() -> void:
@@ -104,14 +159,25 @@ func test_the_game_is_silent_until_it_is_touched() -> void:
 	assert_eq(_bell().rings(), 0, "the game made a noise on its own")
 
 
-func test_start_rings_and_keeps_ringing_after_the_screen_it_was_pressed_on_is_gone() -> void:
-	# The failure this whole arrangement exists to prevent, and the one a
-	# screenshot cannot show: the title screen is removed *and freed* on the press
-	# that starts the game, so a bell owned by that screen would be freed
-	# mid-ding and Start would sound like a click. The host outlives every screen.
+func test_the_title_card_no_longer_rings_on_its_own_press() -> void:
+	# The bell means the job starts, and Start no longer starts a job. What that
+	# press still does is unlock the browser's audio — answered by the theme, two
+	# tests below, rather than by the counter bell.
 	await _press_start()
+	assert_eq(_current_screen_path(), MAIN_MENU, "the swap must have happened")
+	assert_eq(_bell().rings(), 0, "the menu was opened with a ding on it")
+
+
+func test_play_rings_and_keeps_ringing_after_the_screen_it_was_pressed_on_is_gone() -> void:
+	# The failure this whole arrangement exists to prevent, and the one a
+	# screenshot cannot show: the menu is removed *and freed* on the press that
+	# starts the game, so a bell owned by that screen would be freed mid-ding and
+	# Play would sound like a click. The host outlives every screen — which is
+	# also why moving the ding one screen down the flow cost nothing here.
+	await _press_start()
+	await _press_play()
 	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
-	assert_eq(_bell().rings(), 1, "Start rang no bell")
+	assert_eq(_bell().rings(), 1, "Play rang no bell")
 	assert_true(_bell().is_ringing(), "the bell was cut off with the screen that asked for it")
 
 
@@ -128,35 +194,72 @@ func test_touching_the_title_screen_starts_the_theme() -> void:
 	assert_true(_music().playing(), "the title screen never got its music")
 
 
-func test_start_fades_the_music_and_it_keeps_playing_after_the_screen_is_gone() -> void:
+func test_the_theme_carries_across_the_menu() -> void:
+	# The brief, end to end through the real player: the theme is unlocked on the
+	# title card and is still going while the player is choosing. This is the
+	# whole reason the fade moved off Start — and the reason it costs nothing to
+	# move it is that the [Bandstand] hangs off the host, so it survives both
+	# swaps without either screen handing it over.
+	await _touch()
+	assert_true(_music().playing(), "the title screen never got its music")
+	await _press_start()
+	assert_eq(_current_screen_path(), MAIN_MENU, "the swap must have happened")
+	assert_true(_music().playing(), "the theme was left behind on the title card")
+	assert_false(_music().fading(), "the menu is not the end of anything")
+
+
+func test_play_fades_the_music_and_it_keeps_playing_after_the_screen_is_gone() -> void:
 	# The failure this arrangement exists to prevent, and the sharper twin of the
-	# bell's: the title screen is removed *and freed* on the press that starts
-	# the game, so a fade owned by that screen would be killed on the first frame
-	# of itself and Start would cut the music dead instead of easing it out.
+	# bell's: the menu is removed *and freed* on the press that starts the game,
+	# so a fade owned by that screen would be killed on the first frame of itself
+	# and Play would cut the music dead instead of easing it out.
 	await _touch()
 	assert_true(_music().playing(), "nothing to fade")
 	await _press_start()
+	await _press_play()
 	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
 	assert_true(_music().playing(), "the music was cut off with the screen that asked for it")
 	assert_true(_music().fading(), "the music is playing on into the game instead of fading")
+
+
+func test_the_theme_survives_the_long_way_round_as_well() -> void:
+	# Three swaps instead of one. Nothing on the way to the rules and back asks
+	# the music for anything, so a player who reads first should arrive at the
+	# game with the same theme still playing that a player who did not heard.
+	await _touch()
+	await _press_start()
+	await _press("HowToPlay")
+	assert_true(_music().playing(), "the rules screen stopped the theme")
+	assert_false(_music().fading(), "reading is not leaving")
+	await _press_play()
+	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
+	assert_true(_music().fading(), "the rules screen's Play left the theme running into the game")
 
 
 func test_only_one_screen_is_mounted_at_a_time() -> void:
 	# The helper above already returns "" for any child count but one, so this
 	# is spelled out because of the bug it prevents: `queue_free()` without
 	# `remove_child()` leaves the outgoing screen drawn over the incoming one
-	# for the rest of the frame.
-	await _press_start()
+	# for the rest of the frame. Checked after every press of the walk, because
+	# there are three of them now and the bug only needs one to go wrong.
 	var host: Control = _main.get_node("%ScreenHost") as Control
-	assert_eq(host.get_child_count(), 1)
-
-
-func test_the_title_screen_does_not_come_along_into_the_game() -> void:
-	# The outgoing screen is removed *and* freed — see `main.gd`. A title screen
-	# still mounted would be drawn over the room and still be taking taps, which
-	# is the bug `test_only_one_screen_is_mounted_at_a_time` catches from the
-	# other side.
 	await _press_start()
+	assert_eq(host.get_child_count(), 1, "after Start")
+	await _press("HowToPlay")
+	assert_eq(host.get_child_count(), 1, "after How to Play")
+	await _press("MainMenu")
+	assert_eq(host.get_child_count(), 1, "after Main Menu")
+	await _press_play()
+	assert_eq(host.get_child_count(), 1, "after Play")
+
+
+func test_no_screen_comes_along_into_the_game() -> void:
+	# The outgoing screen is removed *and* freed — see `main.gd`. A menu still
+	# mounted would be drawn over the room and still be taking taps, which is the
+	# bug `test_only_one_screen_is_mounted_at_a_time` catches from the other side.
+	await _press_start()
+	await _press_play()
 	var host: Control = _main.get_node("%ScreenHost") as Control
 	assert_eq(host.get_child_count(), 1)
 	assert_false(host.get_child(0).has_node("%Start"), "the game has no Start button on it")
+	assert_false(host.get_child(0).has_node("%HowToPlay"), "nor a way back to the rules")
