@@ -9,8 +9,12 @@
 ##
 ## The car used to be one of those boxes, and then it was a CSG blockout in a
 ## 4.3 × 1.9 × 1.4 m envelope standing in for one. It is now a [MeshCar]: one of
-## the ten models in [code]assets/models/cars/[/code], picked at random and
-## painted at random every time this room is instanced. What it is made of is
+## the ten models in [code]assets/models/cars/[/code] — pinned to the sedan in
+## [code]src/world/mesh_car.tscn[/code] so a playtest gets the same car twice, and
+## painted at random every time this room is instanced. That pin is one line in
+## that scene file and the room is written as though it were not there: the
+## clearances below still have to hold for all ten, because the line is a
+## playtesting convenience and not a fact about the bay. What it is made of is
 ## [code]src/world/car.gd[/code]'s business and [code]src/world/mesh_car.gd[/code]'s;
 ## this scene only cares that it is a thing with a position and an outline.
 ##
