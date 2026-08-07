@@ -166,6 +166,13 @@ const WHEEL_PART: String = "Wheel"
 ## actually wants is not "the same car every run" but "this car" — so the door is
 ## the value itself. Nothing else about the pick is worth reproducing: it is one
 ## draw from ten, taken once.
+##
+## [b]The default here is empty and the scene beside it is not.[/b]
+## [code]src/world/mesh_car.tscn[/code] pins this to the sedan, so the game parks
+## the same car every run while the bay is being played rather than one of ten —
+## the reasoning is in that file, next to the line, where somebody changing it
+## will be. This default stays empty because it is what "nobody chose" means, and
+## it is the branch below that a test asking for a random car exercises.
 @export var style: String = ""
 
 ## What the windows are made of — see the class docs for why the pack's own near-
