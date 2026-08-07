@@ -23,12 +23,21 @@ var _rung: Array[Bell.Voice] = []
 var _faded: Array[float] = []
 var _window_size_before: Vector2i = Vector2i.ZERO
 var _muted_before: bool = false
+var _chosen_before: String = ""
 
 
 func before_each() -> void:
 	_requested = []
 	_rung = []
 	_faded = []
+	# This screen writes the player's car into [CarChoice] the moment it opens —
+	# it adopts whatever the bay drew — and the pick is process-wide, so a suite
+	# that walked away from one would decide which car every later suite's bay
+	# parks. Snapshotted before the screen exists and put back in after_each, the
+	# same care [member Sound.muted] gets above. Cleared as well as saved, so the
+	# tests below start from a run nobody has chosen in.
+	_chosen_before = CarChoice.chosen
+	CarChoice.forget()
 	# The menu's own toggle opens agreeing with whatever [Sound] was already at —
 	# see src/ui/sound_toggle.gd — so a suite that left the game muted would open
 	# this screen silenced too, for a reason that has nothing to do with this
@@ -64,6 +73,7 @@ func before_each() -> void:
 func after_each() -> void:
 	get_tree().root.size = _window_size_before
 	Sound.set_muted(_muted_before)
+	CarChoice.choose(_chosen_before)
 
 
 func _record(state: GameState) -> void:

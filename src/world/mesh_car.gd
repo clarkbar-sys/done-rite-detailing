@@ -167,12 +167,16 @@ const WHEEL_PART: String = "Wheel"
 ## the value itself. Nothing else about the pick is worth reproducing: it is one
 ## draw from ten, taken once.
 ##
-## [b]The default here is empty and the scene beside it is not.[/b]
-## [code]src/world/mesh_car.tscn[/code] pins this to the sedan, so the game parks
-## the same car every run while the bay is being played rather than one of ten —
-## the reasoning is in that file, next to the line, where somebody changing it
-## will be. This default stays empty because it is what "nobody chose" means, and
-## it is the branch below that a test asking for a random car exercises.
+## [b]Empty is what "nobody chose" means, and it is no longer the same thing as
+## "at random".[/b] [code]#142[/code] pinned this to the sedan in
+## [code]src/world/mesh_car.tscn[/code] so a playtest got the same car twice;
+## [code]#143[/code] took the pin out and gave the choice to the player instead,
+## which is [CarChoice] and the arrows on the menu. So an empty style now asks
+## that class what the player picked, and only falls back to a draw from
+## [constant STYLES] when nobody has picked yet — which is true for the one car
+## that is parked before any screen has offered a choice. What this export means
+## is unchanged: a car this is set on is that car, and the whole of what a caller
+## has to do is set it before the node enters the tree.
 @export var style: String = ""
 
 ## What the windows are made of — see the class docs for why the pack's own near-
@@ -187,7 +191,7 @@ const WHEEL_PART: String = "Wheel"
 
 func _ready() -> void:
 	if style.is_empty():
-		style = str(STYLES.pick_random())
+		style = CarChoice.for_the_next_car(STYLES)
 	_build(style)
 	# The paint colour is [Car]'s to pick and this class deliberately does not
 	# repeat it — but it can only be picked once there is a material to put it on,
@@ -197,6 +201,50 @@ func _ready() -> void:
 	if paint == null:
 		return
 	super()
+
+
+## Throws this car away and parks [param style_name] in its place, on a car that
+## is already standing in a room.
+##
+## [b]The one thing [member style] cannot do.[/b] That export is read once, in
+## [method Node._ready], which is the right contract for the car a game is played
+## with — it is chosen before the bay exists and never changes while somebody is
+## washing it. The menu is the exception and the reason this exists: the bay
+## behind it is a showroom, the arrows are a way to look at the other nine, and a
+## picker whose label says "Pickup" over a sedan is a picker that reads as broken.
+## The room drives this rather than a screen — see [method Garage.show_style],
+## which is also what re-sits the new car on the tarmac and puts fresh mud on it.
+##
+## [b]Removed and then freed, in that order, which is the whole of why this is
+## safe.[/b] [method Node.queue_free] is deferred, so panels freed alone would
+## still be children for the rest of the frame — and [method Car.panels] would
+## answer with fourteen of them, [method Car.bounds] would report a box around two
+## cars at once, and both old colliders and new would be in the physics space for
+## a tick. Removing first is immediate on all three counts. It is the same pairing
+## and the same argument [code]src/main/main.gd[/code] makes for swapping a
+## screen.
+##
+## [b]The paint carries over and the model does not.[/b] [method _build] hands
+## back a fresh copy of the pack's greyscale livery, so a car rebuilt without this
+## would come out unpainted — and re-rolling [constant Car.PAINT_COLORS] instead
+## would mean the colour changed every time somebody pressed an arrow, which turns
+## "look at the other nine" into a slot machine. What a player is comparing is the
+## shape, so the shape is the only thing that moves.
+func restyle(style_name: String) -> void:
+	if style_name == style:
+		return
+	var colour: Color = Color.WHITE if paint == null else paint.albedo_color
+	for panel: Node in get_children():
+		remove_child(panel)
+		panel.queue_free()
+	style = style_name
+	_build(style)
+	# A style with no model behind it has already been reported by `_build`, and
+	# what is standing here now is a car with no panels rather than a crash — the
+	# same failure mode `_ready` leaves behind, reached the same way.
+	if paint == null:
+		return
+	paint.albedo_color = colour
 
 
 ## Builds the panels of [param style_name] under this node: seven parts, each one

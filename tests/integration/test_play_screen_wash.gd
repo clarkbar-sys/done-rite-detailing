@@ -52,7 +52,28 @@ const WASH_FRAMES: int = 60
 ## this press is made with, and still 43 px inside the picture on the tallest car
 ## in the pack. [method _at_the_sky] re-asserts that second half on every use
 ## rather than trusting this table to stay true.
+##
+## [b]It is a floor now and not the answer.[/b] The table above is about the
+## roofline, and the roofline is not the only thing in the way: on the sport car
+## — 1.04 m tall, against an eye standing at 1.70 m — a press six tenths over the
+## roof is still below the person making it, so the ray goes [i]across[/i] the car
+## rather than up off it, finds the far flank, and washes it. Measured, on this
+## suite, before it was noticed: 0.15% of the mud gone and nine styles out of ten
+## green. [method _at_the_sky] climbs from here instead of pressing here.
 const CLEARS_THE_SWEEP: float = 0.6
+
+## How far the sky press climbs per step while it is looking for the top of the
+## picture, in metres. Five centimetres is finer than the difference any of this
+## turns on and 80 of them is four metres, which is twice the tallest car plus
+## the tallest eye — so the loop is bounded by the picture on every style rather
+## than by running out of steps.
+const SKY_STEP: float = 0.05
+const SKY_STEPS: int = 80
+
+## How far inside the edge of the picture that press has to stay, in design
+## pixels. A press on the last pixel of the frame is one rounding error from not
+## being a press, and this suite has already been round that loop once.
+const INSIDE_THE_FRAME: float = 8.0
 
 var _main: Control = null
 var _window_size_before: Vector2i = Vector2i.ZERO
@@ -184,15 +205,38 @@ func _at_the_car() -> Vector2:
 ## than assumed for the same reason: a press off the top of the frame is not a
 ## press at all, and the headroom above the roof is a different number on a
 ## minivan than on a sport car.
+##
+## [b]And it climbs rather than pressing at a fixed height, because no fixed
+## height exists.[/b] The press has to clear two things at once and they pull
+## opposite ways: high enough that the ray leaves over the car — which on the
+## lowest style means clearing an eye standing above its roof, not the roof —
+## and low enough to still be in the picture, where the tallest style has only a
+## few tenths of a metre of headroom left. [constant CLEARS_THE_SWEEP] records
+## both edges being a few tenths apart and car-dependent; [code]#143[/code],
+## which took the pin off the style and let the bay draw all ten again, is what
+## made that gap visible as a red suite one run in ten rather than as a comment.
+##
+## So the answer is measured on the car in front of it: start at the floor the
+## sweep needs, climb while the picture still has room, and press at the last
+## point that did. Measured over the ten, that lands 0.75 m (sport) to 1.20 m
+## (wagon) over the roofline, 9 to 20 px inside the top of the frame, and spends
+## no water on any of them.
 func _at_the_sky() -> Vector2:
 	var middle: Vector3 = _car().global_position
-	var over: Vector3 = Vector3(middle.x, _car().bounds().end.y + CLEARS_THE_SWEEP, middle.z)
-	var at: Vector2 = _on_screen(over)
 	var view: SubViewport = _camera().get_viewport() as SubViewport
+	var frame: Rect2 = Rect2(Vector2.ZERO, Vector2(view.size)).grow(-INSIDE_THE_FRAME)
+	var lift: float = _car().bounds().end.y + CLEARS_THE_SWEEP
+	var at: Vector2 = _on_screen(Vector3(middle.x, lift, middle.z))
 	assert_true(
-		Rect2(Vector2.ZERO, Vector2(view.size)).has_point(at),
+		frame.has_point(at),
 		"the press at %v is off the picture and would not be a press at all" % at
 	)
+	for _step: int in SKY_STEPS:
+		var higher: Vector2 = _on_screen(Vector3(middle.x, lift + SKY_STEP, middle.z))
+		if not frame.has_point(higher):
+			break
+		lift += SKY_STEP
+		at = higher
 	return at
 
 

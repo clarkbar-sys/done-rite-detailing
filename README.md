@@ -12,7 +12,10 @@ type-checks, boots headlessly, and exports a playable build — in your browser,
 or as a Linux binary — from CI. It opens on a title screen with the game
 already being played behind the card — a filthy car being washed, cleaned and
 buffed by nobody, in the bay you are about to stand in. Start opens a menu over
-that same bay, still working away behind it: **Play** drops you into the room,
+that same bay, still working away behind it — and that bay is the showroom: an
+arrow either side of the screen steps through the ten cars in the pack, the one
+you land on is parked behind the menu, and it is the one you drive off with.
+**Play** drops you into the room,
 standing beside the car with a tool in your hand, and **How to Play** is one
 screen of rules — four things you can do and the three passes a panel goes
 through — with its own way straight into the game, so reading first costs you
@@ -317,7 +320,8 @@ public issue for security reports.
 
 ## Credits
 
-The car the bay parks is one of ten styles baked out of
+The car the bay parks is whichever of ten styles you pick off the menu, baked
+out of
 **"Generic passenger car pack"** (https://skfb.ly/6sUFy) by **Comrade1280**,
 licensed under
 [Creative Commons Attribution 4.0](http://creativecommons.org/licenses/by/4.0/).

@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/screens/main_menu.gd" id="1_menu"]
 [ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
 [ext_resource type="Texture2D" path="res://assets/brand/done-rite-logo.png" id="3_logo"]
 [ext_resource type="Script" path="res://src/ui/sound_toggle.gd" id="4_sound"]
+[ext_resource type="Script" path="res://src/ui/car_arrow.gd" id="5_arrow"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -31,6 +32,55 @@ unique_name_in_owner = true
 layout_mode = 0
 script = ExtResource("4_sound")
 
+; The two ways through the pack, one against each edge of the screen and
+; vertically centred — see src/ui/car_arrow.gd for why the chevron is drawn
+; rather than typed, and src/screens/main_menu.gd for what a press does.
+;
+; Out here rather than in the column under the logo, and that is arithmetic
+; rather than taste. A row of arrows is a row a finger has to hit, so it is at
+; least TouchTarget.min_design_size() (164) tall; the column already runs 645 of
+; the design's 720 and the credit line owns the last 48 of those. There is no
+; height to give it. The edges, meanwhile, are the emptiest part of this screen
+; and are where a thumb already is on a phone held in two hands.
+;
+; 176 square: the height Play wears, comfortably over the 164 floor, and square
+; because dress_quiet cuts the pill round at the button's own height and a round
+; plate is what an icon rather than a caption goes on — the same shape and the
+; same reasoning as the sound toggle's corner. 12 in from the edge is
+; ToolBeltHud.MARGIN, which is what every other thing in this game pinned to a
+; screen edge stands off by.
+[node name="PreviousCar" type="Button" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(176, 176)
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 12.0
+offset_top = -88.0
+offset_right = 188.0
+offset_bottom = 88.0
+grow_vertical = 2
+script = ExtResource("5_arrow")
+backwards = true
+
+[node name="NextCar" type="Button" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(176, 176)
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -188.0
+offset_top = -88.0
+offset_right = -12.0
+offset_bottom = 88.0
+grow_horizontal = 0
+grow_vertical = 2
+script = ExtResource("5_arrow")
+
 ; `mouse_filter = 2` (ignore) rather than the engine's default `stop`: this is
 ; full-rect, so left at the default it would claim every point on the screen
 ; for itself — including the sound toggle's corner, where none of its own
@@ -55,22 +105,42 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 
-; 292x245 against the title card's 380x319: the lockup gives up a little height
-; so the second pill fits under it without the column running off a 720-tall
-; screen. Same picture, same card, same mipmapped filter — see
-; src/screens/title_screen.gd for why the filter is not this project's default.
+; 273x229 against the title card's 380x319: the lockup gives up height twice
+; over, once so the second pill fits under it and again so the car's name does,
+; and both times so the column does not run off a 720-tall screen into the credit
+; line along the bottom. 229 is 16 less than the 245 it was, which is exactly
+; what the name costs after the 20 px spacer it replaces is given back — so the
+; column is the same height it has been since the menu existed. Same picture,
+; same card, same mipmapped filter — see src/screens/title_screen.gd for why the
+; filter is not this project's default.
 [node name="Logo" type="TextureRect" parent="Center/Column/LogoCard"]
 unique_name_in_owner = true
 texture_filter = 4
-custom_minimum_size = Vector2(292, 245)
+custom_minimum_size = Vector2(273, 229)
 layout_mode = 2
 texture = ExtResource("3_logo")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Gap" type="Control" parent="Center/Column"]
-custom_minimum_size = Vector2(0, 20)
+; Which of the ten is parked behind this screen, and the only thing on it that
+; says so — the arrows either side are a picture and the bay itself is the
+; answer. Where the 20 px spacer used to be, doing its job as well as its own:
+; the column still needs air between the lockup and the first pill, and a line of
+; type in that air reads as a caption for the room rather than as a label
+; somebody had to find room for.
+;
+; The text here is a placeholder. main_menu.gd sets it from CarChoice.label_for
+; in `_ready`, before the first frame, exactly as it sets the build stamp — what
+; is in the file is what a scene-file reader should see rather than an empty
+; string.
+[node name="CarName" type="Label" parent="Center/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Sedan"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 ; The size Start wears on the title card, unchanged: this is the same press,
 ; one screen later.

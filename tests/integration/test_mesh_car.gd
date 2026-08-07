@@ -51,6 +51,22 @@ const LENGTH_M: Vector2 = Vector2(2.5, 6.5)
 const WIDTH_M: Vector2 = Vector2(1.4, 2.5)
 const HEIGHT_M: Vector2 = Vector2(0.9, 2.2)
 
+var _chosen_before: String = ""
+
+
+func before_each() -> void:
+	# Every car built here with an empty style asks [CarChoice] what the player
+	# picked, and the answer is process-wide — so a pick left behind by another
+	# suite would decide what "nobody chose" means in this one. Cleared going in
+	# and put back on the way out, the same care test_main_menu.gd takes over
+	# [member Sound.muted].
+	_chosen_before = CarChoice.chosen
+	CarChoice.forget()
+
+
+func after_each() -> void:
+	CarChoice.choose(_chosen_before)
+
 
 ## One car of [param style], in the tree and building itself on the way in.
 ##
@@ -381,7 +397,13 @@ func test_a_car_nobody_chose_a_style_for_picks_one_of_the_ten() -> void:
 	# colours. Asserted as membership rather than as a distribution — the pick is one
 	# draw from a list and a test that demanded variety would be a test that fails
 	# once in ten thousand runs for no reason.
+	#
+	# Forgotten between cars because the draw is a car per *game* and not per car:
+	# every screen builds its own room, so [CarChoice] takes the draw once and hands
+	# the same answer to the rest of the run. Without this the loop below would be
+	# twelve copies of one car, which is true and is not what this is asking.
 	for _each: int in range(12):
+		CarChoice.forget()
 		var car: MeshCar = _car_of("")
 		assert_has(MeshCar.STYLES, car.style, "an unasked-for car is not one of the ten")
 
@@ -397,3 +419,90 @@ func test_the_style_is_readable_after_the_car_is_built() -> void:
 	assert_string_contains(
 		livery.albedo_texture.resource_path, car.style, "the model is not the style it claims"
 	)
+
+
+func test_a_car_nobody_chose_a_style_for_is_the_one_the_player_picked() -> void:
+	# What #143 put where the scene file's pin used to be, and the only change to
+	# what an empty style means: it is still "nobody set this export", but the
+	# question it now asks is the menu's rather than a random number generator's.
+	# Every style, because the plumbing has no business caring which.
+	for style: String in MeshCar.STYLES:
+		CarChoice.choose(style)
+		assert_eq(_car_of("").style, style, "the bay ignored the player and parked something else")
+
+
+func test_a_style_set_on_the_car_still_beats_the_player() -> void:
+	# The export's contract, unchanged and worth pinning precisely because there is
+	# now something else with an opinion. Every suite in this repo that asks for a
+	# particular car — this one, test_garage_styles.gd, test_mesh_car_hits.gd —
+	# depends on the export winning.
+	CarChoice.choose("pickup")
+	assert_eq(_car_of("minivan").style, "minivan", "a car asked for by name must be that car")
+
+
+# ---- swapping one for another, in place ---------------------------------------
+
+
+func test_a_car_can_be_restyled_where_it_stands() -> void:
+	# What the menu's arrows are made of. The car is already in a room by then —
+	# parked, aimed at, walked around — so the swap has to happen under all of that
+	# rather than by building a second car somewhere.
+	var car: MeshCar = _car_of("sedan")
+	car.restyle("pickup")
+	assert_eq(car.style, "pickup", "the readout must agree with what was asked for")
+	var skin: MeshInstance3D = car.skin_of(_panel(car, MeshCar.BODY_PART)) as MeshInstance3D
+	var livery: StandardMaterial3D = skin.mesh.surface_get_material(0) as StandardMaterial3D
+	assert_string_contains(
+		livery.albedo_texture.resource_path, "pickup", "the model is not the style it claims"
+	)
+
+
+func test_the_car_it_replaces_is_gone_the_same_frame() -> void:
+	# The bug this is here for: `queue_free` alone is deferred, so panels freed and
+	# not removed would still be children for the rest of the frame — `panels()`
+	# would answer with fourteen, `bounds()` would report a box drawn round two
+	# cars at once, and the room re-sits the car on the tarmac from that box on the
+	# very next line of Garage.show_style. No await, because the whole claim is
+	# that a frame is not needed.
+	var car: MeshCar = _car_of("compact")
+	var before: AABB = car.bounds()
+	car.restyle("pickup")
+	assert_eq(car.panels().size(), PARTS.size(), "the old car is still hanging off this one")
+	# The pack is +Z forward, so length is the z of the box: 3.26 m of compact
+	# against 5.19 m of pickup. A box still drawn round both of them would be the
+	# longer of the two either way, which is why the compact goes in first.
+	var after: AABB = car.bounds()
+	assert_gt(after.size.z, before.size.z, "the pickup is longer than the compact it replaced")
+
+
+func test_a_restyled_car_keeps_the_colour_it_was_painted() -> void:
+	# `_build` hands back a fresh copy of the pack's greyscale livery, so a rebuild
+	# that did nothing about it would come out unpainted — and re-rolling the colour
+	# instead would turn "look at the other nine" into a slot machine. What the
+	# player is comparing across a press is the shape.
+	var car: MeshCar = _car_of("sedan")
+	var colour: Color = car.paint.albedo_color
+	car.restyle("minivan")
+	assert_eq(car.paint.albedo_color, colour, "the car was repainted for changing shape")
+
+
+func test_a_restyled_car_is_painted_at_all() -> void:
+	# The half the test above cannot see: it compares the new material against a
+	# colour, and a rebuild that left `paint` pointing at the old car's material
+	# would pass it while every panel on screen stayed grey. Asserted through a
+	# panel's own override, which is what is actually drawn.
+	var car: MeshCar = _car_of("sedan")
+	car.restyle("suv")
+	var skin: MeshInstance3D = car.skin_of(_panel(car, MeshCar.BODY_PART)) as MeshInstance3D
+	assert_eq(skin.get_surface_override_material(0), car.paint, "the new body is not this car's")
+
+
+func test_restyling_to_the_car_that_is_already_there_does_nothing() -> void:
+	# Which is what makes the menu's "adopt whatever the room drew" call free: it
+	# runs on the way into every menu and must not rebuild a car that is already
+	# correct. Asserted on the panels themselves rather than on the style string,
+	# because the string would agree either way.
+	var car: MeshCar = _car_of("wagon")
+	var panels: Array[Node3D] = car.panels()
+	car.restyle("wagon")
+	assert_eq(car.panels(), panels, "the car was rebuilt for no reason")
