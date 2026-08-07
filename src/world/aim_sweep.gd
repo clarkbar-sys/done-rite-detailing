@@ -21,9 +21,11 @@
 ## [code]surface: false[/code] into real hits that can be worked. The press it was
 ## built for is the one the game creates for itself: [ThumbLift] deliberately
 ## takes the aim a thumb's width up the glass from the finger, and a thumb on the
-## flank of a 1.4 m car routinely sends the ray just over the roofline. The wheel
-## arches and the wing mirrors are the same shape of problem from the other
-## direction — geometry thin enough for a zero-width ray to thread.
+## flank of a low car routinely sends the ray just over the roofline — a sport car
+## is 1.04 m tall and the blockout this was measured on was 1.4 m. The wheel
+## arches and the gap between a tyre and its sill are the same shape of problem
+## from the other direction — geometry thin enough for a zero-width ray to
+## thread.
 ##
 ## [b]It is not the primary query, and that is deliberate.[/b] A swept sphere
 ## stops at the first thing it touches, which is not the same as the thing you

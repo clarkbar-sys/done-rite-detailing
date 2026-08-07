@@ -4,22 +4,25 @@
 ; each Surface.Kind (two of bodywork), at round numbers a test can do arithmetic
 ; with in its head.
 ;
-; WHY THIS EXISTS. src/world/car.tscn is a blockout that is going to be replaced
-; by real geometry, and a test that says "wash the Hood" is a test that breaks
-; when somebody renames a panel or reshapes the nose — for reasons that have
-; nothing to do with washing. Everything about the rules of the job (a cleaner
-; needs bare paint, the wrong bottle does nothing, a hit reaches the right map)
-; is true of any car at all, so those tests use this one and stop caring what the
-; game's car looks like.
+; WHY THIS EXISTS. A test that says "wash the Hood" is a test that breaks when
+; somebody renames a panel or reshapes the nose — for reasons that have nothing
+; to do with washing. It was written while the game's car was still a blockout
+; waiting to be replaced by real geometry, and #139 replaced it: the driveway now
+; parks one of ten imported models, picked at random, and "the Hood" is not even
+; a panel on any of them. Everything about the rules of the job (a cleaner needs
+; bare paint, the wrong bottle does nothing, a hit reaches the right map) is true
+; of any car at all, so those tests use this one and stop caring what the game's
+; car looks like — which turned out to be worth rather more than it cost.
 ;
 ; WHAT IT DELIBERATELY DOES NOT REPLACE. Anything that measures the real car:
 ; the camera's clearance around it, the viewmodel's reach across it, the standoff
 ; hugging its outline. Those tests are supposed to go red when the art changes —
 ; that is the bug they exist to catch — and pointing them at a fixture would
-; delete their reason to exist. tests/integration/test_car.gd stays on the real
-; scene too, because it is the contract between this file and reality: it is
-; what fails if the groups come off the real car's glass while every test in here
-; goes on passing.
+; delete their reason to exist. tests/integration/test_mesh_car.gd and
+; tests/integration/test_garage_styles.gd stay on the real thing for that reason,
+; and so does tests/integration/test_car.gd on the blockout beside this file: it
+; is the contract between a fixture and reality, and it is what fails if the
+; groups come off a real car's glass while every test in here goes on passing.
 ;
 ; It runs the real Car script rather than a stand-in, so panels(), kind_of() and
 ; the paint all behave exactly as they do in the game. What is fake here is the

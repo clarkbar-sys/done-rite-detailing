@@ -101,10 +101,10 @@ var _skins: Array[GeometryInstance3D] = []
 ##
 ## [b]The one thing here that runs on a clock.[/b] Everything else in this class
 ## happens because a tool was held; a flash happens because one was held a moment
-## ago, and something has to take it away again. It is a loop over twelve panels
-## doing a single integer comparison each while nothing is lit — [method
+## ago, and something has to take it away again. It is a loop over the car's
+## panels doing a single integer comparison each while nothing is lit — [method
 ## PatchFlash.fade] returns early and uploads nothing — so an untouched car costs
-## a dozen branches a frame rather than a dozen texture uploads.
+## a handful of branches a frame rather than a handful of texture uploads.
 func _process(delta: float) -> void:
 	for flash: PatchFlash in _flashes:
 		flash.fade(delta)
@@ -185,8 +185,8 @@ func flash_of(panel: Node) -> PatchFlash:
 ## panel equally rather than weighted by area.
 ##
 ## Unweighted deliberately: a mask is the same number of texels whatever size the
-## panel is, so "half the car" here means half the texels, and a wing mirror
-## counts as much as a door. That is the wrong answer for a score and the right
+## panel is, so "half the car" here means half the texels, and a wheel counts as
+## much as the whole shell. That is the wrong answer for a score and the right
 ## one for a progress bar over a fixed amount of work, which is what this is
 ## while there is nothing spending it.
 func remaining() -> float:
@@ -230,8 +230,10 @@ func shine() -> float:
 ## three readings above it. Those answer "how far through is the car", so a
 ## panel-average is the honest shape and a car with one spotless wing is not
 ## finished. This answers "how much has been done", and half a patch of washing
-## is half a patch of washing whichever panel it happened on — dividing by twelve
-## would make the same stroke worth less on a car with more pieces.
+## is half a patch of washing whichever panel it happened on — dividing by the
+## panel count would make the same stroke worth less on a car with more pieces,
+## which is exactly the trap the swap from a twelve-panel blockout to a
+## seven-panel model would have sprung.
 ##
 ## Monotonic, so a caller reads it twice and pays for the difference. That is the
 ## whole intended use: cleaning is a thing that is true across frames rather than

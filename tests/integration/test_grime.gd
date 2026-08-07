@@ -4,7 +4,7 @@
 ## car.[/b] Nothing here is a statement about the blockout: that a hit reaches the
 ## right map, that a bottle needs bare paint, that each panel is told what its
 ## product looks like — all of it is true of any car with a panel, a window and a
-## wheel. Running it against [code]src/world/car.tscn[/code] bought nothing and
+## wheel. Running it against [code]tests/fixtures/blockout_car.tscn[/code] bought nothing and
 ## cost a suite full of [code]"Hood"[/code] and [code]"WheelFrontLeft"[/code],
 ## which is a suite that goes red the day somebody renames a panel for reasons
 ## that have nothing to do with grime. The fixture's own docs have the split, and

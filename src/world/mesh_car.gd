@@ -7,7 +7,7 @@
 ## inherited unchanged and are the whole of what the garage, the grime and the
 ## tools consume — [Car]'s class docs are where the four points of that contract
 ## are argued, and the paragraph in them that begins "A mesh car is therefore a
-## [StaticBody3D] parked where each [CSGCombiner3D] is today" is a description of
+## [StaticBody3D] parked where each [CSGCombiner3D] stood" is a description of
 ## this file. So this class is not a second kind of car; it is the same car with
 ## its geometry arriving from a [code].glb[/code] instead of from a scene file,
 ## and everything it does happens before the first frame the rest of the game
@@ -17,9 +17,11 @@
 ## four methods above are already about "a root a ray can hand back, with a skin
 ## under it" and neither of them mentions CSG. A common base would be [Car] with
 ## the word [code]Car[/code] taken off it and two files where there is one. It
-## also keeps [code]#139[/code] — swapping this into the driveway — a change of
-## which scene [code]%Car[/code] instances and nothing else, because
-## [code]src/world/garage.gd[/code] types that reference [Car] and this is one.
+## also kept [code]#139[/code] — swapping this into the driveway — down to which
+## scene [code]%Car[/code] instances, because [code]src/world/garage.gd[/code]
+## types that reference [Car] and this is one. The one thing it did cost the room
+## is that the ten styles are ten heights, so where the car sits on the tarmac had
+## to stop being a number in a scene file — see [code]Garage._park_the_car[/code].
 ##
 ## [b]What the pack hands over.[/b] [code]scripts/build-car-pack.py[/code] bakes
 ## each style into exactly seven [MeshInstance3D]s under one [Node3D] — [code]Body[/code],
@@ -40,8 +42,8 @@
 ##
 ## [b]The colliders are trimeshes, generated at load.[/b] [method Mesh.create_trimesh_shape]
 ## turns a part's own triangles into a [ConcavePolygonShape3D], so the thing a tool
-## hits is the thing the player can see — down to the wheel arches, the mirrors and
-## the gap between a tyre and its sill. Measured on this hardware: 7,122 triangles
+## hits is the thing the player can see — down to the wheel arches and the gap
+## between a tyre and its sill. Measured on this hardware: 7,122 triangles
 ## for the whole sedan in 2.8 ms, 7,951 for the SUV in 3.4 ms. That is one frame's
 ## worth of work, once, for the one car a game has, which is why it is not baked
 ## into ten [code].tres[/code] files sitting beside the [code].glb[/code]s: those
@@ -104,7 +106,7 @@
 ##
 ## [b]The glass is repainted outright[/b], because the pack's is near-black at 68%
 ## alpha and this game decided otherwise in [code]#58[/code]: a light bluish-green,
-## the same numbers [code]src/world/car.tscn[/code] gives the blockout's windows.
+## the same numbers [code]tests/fixtures/blockout_car.tscn[/code] gives the blockout's windows.
 ## Opaque, and that is the deliberate half — these bodies are shells with no
 ## interior, so a see-through windscreen shows the inside of the far door. Culling
 ## stays off, which is the pack's own setting for a shell with no thickness.

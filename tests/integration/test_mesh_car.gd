@@ -33,7 +33,7 @@ const PARTS: Array[String] = ["Body", "Glass", "Optics", "Wheel1", "Wheel2", "Wh
 const WHEELS: Array[String] = ["Wheel1", "Wheel2", "Wheel3", "Wheel4"]
 
 ## The look this game settled on for glass in #58, and the numbers
-## [code]src/world/car.tscn[/code] gives the blockout's windows.
+## [code]tests/fixtures/blockout_car.tscn[/code] gives the blockout's windows.
 const GLASS_COLOR: Color = Color(0.35, 0.62, 0.58, 1.0)
 
 ## A centimetre. The same tolerance [code]tests/integration/test_car.gd[/code]
@@ -338,7 +338,7 @@ func test_the_suv_s_hub_caps_are_painted_with_the_car() -> void:
 func test_the_windows_are_the_light_bluish_green_this_game_settled_on() -> void:
 	# #58, against the pack, which ships its glass near-black at 68% alpha — the
 	# exact look that issue was filed about. The numbers are the blockout's
-	# (src/world/car.tscn), so the two cars' windows match while both exist.
+	# (tests/fixtures/blockout_car.tscn), so the two cars' windows match while both exist.
 	for style: String in MeshCar.STYLES:
 		var car: MeshCar = _car_of(style)
 		var glass: MeshInstance3D = car.skin_of(_panel(car, MeshCar.GLASS_PART)) as MeshInstance3D

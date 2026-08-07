@@ -1,4 +1,21 @@
-## Integration test for the car — the CSG blockout that replaced the green box.
+## Integration test for the blockout — the CSG car that replaced the green box,
+## and that the driveway parked until [code]#139[/code] put a real model there.
+##
+## [b]It is a fixture now, and this suite is why it is still worth having.[/b]
+## [code]tests/fixtures/blockout_car.tscn[/code] is the only car in the repo that
+## answers the panel contract out of CSG — geometry that generates its own body,
+## with the groups authored on the nodes rather than read off a name — and
+## [code]src/world/car.gd[/code]'s class docs claim that contract holds for both
+## kinds of car. Half of that claim is checked here and the other half in
+## [code]tests/integration/test_mesh_car.gd[/code]. Delete this file and the CSG
+## half becomes a paragraph nobody can fail.
+##
+## What it is [i]not[/i] any more is a test of the car the player washes. The
+## shape assertions below say "this fixture is still the 4.3 × 1.9 × 1.4 m car
+## every clearance in [code]src/world/garage.gd[/code] was first tuned against",
+## which is a fact about a reference and no longer a fact about the game.
+## [code]tests/integration/test_garage_styles.gd[/code] is where the shot is held
+## against the car that actually ships.
 ##
 ## Under tests/integration/ because every assertion here needs a frame to have
 ## happened: CSG meshes are built deferred, so a panel has no [AABB] to give
@@ -8,7 +25,7 @@
 ## and pinned by its own test rather than left to be rediscovered.
 extends GutTest
 
-const CAR: String = "res://src/world/car.tscn"
+const CAR: String = "res://tests/fixtures/blockout_car.tscn"
 
 ## Close enough for a blockout: a centimetre. The shape is a design decision
 ## being asserted, not arithmetic — the tolerances elsewhere are 0.0001 because
@@ -16,8 +33,11 @@ const CAR: String = "res://src/world/car.tscn"
 const TOLERANCE: float = 0.01
 
 ## What the green box was, and what the room, the camera's standing distance and
-## every clearance in the suite were tuned against. The blockout is allowed to be
-## any shape it likes inside this; it is not allowed to grow.
+## every clearance in the suite were first tuned against. The blockout is allowed
+## to be any shape it likes inside this; it is not allowed to grow. Kept as an
+## assertion after the blockout became a fixture, because a reference that has
+## quietly changed size is worse than no reference: half the numbers in
+## [code]src/world/garage.gd[/code] cite it.
 const LENGTH: float = 4.3
 const WIDTH: float = 1.9
 const HEIGHT: float = 1.4
@@ -224,7 +244,7 @@ func test_a_panel_can_be_baked_to_a_real_mesh() -> void:
 
 
 func test_the_glass_panels_are_glass() -> void:
-	# Read off groups set in `car.tscn` rather than off panel names — see
+	# Read off groups set in `blockout_car.tscn` rather than off panel names — see
 	# [method Car.kind_of]. What this pins is that the groups are actually on the
 	# nodes, which is the half of that arrangement a script cannot check itself.
 	for named: String in ["Windshield", "RearGlass", "SideGlass"]:
@@ -261,15 +281,18 @@ func test_every_panel_of_the_car_has_a_cleaner_for_it() -> void:
 		assert_true(belt.index_of(cleaner) >= 0, "%s has no cleaner on the belt" % panel.name)
 
 
-func test_the_real_car_carries_every_kind_the_fixture_stands_in_for() -> void:
-	# THE CONTRACT BETWEEN THE FIXTURE AND REALITY, and the reason this file stays
-	# on `src/world/car.tscn` while `test_grime.gd` moved off it.
+func test_a_whole_car_carries_every_kind_the_fixture_stands_in_for() -> void:
+	# THE CONTRACT BETWEEN A FIXTURE AND A WHOLE CAR, and the reason this file
+	# stays on `tests/fixtures/blockout_car.tscn` while `test_grime.gd` moved off
+	# it.
 	#
 	# The rules of the job are tested against `tests/fixtures/plain_car.tscn`,
 	# which has a slab of each kind and always will. That is only safe while the
-	# real car also has one of each — the day somebody re-models the glass and the
-	# group does not come with it, every test over there goes on passing and the
-	# window cleaner stops working in the game. This is what fails instead.
+	# cars the game builds also have one of each — the day somebody re-models the
+	# glass and the group does not come with it, every test over there goes on
+	# passing and the window cleaner stops working in the game. This is what fails
+	# instead, for the blockout; `test_mesh_car.gd` holds the same property over
+	# all ten styles of the car that ships.
 	#
 	# By kind and not by name on purpose: renaming a panel is allowed, losing a
 	# whole surface is not.
@@ -278,7 +301,7 @@ func test_the_real_car_carries_every_kind_the_fixture_stands_in_for() -> void:
 		for panel: Node3D in _car.panels():
 			if _car.kind_of(panel) == kind:
 				found += 1
-		assert_gt(found, 0, "the real car has no panel of kind %d left" % kind)
+		assert_gt(found, 0, "this car has no panel of kind %d left" % kind)
 
 
 # ---- trim: seen, never cleaned -------------------------------------------------
@@ -298,7 +321,7 @@ func test_the_trim_is_on_the_car_but_is_not_a_panel() -> void:
 
 
 func test_marking_a_node_trim_covers_everything_under_it() -> void:
-	# The property that lets `car.tscn` put the group on two combiners instead of
+	# The property that lets `blockout_car.tscn` put the group on two combiners instead of
 	# on sixteen brushes. Built here rather than read off the car, because what is
 	# being pinned is _gather's behaviour and not the scene's current shape: a
 	# plain Node3D holding CSG is a grouping somebody could add in the editor
@@ -311,6 +334,28 @@ func test_marking_a_node_trim_covers_everything_under_it() -> void:
 	_car.add_child(holder)
 	assert_eq(_car.panels().size(), before, "a trim node hides its children as well as itself")
 	holder.queue_free()
+
+
+func test_every_panel_of_the_blockout_is_something_a_ray_can_find() -> void:
+	# A CSG mesh is invisible to a raycast unless the panel asks for collision, and
+	# a standoff cast at a car like that measures nothing, finds no hit and holds
+	# whatever radius it started with — a bug that looks exactly like the feature
+	# not being wired up. It is a property on each panel, so it can be forgotten
+	# one panel at a time.
+	#
+	# [method Car.panels] deliberately does not read the flag — see its docs: a
+	# panel with the box unticked has to fail here rather than quietly leave the
+	# car. This lived in `tests/integration/test_garage.gd` while the blockout was
+	# what the driveway parked, and moved here with the blockout: the room's copy
+	# is now the same assertion about a StaticBody3D with a shape in it, which is
+	# how a mesh car answers the same half of the contract.
+	var panels: Array[Node3D] = _car.panels()
+	assert_gt(panels.size(), 0, "the car needs panels")
+	for panel: Node3D in panels:
+		var shape: CSGShape3D = panel as CSGShape3D
+		assert_not_null(shape, "%s is not CSG; this file is the blockout's" % panel.name)
+		if shape != null:
+			assert_true(shape.use_collision, "%s must be something a ray can hit" % panel.name)
 
 
 func test_the_trim_has_no_collider_for_a_tool_to_find() -> void:

@@ -157,23 +157,34 @@ func test_steering_a_room_nobody_is_standing_in_is_ignored() -> void:
 
 
 func test_every_panel_of_the_car_is_something_a_ray_can_find() -> void:
-	# A CSG mesh is invisible to a raycast unless the panel asks for collision,
-	# and the standoff would then measure nothing, find no hit, and hold whatever
-	# radius it started with — a bug that looks exactly like the feature not being
-	# wired up. It used to be one hand-built box shape that could go stale; it is
-	# now a property on each panel that can be forgotten one panel at a time.
+	# Geometry is invisible to a raycast unless something arms it, and the standoff
+	# would then measure nothing, find no hit, and hold whatever radius it started
+	# with — a bug that looks exactly like the feature not being wired up. It used
+	# to be one hand-built box shape that could go stale; it is now something each
+	# panel has to carry, which can be forgotten one panel at a time.
 	#
-	# [method Car.panels] deliberately does not read the flag — see its docs: a
-	# panel with the box unticked has to fail here rather than quietly leave the
-	# car. So this is where the blockout's half of the contract is held, and it is
-	# a CSG assertion about a CSG car, cast to say so.
+	# [method Car.panels] deliberately does not read that — see its docs: a panel
+	# that cannot be hit has to fail here rather than quietly leave the car. So
+	# this is where the parked car's half of the contract is held, and it is a
+	# mesh-car assertion about a mesh car, cast to say so. The blockout's half is
+	# `use_collision` and is held in `tests/integration/test_car.gd`.
+	#
+	# The shape, and not merely the body: a StaticBody3D with an empty
+	# CollisionShape3D under it is a node the physics server knows about and a ray
+	# passes straight through, which is the failure this is looking for.
 	var panels: Array[Node3D] = _car().panels()
 	assert_gt(panels.size(), 0, "the car needs panels")
 	for panel: Node3D in panels:
-		var shape: CSGShape3D = panel as CSGShape3D
-		assert_not_null(shape, "%s is not CSG; this test is about the blockout" % panel.name)
-		if shape != null:
-			assert_true(shape.use_collision, "%s must be something a ray can hit" % panel.name)
+		var body: StaticBody3D = panel as StaticBody3D
+		assert_not_null(body, "%s is not a body; this test is about the mesh car" % panel.name)
+		if body == null:
+			continue
+		var armed: int = 0
+		for child: Node in body.get_children():
+			var collider: CollisionShape3D = child as CollisionShape3D
+			if collider != null and collider.shape != null:
+				armed += 1
+		assert_gt(armed, 0, "%s must be something a ray can hit" % panel.name)
 
 
 func test_the_standoff_ray_finds_the_car_and_can_name_what_it_hit() -> void:
@@ -202,15 +213,37 @@ func test_the_standoff_ray_finds_the_car_and_can_name_what_it_hit() -> void:
 	assert_not_null(panel, "what a ray hits must be a node in the room")
 	assert_true(_car().panels().has(panel), "what a ray hits must be a panel of the car")
 	if panel != null:
-		assert_eq(panel.name, &"Body", "level at mid-height, side on, the ray meets the tub")
+		# Whichever of the ten is parked today. Mid-height on a car is the door
+		# skin — below the glass and above the sill — on every style in the pack,
+		# which is the property that lets the standoff measure a vertical face from
+		# any eye height. A style whose greenhouse reached down to its own middle
+		# would fail here, and would deserve to.
+		assert_eq(panel.name, &"Body", "level at mid-height, side on, the ray meets the flank")
+
+
+func test_the_car_is_sat_on_the_tarmac_and_not_in_it() -> void:
+	# What Garage._park_the_car buys, and the thing the scene file used to say with
+	# a single 0.7 that was really half the blockout's height. The ten styles are
+	# 1.04 m to 1.77 m tall and all of them are authored about their own middle, so
+	# a fixed lift sinks the tall ones and floats the short ones — 18 cm either
+	# way, which is a wheel through the drive.
+	#
+	# The floor is read off the driveway rather than assumed to be zero, for the
+	# same reason `_ground_half_width` reads the grass: the room is allowed to move
+	# and this is a statement about the two of them together.
+	var drive: Node3D = _garage.get_node("View/World/Ground/Driveway") as Node3D
+	var tarmac: float = drive.position.y + drive.scale.y * 0.5
+	var box: AABB = _car().bounds()
+	assert_gt(box.size.y, 0.0, "a car with no box is not parked anywhere")
+	assert_almost_eq(box.position.y, tarmac, TOLERANCE, "the tyres must be on the drive")
 
 
 func test_no_panel_is_scaled() -> void:
 	# The rule the old hand-built collider existed to satisfy, now enforced across
 	# every panel instead: a non-uniformly scaled shape is the one thing the
-	# physics server asks not to be handed, and CSG generates its body from the
-	# panel's own transform. The room's walls are unit boxes scaled into place;
-	# the car is authored at its real size precisely so this never comes up.
+	# physics server asks not to be handed, and a panel's collider is generated
+	# from the panel's own transform. The room's walls are unit boxes scaled into
+	# place; the car is authored at its real size precisely so this never comes up.
 	for panel: Node3D in _car().panels():
 		var scaling: Vector3 = panel.global_transform.basis.get_scale()
 		assert_almost_eq(

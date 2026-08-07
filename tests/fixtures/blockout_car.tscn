@@ -1,5 +1,52 @@
 [gd_scene format=3]
 
+; The blockout: the CSG car the whole game was designed, measured and tuned
+; against, kept as a fixture now that the driveway parks a real one.
+;
+; WHY IT IS STILL HERE. It was src/world/car.tscn until #139, and it is the only
+; car in the repo that answers the panel contract out of CSG — twelve
+; CSGCombiner3D roots, each generating its own body from its own brushes, with
+; the groups authored on the nodes in the editor. src/world/car.gd's class docs
+; argue that a panel is "a root a ray can hand back, with a skin under it" and
+; that CSG satisfies all four points of that by accident of what a CSGShape3D
+; is; this file is the evidence, and deleting it would leave that whole half of
+; the contract untested the first time somebody simplified Car.skin_of into
+; "the MeshInstance3D under the body".
+;
+; It is also the shape every number in src/world/garage.gd was chosen against,
+; which is worth being able to load and measure when one of those numbers is
+; questioned. Its dimensions used to be written down in src/world/car.gd's class
+; docs and have moved here with the geometry they describe, because nothing in
+; the game may assume them any more:
+;
+;   overall          4.30 long, 1.90 wide, 1.40 tall   (the box's own size, kept)
+;   wheelbase        2.70          front axle +1.38, rear axle -1.32
+;   wheels           r 0.33, 0.22 wide, centres at x ±0.79
+;   beltline         0.95 above the ground; roof 1.40
+;   windscreen       33° from horizontal; backlight 46°
+;   tumblehome       15°, so a 1.66 m greenhouse is 1.44 m across the roof
+;   mirrors          reach x ±1.04, the only parts wider than the body
+;
+; Authored about its own middle, like every car in this game: local y=0 is
+; mid-height, ground is y=-0.70, the roof is y=+0.70, and +Z is the front.
+; src/world/car.gd has why that convention exists and who depends on it.
+;
+; THE TUB IS TWO EXTRUSIONS, not a stack of boxes. Body/Profile is the side
+; silhouette — bumpers, sills, the dip under the bonnet, the rise to the
+; beltline — extruded the full width of the car, and Body/Plan is the top-down
+; silhouette intersected with it. Two brushes, and the result tapers at the nose
+; and the tail and is widest through the doors, which is the thing that reads as
+; "car" from across a room. Stacking boxes instead gets a wedding cake, and
+; rotating boxes to chamfer each corner takes four brushes to do worse.
+;
+; WHAT IT IS NOT. It is not the game's car and nothing under src/ instances it.
+; tests/* is excluded from both export presets, so moving it here is also what
+; takes twelve CSG panels and their six materials out of the shipped bundle.
+;
+; tests/integration/test_car.gd is its suite. tests/fixtures/plain_car.tscn is
+; the one to reach for when a test needs *a* car rather than *this* car — see
+; that file's header for the split.
+
 [ext_resource type="Script" path="res://src/world/car.gd" id="1_1nwee"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i0fu5"]

@@ -41,7 +41,7 @@ enum Kind {
 	WHEEL,
 }
 
-## The group that marks a panel as glass in [code]src/world/car.tscn[/code].
+## The group that marks a panel as glass in [code]tests/fixtures/blockout_car.tscn[/code].
 const GLASS_GROUP: String = "glass"
 
 ## The group that marks a panel as a wheel.

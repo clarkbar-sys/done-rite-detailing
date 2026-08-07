@@ -7,14 +7,14 @@
 ; a copy of the pack's own material rather than a sub-resource in here.
 ;
 ; It is named "Car" and not "MeshCar" on purpose. The garage instances one of
-; these under the unique name %Car and types it as a Car, so the day this replaces
-; the blockout (#139) the whole of that change is which scene the instance points
-; at.
+; these under the unique name %Car and types it as a Car, so replacing the
+; blockout with it (#139) was a change of which scene that instance points at and
+; nothing else in the room's own tree.
 
 [ext_resource type="Script" path="res://src/world/mesh_car.gd" id="1_meshcar"]
 
 ; The windows, and one of the two materials on the car that this game supplies
-; rather than the pack. Light bluish-green — the same numbers src/world/car.tscn
+; rather than the pack. Light bluish-green — the same numbers tests/fixtures/blockout_car.tscn
 ; gives the blockout's glass, which is where the decision was taken (#58) after
 ; near-black windows read as holes in the car rather than as glass.
 ;

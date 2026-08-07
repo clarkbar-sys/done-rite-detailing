@@ -32,6 +32,28 @@ const RESOLVE_FRAMES: int = 4
 ## are about whether water is flowing rather than about how fast.
 const WASH_FRAMES: int = 60
 
+## How far over the roofline a press has to aim, in metres, to be past every tier
+## that answers off real geometry — see [method _at_the_sky].
+##
+## [b]Measured across all ten styles at the design resolution, at the settled
+## shot, rather than reasoned about[/b] — because the two edges it has to sit
+## between are only a few tenths of a metre apart and neither of them is the same
+## number on every car:
+##
+## [codeblock]
+## 0.3   the exact ray misses all ten, and a 0.4 m sweep catches all ten
+## 0.4   a 0.4 m sweep still catches the three tallest (minivan, offroad, pickup)
+## 0.5   everything misses, and the press is 66 to 152 px down the frame
+## 0.6   everything misses, and the press is 43 to 130 px down the frame
+## 0.8   everything misses, and the press is 3 px ABOVE the top of it on a minivan
+## [/codeblock]
+##
+## Six tenths: half again the power wash's own 0.4 m window, which is the tool
+## this press is made with, and still 43 px inside the picture on the tallest car
+## in the pack. [method _at_the_sky] re-asserts that second half on every use
+## rather than trusting this table to stay true.
+const CLEARS_THE_SWEEP: float = 0.6
+
 var _main: Control = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
@@ -141,17 +163,36 @@ func _at_the_car() -> Vector2:
 	return _on_screen(_car().global_position)
 
 
-## Just over the roof: a press that hits nothing, and so one the room answers
-## with the nearest bodywork rather than with a hit.
+## Well over the roof: a press no tier of [method Garage._under_the_finger] can
+## answer off real geometry, and so one the room answers with a corner of the
+## nearest panel's bounding box.
 ##
-## Measured off the car's own bounding box rather than written down as an offset.
-## A press has to clear the roof to miss and stay in frame to be a press at all,
-## and the gap between those two is small — half a metre higher than this is off
-## the top of a 720-line frame, which is a test that fails for a reason that has
-## nothing to do with washing.
+## [b]It has to clear the swept sphere and not merely the exact ray[/b], which is
+## what [constant CLEARS_THE_SWEEP] is and what this used to get wrong. It was
+## 0.3 m, which is inside the window a 0.4 m sweep reaches — measured in
+## [code]tests/integration/test_play_screen_sweep.gd[/code], whose own constants
+## record that the car is found up to 0.3 m over the roofline at the power wash's
+## radius and lost from 0.4 m. On the blockout the press missed anyway, on the
+## shape of that particular roof; against the ten cars the bay parks now it lands
+## on one, and a test whose subject is "a mark that came off a box spends no
+## water" was quietly asserting something else. [constant CLEARS_THE_SWEEP] has
+## the table it was re-measured from.
+##
+## Measured off the car's own bounding box rather than written down as an offset,
+## because the ten styles differ by 70 cm in height. On screen is asserted rather
+## than assumed for the same reason: a press off the top of the frame is not a
+## press at all, and the headroom above the roof is a different number on a
+## minivan than on a sport car.
 func _at_the_sky() -> Vector2:
 	var middle: Vector3 = _car().global_position
-	return _on_screen(Vector3(middle.x, _car().bounds().end.y + 0.3, middle.z))
+	var over: Vector3 = Vector3(middle.x, _car().bounds().end.y + CLEARS_THE_SWEEP, middle.z)
+	var at: Vector2 = _on_screen(over)
+	var view: SubViewport = _camera().get_viewport() as SubViewport
+	assert_true(
+		Rect2(Vector2.ZERO, Vector2(view.size)).has_point(at),
+		"the press at %v is off the picture and would not be a press at all" % at
+	)
+	return at
 
 
 func _touch(at: Vector2, pressed: bool) -> void:
@@ -255,7 +296,9 @@ func test_letting_go_stops_the_water() -> void:
 
 func test_a_mark_on_a_bounding_box_is_not_somewhere_water_can_go() -> void:
 	# The one case `surface` still refuses. A press well over the roof reaches no
-	# geometry at all, even after the second probe ray, so the crosshair ends up on
+	# geometry at all — not by the exact ray, not by the swept sphere
+	# ([constant CLEARS_THE_SWEEP] is what puts it past that) and not by the second
+	# probe ray — so the crosshair ends up on
 	# a point clamped onto a bounding box with a normal invented facing the player.
 	# [BoxProjection] fed that normal picks a face off a measurement nobody took,
 	# so it would wash a texel that has nothing to do with where the mark is.

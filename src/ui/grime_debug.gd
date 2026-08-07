@@ -70,8 +70,11 @@ const TOGGLE_TEXT: String = "~"
 ## being a second number that could disagree with it.
 const THUMBNAIL_WIDTH: float = 108.0
 
-## How many thumbnails to a row. Four across and twelve panels is three rows,
-## which keeps the board clear of the belt's own corner.
+## How many thumbnails to a row. Four across is three rows for the twelve-panel
+## blockout this was laid out against and two for the seven-panel cars the bay
+## parks now, both of which keep the board clear of the belt's own corner. It is
+## a width and not a shape on purpose: the board takes as many rows as the car
+## has panels, and nothing here decides how many that is.
 const COLUMNS: int = 4
 
 @onready var _toggle: Button = %Toggle

@@ -95,10 +95,13 @@ func _view_model() -> Node3D:
 ## The car's bounding box in world space — read off the car rather than written
 ## down again here, so it keeps meaning "the car" after somebody reshapes it.
 ##
-## [Car.bounds] rather than an [AABB] off a mesh, because the car is twelve
-## CSG panels now and there is no one visual instance left to ask. It is wider
-## than the bodywork by the reach of the wing mirrors, which only makes every
-## clearance below more conservative.
+## [Car.bounds] rather than an [AABB] off a mesh, because a car is a handful of
+## separate panels and there is no one visual instance left to ask. An
+## axis-aligned box is wider than the bodywork it is drawn round — every car in
+## the pack tapers at the nose and the tail — which only makes every clearance
+## below more conservative. It is deliberately not "the mirrors": the blockout's
+## mirrors were the widest thing on it and no car in the pack has any, so the
+## slack here is the shape of the car rather than a fitting on it.
 func _car_box() -> AABB:
 	return _car().bounds()
 

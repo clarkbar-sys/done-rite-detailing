@@ -7,7 +7,7 @@
 extends GutTest
 
 ## A wheel-sized box: two thirds of a metre across, the number
-## [code]src/world/car.tscn[/code] and the pack's own wheels both use. Below
+## [code]tests/fixtures/blockout_car.tscn[/code] and the pack's own wheels both use. Below
 ## [constant PanelResolution.MIN_TILE_PIXELS]'s reach, so this is what proves the
 ## floor holds.
 const WHEEL: AABB = AABB(Vector3(-0.33, -0.11, -0.33), Vector3(0.66, 0.22, 0.66))
