@@ -98,8 +98,8 @@ func _bell() -> Chime:
 
 ## The panel called [param named], or null — the car names its own pieces, so a
 ## test can ask for the bonnet rather than for "the third child".
-func _panel(named: String) -> CSGShape3D:
-	for panel: CSGShape3D in _car().panels():
+func _panel(named: String) -> Node3D:
+	for panel: Node3D in _car().panels():
 		if String(panel.name) == named:
 			return panel
 	return null
@@ -108,8 +108,8 @@ func _panel(named: String) -> CSGShape3D:
 ## One panel of [param kind] on the real car. Asked for by what it is made of
 ## rather than by name, so reshaping or renaming the blockout cannot make a test
 ## about the bell quietly become a test about nothing.
-func _a_panel_of(kind: Surface.Kind) -> CSGShape3D:
-	for panel: CSGShape3D in _car().panels():
+func _a_panel_of(kind: Surface.Kind) -> Node3D:
+	for panel: Node3D in _car().panels():
 		if _car().kind_of(panel) == kind:
 			return panel
 	return null
@@ -204,8 +204,15 @@ func _settle() -> void:
 ## bonnet and does not reach the corner of one on the car's whole shell. A fixed
 ## radius here silently stopped finishing patches the moment these tests started
 ## asking for "a body panel" instead of naming the bonnet.
-func _whole_face_of(panel: CSGShape3D) -> float:
-	return (panel.global_transform * panel.get_aabb()).size.length()
+func _whole_face_of(panel: Node3D) -> float:
+	return _box_around(panel).size.length()
+
+
+## Where a panel's box actually is, in the room — off its skin rather than off the
+## panel, which is [method Car.skin_of]'s whole reason for existing.
+func _box_around(panel: Node3D) -> AABB:
+	var skin: GeometryInstance3D = _car().skin_of(panel)
+	return skin.global_transform * skin.get_aabb()
 
 
 # ---- is there mud at all -----------------------------------------------------
@@ -292,7 +299,7 @@ func test_only_the_power_wash_takes_mud_off() -> void:
 ## glass, as it happens, which was measured here rather than guessed at. A test
 ## that assumed the bodywork and reached for the sponge would have quietly become
 ## a test that the sponge does nothing.
-func _panel_under(at: Vector2) -> CSGShape3D:
+func _panel_under(at: Vector2) -> Node3D:
 	# An array rather than a plain local: a GDScript lambda captures locals by
 	# value, so a `String` assigned inside this one would never come back out.
 	var seen: Array[String] = [""]
@@ -322,7 +329,7 @@ func test_the_wrong_cleaner_for_a_surface_does_nothing() -> void:
 	# a wash, because before one there would be no bare paint and this would pass
 	# for the wrong reason.
 	await _settle()
-	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	var panel: Node3D = await _panel_under(_at_the_car())
 	assert_not_null(panel, "the press landed on nothing")
 	if panel == null:
 		return
@@ -338,7 +345,7 @@ func test_the_right_cleaner_for_a_surface_covers_it() -> void:
 	# And the other half, so the test above cannot pass because the middle pass is
 	# broken for everything.
 	await _settle()
-	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	var panel: Node3D = await _panel_under(_at_the_car())
 	assert_not_null(panel, "the press landed on nothing")
 	if panel == null:
 		return
@@ -352,7 +359,7 @@ func test_the_rag_turns_that_into_shine() -> void:
 	# stack: a thumb on the glass three times with three different tools, and a
 	# car that is measurably further along than it was.
 	await _settle()
-	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	var panel: Node3D = await _panel_under(_at_the_car())
 	assert_not_null(panel, "the press landed on nothing")
 	if panel == null:
 		return
@@ -389,12 +396,12 @@ func test_a_patch_coming_clean_rings_the_bell() -> void:
 	# red the day somebody turns the water down. That a held press reaches the
 	# paint at all is the tests above.
 	await _settle()
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
 	var before: int = _bell().rings()
-	var box: AABB = hood.global_transform * hood.get_aabb()
+	var box: AABB = _box_around(hood)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var finished: int = 0
 	for _sweep: int in 60:
@@ -409,10 +416,10 @@ func test_a_burst_of_patches_is_not_a_burst_of_bells() -> void:
 	# this asserts the screen leaves that judgement to it rather than filtering
 	# on its own or, worse, ringing per texel.
 	await _settle()
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	if hood == null:
 		return
-	var box: AABB = hood.global_transform * hood.get_aabb()
+	var box: AABB = _box_around(hood)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var before: int = _bell().rings()
 	var finished: int = 0

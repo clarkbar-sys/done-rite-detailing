@@ -270,7 +270,7 @@ func _settle() -> void:
 ## Whether [param who] is one of the car's own panels, asked of the car rather
 ## than by name — so this keeps meaning the same thing after somebody adds a wing.
 func _is_a_panel(who: Object) -> bool:
-	for panel: CSGShape3D in _car().panels():
+	for panel: Node3D in _car().panels():
 		if panel == who:
 			return true
 	return false

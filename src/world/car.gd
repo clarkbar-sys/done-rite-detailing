@@ -1,5 +1,8 @@
-## The car, as a CSG blockout: a tub, a greenhouse, four wheels and the panels
-## a detailer would actually name, each one a [CSGCombiner3D] of its own.
+## The car: the panels a detailer would name, and the contract every other class
+## in the game reads them through. Today they are a CSG blockout — a tub, a
+## greenhouse, four wheels and a panel per part, each one a [CSGCombiner3D] of
+## its own — and [method panels] deliberately no longer says so, which is what
+## the contract section below is about.
 ##
 ## It replaces a green [BoxMesh] scaled to 1.9 × 1.4 × 4.3 m, and it is still
 ## not the final asset — the point of constructive solid geometry here is that
@@ -7,6 +10,56 @@
 ## to open Blender to change, and that it keeps being that right up until the
 ## day a real mesh exists. [method CSGShape3D.bake_static_mesh] turns any panel
 ## below into an [ArrayMesh] the moment that stops being the trade you want.
+##
+## [b]What a panel has to be, said without saying CSG.[/b] Everything downstream
+## of [method panels] does exactly four things with what it is handed, and those
+## four are the whole contract:
+##
+## [codeblock]
+## 1  a local-space AABB       sizes the grime map, and is what bounds() merges
+## 2  a material_overlay slot  where the grime shader hangs
+## 3  group membership         kind_of(), via Surface.GLASS_GROUP and friends
+## 4  the node a ray hands back intersect_ray's `collider`, named in the readout
+## [/codeblock]
+##
+## One node covers all four here only by an accident of the blockout. A
+## [CSGShape3D] is a [GeometryInstance3D], which is 1 and 2; with [member
+## CSGShape3D.use_collision] it generates its own body, so [method
+## PhysicsDirectSpaceState3D.intersect_ray] hands the panel itself back, which is
+## 4. Nothing had to be arranged and so the whole chain could be typed
+## [CSGShape3D] end to end. A [MeshInstance3D] breaks that: it is 1 and 2 and it
+## is not a collider and never will be, so a mesh car cannot answer 4 with the
+## node that answers 1 and 2.
+##
+## [b]So a panel is a root and a skin, and [method panels] hands back the
+## root.[/b] The [i]root[/i] is whatever a ray comes back holding — a
+## [StaticBody3D] on a mesh car, the [CSGShape3D] itself on this one — and it is
+## where the groups go, because 3 and 4 have to be true of the same node or a hit
+## cannot be named. The [i]skin[/i] is the [GeometryInstance3D] at or under the
+## root that carries 1 and 2, and [method skin_of] is how anything asks for it;
+## on this car it answers the panel itself, unchanged.
+##
+## A mesh car is therefore a [StaticBody3D] parked where each [CSGCombiner3D] is
+## today, with the imported mesh and a [CollisionShape3D] under it, carrying the
+## same groups under the same names — and no other file has to know.
+##
+## [b]An accessor pair and not an adapter object.[/b] The tidy-looking
+## alternative is a small [RefCounted] holding the two nodes, handed out by
+## [method panels] instead of the root. It does not survive contact with what a
+## panel is [i]for[/i]: three callers hold a panel that came out of a raycast and
+## look it up by identity ([method Grime.map_of], [method Grime.flash_of], the
+## attract loop's running order), and a wrapper minted per call never matches
+## while a wrapper cached per node is this accessor with a dictionary in front of
+## it. A panel is also not a thing this class owns — it is a node somebody
+## authored in a scene — and an adapter would be a second lifetime to keep in
+## step with it for no gain.
+##
+## [b]And "wait a frame before you trust the box" is CSG's, not the
+## contract's.[/b] A CSG panel has no mesh, and so no [AABB], until the deferred
+## build has run; a [MeshInstance3D] answers exactly, on the frame it is
+## instanced. That warning is written on [method bounds] and on [method
+## Grime.lay_on] as a fact about this blockout, and it comes off with the
+## blockout — nothing in the four points above says a panel is late.
 ##
 ## [b]Why it is panels and not one solid.[/b] Every child below is a separate
 ## CSG root, which costs the ability to run boolean operations [i]between[/i]
@@ -121,24 +174,73 @@ func _ready() -> void:
 	paint.albedo_color = PAINT_COLORS.pick_random()
 
 
-## Every panel of the car: the [CSGShape3D]s that are roots of their own CSG
-## tree, which is exactly the set that has a mesh and a collider of its own.
+## Every panel of the car: the roots a ray can hand back, each one with a skin
+## under it — the class docs have the full shape of that.
 ##
-## The root test is "my parent is not itself a CSG shape", which is the engine's
-## own rule for which shape does the building, rather than a list written down
-## here that would go stale the first time somebody adds a panel in the editor.
-## The recursion stops at a root on purpose: the brushes underneath are the
-## subtractions and intersections that shape it, they are [CSGShape3D]s too, and
-## a cutting box parked two metres outside the car is emphatically not a panel.
+## The test is a property of the node and not a list written down here, which is
+## the same argument [method kind_of] makes about reading a group instead of a
+## name: a list goes stale the first time somebody adds a panel in the editor. A
+## panel is something a ray can be handed back holding — a [CSGShape3D], which
+## builds its own body, or a [CollisionObject3D], which is one — [i]and[/i] has a
+## [method skin_of] to be measured and painted. Both halves are required, because
+## a body with no geometry has no box to size a map from, and geometry with no
+## body is a thing no tool can ever land on.
 ##
-## [constant TRIM_GROUP] is the one thing that overrules the root test — see
-## [method _gather]. Everything downstream of here takes this list as the whole of
-## the car it has to deal with, so a panel left out of it has no grime, no map, no
-## turn in the attract loop and no cleaner, which is exactly what trim wants.
-func panels() -> Array[CSGShape3D]:
-	var found: Array[CSGShape3D] = []
+## The recursion stops at a panel on purpose: on this car the brushes underneath
+## are the subtractions and intersections that shape it, they are [CSGShape3D]s
+## too, and a cutting box parked two metres outside the car is emphatically not a
+## panel. On a mesh car it is the mesh and the collision shape under the body,
+## which are the panel rather than two more of them.
+##
+## [b]What is deliberately not tested here is [member CSGShape3D.use_collision].[/b]
+## It is the flag that actually arms a CSG panel's body, and
+## [code]tests/integration/test_garage.gd[/code] asserts it on every panel of the
+## real car. Reading it here would make a panel's [i]existence[/i] depend on a
+## checkbox: a panel with the box unticked would silently leave the car — no
+## grime, no map, no cleaner — instead of failing the test that says a tool must
+## be able to hit it. Loud is the right direction for that mistake.
+##
+## [constant TRIM_GROUP] is the one thing that overrules all of it — see [method
+## _gather]. Everything downstream of here takes this list as the whole of the car
+## it has to deal with, so a panel left out of it has no grime, no map, no turn in
+## the attract loop and no cleaner, which is exactly what trim wants.
+func panels() -> Array[Node3D]:
+	var found: Array[Node3D] = []
 	_gather(self, found)
 	return found
+
+
+## The geometry of [param panel]: the node that carries its [AABB] and its
+## [member GeometryInstance3D.material_overlay] — points 1 and 2 of the contract
+## in the class docs — or [code]null[/code] for a node that has none.
+##
+## [b]The panel itself, whenever the panel is geometry.[/b] Every [CSGShape3D] is
+## a [GeometryInstance3D], so on this car this is the identity function and the
+## blockout satisfies the widened contract without a line of the scene file
+## changing. It only has work to do for a panel whose root is a body — a mesh
+## car's [StaticBody3D] — where the answer is the [MeshInstance3D] underneath.
+##
+## Depth-first and first-match, rather than a named child or an exported path.
+## A glTF importer decides how deeply it nests the mesh it makes and under what
+## name, and a car scene built from one should not have to be rearranged to be
+## washable; the shallowest geometry under the root is the one that is there
+## whichever shape the import took.
+##
+## [b]Read it, do not cache it.[/b] It walks a handful of children and it is
+## called once per panel when the grime is laid and once per panel per frame at
+## most anywhere else. [Grime] keeps the answer beside its maps because it is
+## already keeping an array parallel to the panels and not because this is dear.
+func skin_of(panel: Node) -> GeometryInstance3D:
+	if panel == null:
+		return null
+	var geometry: GeometryInstance3D = panel as GeometryInstance3D
+	if geometry != null:
+		return geometry
+	for child: Node in panel.get_children():
+		var under: GeometryInstance3D = skin_of(child)
+		if under != null:
+			return under
+	return null
 
 
 ## What [param panel] is made of, which is what decides the bottle a detailer
@@ -175,14 +277,18 @@ func kind_of(panel: Node) -> Surface.Kind:
 ## car — the camera's standing distance, the walk, the reach of a held tool —
 ## goes through here instead.
 ##
-## [b]It is not trustworthy until a frame has passed.[/b] CSG meshes are built
-## deferred, so a panel has no [AABB] to give until the build has run — measured,
-## and measured again after getting it wrong: a car instanced into an idle tree
-## really does report zero, but one instanced alongside a build that is already
-## flushing reports part of a car, which is worse than nothing because it looks
-## like an answer. Wait a frame. Nothing in the garage reads this during startup
-## — the camera is placed off [member Node3D.global_position], which is exact
-## immediately — and the tests that do read it wait.
+## [b]It is not trustworthy until a frame has passed — on a CSG car.[/b] CSG
+## meshes are built deferred, so a panel has no [AABB] to give until the build has
+## run — measured, and measured again after getting it wrong: a car instanced into
+## an idle tree really does report zero, but one instanced alongside a build that
+## is already flushing reports part of a car, which is worse than nothing because
+## it looks like an answer. Wait a frame. Nothing in the garage reads this during
+## startup — the camera is placed off [member Node3D.global_position], which is
+## exact immediately — and the tests that do read it wait.
+##
+## That is a fact about the blockout and not about this method. A panel skinned
+## with a [MeshInstance3D] has its box the moment it is in the tree, so the wait
+## is one of the things that comes off with the CSG.
 ##
 ## Note that this is wider than the bodywork: the mirrors reach x ±1.04 against
 ## a body half-width of 0.95, so an axis-aligned box around the car is 2.08 m
@@ -190,18 +296,24 @@ func kind_of(panel: Node) -> Surface.Kind:
 ## box and the conservative one for anything asking "am I clear of the car" —
 ## the ray the garage's standoff actually steers by is cast against the colliders
 ## below, which have the real outline.
+## Measured off the skin and moved by the skin's own transform, not the root's.
+## They are the same node on this car and they are not on a mesh one, where the
+## importer is free to leave the mesh sitting at an offset inside its body — and
+## an [AABB] read from one node and placed by another is the kind of wrong that
+## looks right until somebody moves a wheel.
 func bounds() -> AABB:
 	var box: AABB = AABB()
 	var found: bool = false
-	for panel: CSGShape3D in panels():
-		var painted: AABB = panel.global_transform * panel.get_aabb()
+	for panel: Node3D in panels():
+		var skin: GeometryInstance3D = skin_of(panel)
+		var painted: AABB = skin.global_transform * skin.get_aabb()
 		box = painted if not found else box.merge(painted)
 		found = true
 	return box
 
 
-## Depth-first for CSG roots, descending through plain [Node3D]s so panels can
-## be grouped in the editor, and never through a root into its own brushes.
+## Depth-first for panels, descending through anything that is not one so they can
+## be grouped in the editor, and never through a panel into what it is made of.
 ##
 ## [b]Trim is skipped whole.[/b] A node in [constant TRIM_GROUP] is neither
 ## collected nor descended into, so marking one combiner covers every brush under
@@ -214,12 +326,25 @@ func bounds() -> AABB:
 ## overlay and would be washable from that moment on, whatever [method kind_of]
 ## said about it; the only way for a thing to have no cleaner is for it never to
 ## have been a panel.
-func _gather(node: Node, found: Array[CSGShape3D]) -> void:
+func _gather(node: Node, found: Array[Node3D]) -> void:
 	for child: Node in node.get_children():
 		if child.is_in_group(TRIM_GROUP):
 			continue
-		var shape: CSGShape3D = child as CSGShape3D
-		if shape != null:
-			found.append(shape)
+		var part: Node3D = child as Node3D
+		if part != null and _is_a_part(part) and skin_of(part) != null:
+			found.append(part)
 			continue
 		_gather(child, found)
+
+
+## Whether [param node] is the kind of thing a ray comes back holding — point 4 of
+## the contract in the class docs, which is the half of "is this a panel" that is
+## about physics rather than about geometry.
+##
+## Two cases and no third, because the engine has two ways of putting a node in
+## the physics world. A [CSGShape3D] generates a body of its own from its brushes
+## and is handed back as itself; a [CollisionObject3D] — a [StaticBody3D] on a
+## mesh car — [i]is[/i] the body. Anything else a ray meets belongs to one of
+## those two, and asking about the parts underneath would collect a panel twice.
+func _is_a_part(node: Node3D) -> bool:
+	return node is CSGShape3D or node is CollisionObject3D

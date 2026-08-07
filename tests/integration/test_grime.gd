@@ -15,9 +15,9 @@
 ## is no reason for this file to know what the fixture calls its slabs either.
 ##
 ## Under tests/integration/ for the reason [code]tests/integration/test_car.gd[/code]
-## is: every map here is sized from a panel's [method CSGShape3D.get_aabb], CSG
-## meshes are built deferred, and a car asked before a frame has passed reports
-## panels with no size at all. That trap is the whole reason
+## is: every map here is sized from a panel's own box, the fixture's panels are
+## CSG, CSG meshes are built deferred, and a car asked before a frame has passed
+## reports panels with no size at all. That trap is the whole reason
 ## [method Garage._lay_on_the_grime] waits, and it is pinned by its own test
 ## below rather than left to be rediscovered.
 ##
@@ -60,9 +60,9 @@ func before_each() -> void:
 
 
 ## Every panel of [param kind], in the order the car lists them.
-func _panels_of(kind: Surface.Kind) -> Array[CSGShape3D]:
-	var found: Array[CSGShape3D] = []
-	for panel: CSGShape3D in _car.panels():
+func _panels_of(kind: Surface.Kind) -> Array[Node3D]:
+	var found: Array[Node3D] = []
+	for panel: Node3D in _car.panels():
 		if _car.kind_of(panel) == kind:
 			found.append(panel)
 	return found
@@ -70,8 +70,8 @@ func _panels_of(kind: Surface.Kind) -> Array[CSGShape3D]:
 
 ## One panel of [param kind], or null if the car has none — which is a failure
 ## worth reporting rather than a crash, so every caller asserts on it.
-func _a_panel_of(kind: Surface.Kind) -> CSGShape3D:
-	var found: Array[CSGShape3D] = _panels_of(kind)
+func _a_panel_of(kind: Surface.Kind) -> Node3D:
+	var found: Array[Node3D] = _panels_of(kind)
 	return null if found.is_empty() else found[0]
 
 
@@ -83,8 +83,23 @@ func _a_panel_of(kind: Surface.Kind) -> CSGShape3D:
 ## bonnet and does not reach the corner of one on the car's whole shell. A fixed
 ## radius here silently stopped finishing patches the moment these tests started
 ## asking for "a body panel" instead of naming the bonnet.
-func _whole_face_of(panel: CSGShape3D) -> float:
-	return (panel.global_transform * panel.get_aabb()).size.length()
+func _whole_face_of(panel: Node3D) -> float:
+	return _box_around(panel).size.length()
+
+
+## The skin of a panel: the node its box and its overlay are actually on — see
+## [method Car.skin_of]. Asked of the car rather than assumed to be the panel,
+## because that is the whole of what this issue widened and a test that reached
+## straight past it for the panel's own overlay would go on passing after it
+## stopped being true.
+func _skin(panel: Node3D) -> GeometryInstance3D:
+	return _car.skin_of(panel)
+
+
+## Where a panel's box actually is, in the room.
+func _box_around(panel: Node3D) -> AABB:
+	var skin: GeometryInstance3D = _skin(panel)
+	return skin.global_transform * skin.get_aabb()
 
 
 # ---- what got laid on ---------------------------------------------------------
@@ -95,7 +110,7 @@ func test_every_panel_of_the_car_has_mud_on_it() -> void:
 	assert_eq(
 		_grime.panels().size(), _car.panels().size(), "one map per panel, no more and no less"
 	)
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		assert_not_null(_grime.map_of(panel), "%s has no map" % panel.name)
 
 
@@ -105,7 +120,7 @@ func test_every_kind_of_surface_has_a_panel_with_a_map_on_it() -> void:
 	# kind and not by name, so this says what it means rather than listing the
 	# fixture's furniture back at it.
 	for kind: Surface.Kind in KINDS:
-		var panel: CSGShape3D = _a_panel_of(kind)
+		var panel: Node3D = _a_panel_of(kind)
 		assert_not_null(panel, "the car has no panel of kind %d" % kind)
 		if panel != null:
 			assert_not_null(_grime.map_of(panel), "%s has no map" % panel.name)
@@ -118,10 +133,10 @@ func test_a_fresh_car_is_entirely_filthy() -> void:
 func test_a_map_is_sized_from_the_panel_it_is_on() -> void:
 	# The deferred-build trap, stated as a test. A map built a frame too early is
 	# sized from a zero box, and every wash on it would land in the same texel.
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		var box: AABB = _grime.map_of(panel).box()
 		assert_gt(box.size.length(), 0.0, "%s got a zero-sized map" % panel.name)
-		assert_eq(box, panel.get_aabb(), "%s's map is not its own box" % panel.name)
+		assert_eq(box, _skin(panel).get_aabb(), "%s's map is not its own box" % panel.name)
 
 
 func test_grime_that_was_never_laid_on_a_car_says_so() -> void:
@@ -142,12 +157,12 @@ func test_the_mud_is_drawn_over_the_paint_rather_than_instead_of_it() -> void:
 	# tyre with a silver rim instead of one flat colour — see the class docs.
 	# Asserted on the wheel specifically, because it is the panel with two
 	# materials in it and so the only one where the difference shows.
-	var wheel: CSGShape3D = _a_panel_of(Surface.Kind.WHEEL)
+	var wheel: Node3D = _a_panel_of(Surface.Kind.WHEEL)
 	assert_not_null(wheel, "the car has no wheel")
 	if wheel == null:
 		return
-	assert_not_null(wheel.material_overlay, "no grime on the wheel")
-	assert_null(wheel.material_override, "the wheel's own materials were replaced")
+	assert_not_null(_skin(wheel).material_overlay, "no grime on the wheel")
+	assert_null(_skin(wheel).material_override, "the wheel's own materials were replaced")
 
 
 func test_every_panel_gets_its_own_mask_to_sample() -> void:
@@ -155,8 +170,8 @@ func test_every_panel_gets_its_own_mask_to_sample() -> void:
 	# and washing all of them at once, which reads as a lighting bug rather than
 	# as a shared texture.
 	var seen: Array[RID] = []
-	for panel: CSGShape3D in _car.panels():
-		var paint: ShaderMaterial = panel.material_overlay as ShaderMaterial
+	for panel: Node3D in _car.panels():
+		var paint: ShaderMaterial = _skin(panel).material_overlay as ShaderMaterial
 		assert_not_null(paint, "%s has no grime material" % panel.name)
 		if paint == null:
 			continue
@@ -173,8 +188,8 @@ func test_the_shader_is_told_the_box_it_has_to_project_into() -> void:
 	# the projection the CPU paints with, and it can only do that if it is handed
 	# the same box. A panel whose uniforms disagreed with its map would draw the
 	# mud somewhere other than where the water is taking it off.
-	for panel: CSGShape3D in _car.panels():
-		var paint: ShaderMaterial = panel.material_overlay as ShaderMaterial
+	for panel: Node3D in _car.panels():
+		var paint: ShaderMaterial = _skin(panel).material_overlay as ShaderMaterial
 		if paint == null:
 			continue
 		var box: AABB = _grime.map_of(panel).box()
@@ -188,11 +203,11 @@ func test_the_shader_is_told_the_box_it_has_to_project_into() -> void:
 
 
 func test_a_world_space_hit_washes_the_panel_it_landed_on() -> void:
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
-	var box: AABB = hood.global_transform * hood.get_aabb()
+	var box: AABB = _box_around(hood)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var before: float = _grime.map_of(hood).remaining()
 	_grime.wash(hood, on_top, Vector3.UP, 0.3, 0.9)
@@ -204,13 +219,13 @@ func test_washing_the_bonnet_leaves_the_boot_lid_alone() -> void:
 	# to see from any single camera angle if it were wrong.
 	# Two panels of the same kind, deliberately: a shared map would be likeliest
 	# between the panels a projection treats alike.
-	var body: Array[CSGShape3D] = _panels_of(Surface.Kind.BODY)
+	var body: Array[Node3D] = _panels_of(Surface.Kind.BODY)
 	assert_gt(body.size(), 1, "the car needs two body panels for this to mean anything")
 	if body.size() < 2:
 		return
-	var hood: CSGShape3D = body[0]
-	var deck: CSGShape3D = body[1]
-	var box: AABB = hood.global_transform * hood.get_aabb()
+	var hood: Node3D = body[0]
+	var deck: Node3D = body[1]
+	var box: AABB = _box_around(hood)
 	_grime.wash(
 		hood, Vector3(box.get_center().x, box.end.y, box.get_center().z), Vector3.UP, 0.4, 1.0
 	)
@@ -226,7 +241,7 @@ func test_washing_something_that_is_not_the_car_does_nothing() -> void:
 
 
 func test_finishing_a_patch_says_which_panel_it_was_on() -> void:
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
@@ -238,7 +253,7 @@ func test_finishing_a_patch_says_which_panel_it_was_on() -> void:
 	_grime.patch_finished.connect(
 		func(panel: String, _patch: int, _stage: GrimeMap.Stage) -> void: rang.append(panel)
 	)
-	var box: AABB = hood.global_transform * hood.get_aabb()
+	var box: AABB = _box_around(hood)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var rung: int = 0
 	for _sweep: int in 60:
@@ -253,20 +268,20 @@ func test_finishing_a_patch_says_which_panel_it_was_on() -> void:
 
 ## Washes a panel flat at a point, so the passes after the first have bare paint
 ## to work on.
-func _wash_bare(panel: CSGShape3D, at: Vector3, outward: Vector3) -> void:
+func _wash_bare(panel: Node3D, at: Vector3, outward: Vector3) -> void:
 	for _sweep: int in 60:
 		_grime.wash(panel, at, outward, 0.5, 0.2)
 
 
 ## The middle of the top of a panel, in world space — where a tool pointed down at
 ## the car from above would land.
-func _on_top_of(panel: CSGShape3D) -> Vector3:
-	var box: AABB = panel.global_transform * panel.get_aabb()
+func _on_top_of(panel: Node3D) -> Vector3:
+	var box: AABB = _box_around(panel)
 	return Vector3(box.get_center().x, box.end.y, box.get_center().z)
 
 
 func test_a_cleaner_covers_the_paint_the_wash_bared() -> void:
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
@@ -280,7 +295,7 @@ func test_a_cleaner_on_a_muddy_panel_does_nothing() -> void:
 	# The ordering rule, through the real stack rather than on a bare map: a
 	# bottle on a car nobody has washed moves nothing, because there is no bare
 	# paint under it to cover.
-	var deck: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var deck: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(deck, "the car has no bodywork")
 	if deck == null:
 		return
@@ -290,7 +305,7 @@ func test_a_cleaner_on_a_muddy_panel_does_nothing() -> void:
 
 
 func test_the_rag_turns_that_product_into_shine() -> void:
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
@@ -309,7 +324,7 @@ func test_finishing_a_patch_says_which_step_it_was() -> void:
 	# One signal, three stages. A listener that wants to tell a wash from a buff
 	# has the argument to do it with — and the ding, which does not care, ignores
 	# it.
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
@@ -332,8 +347,8 @@ func test_each_panel_is_told_what_its_cleaner_looks_like() -> void:
 	# which bottle left the film, so the colour is a uniform set per panel when
 	# the overlay is built. A panel that never got one would draw its suds in
 	# whatever the shader defaults to, which is white on a tyre.
-	for panel: CSGShape3D in _car.panels():
-		var paint: ShaderMaterial = panel.material_overlay as ShaderMaterial
+	for panel: Node3D in _car.panels():
+		var paint: ShaderMaterial = _skin(panel).material_overlay as ShaderMaterial
 		assert_not_null(paint, "%s has no grime material" % panel.name)
 		if paint == null:
 			continue
@@ -359,10 +374,10 @@ func test_the_glass_and_the_wheels_get_their_own_products() -> void:
 ## hands back a [Variant], and this project's warning levels treat passing one to
 ## a typed parameter as an error rather than as a cast.
 func _product_on(kind: Surface.Kind) -> Color:
-	var panel: CSGShape3D = _a_panel_of(kind)
+	var panel: Node3D = _a_panel_of(kind)
 	if panel == null:
 		return Color.TRANSPARENT
-	var paint: ShaderMaterial = panel.material_overlay as ShaderMaterial
+	var paint: ShaderMaterial = _skin(panel).material_overlay as ShaderMaterial
 	if paint == null:
 		return Color.TRANSPARENT
 	var colour: Color = paint.get_shader_parameter("product_colour")

@@ -36,11 +36,26 @@ func before_each() -> void:
 	await wait_process_frames(1)
 
 
-func _panel(named: String) -> CSGShape3D:
-	for panel: CSGShape3D in _car.panels():
+func _panel(named: String) -> Node3D:
+	for panel: Node3D in _car.panels():
 		if panel.name == named:
 			return panel
 	return null
+
+
+## The panel's own box, off its skin — which on this car is the panel itself, and
+## on a mesh one would be the [MeshInstance3D] under it. Through [method
+## Car.skin_of] rather than off the node, because that is the contract every
+## consumer reads a panel's box through and a test that reached past it would go
+## on passing after the contract stopped holding.
+func _box(named: String) -> AABB:
+	return _car.skin_of(_panel(named)).get_aabb()
+
+
+## The same box, where it actually is in the room.
+func _world_box(named: String) -> AABB:
+	var skin: GeometryInstance3D = _car.skin_of(_panel(named))
+	return skin.global_transform * skin.get_aabb()
 
 
 func test_the_car_instantiates() -> void:
@@ -67,7 +82,7 @@ func test_it_is_made_of_panels_a_detailer_would_name() -> void:
 	# a rename in the editor from silently breaking a raycast that asked for
 	# "Hood" — the failure would otherwise be a tool that quietly cleans nothing.
 	var named: Array[String] = []
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		named.append(panel.name)
 	for expected: String in [
 		"Body",
@@ -91,7 +106,7 @@ func test_panels_are_csg_roots_and_not_the_brushes_inside_them() -> void:
 	# windscreen and shape the arches are CSGShape3Ds too, and they sit metres
 	# outside the car — counting one as a panel would give it a collider it must
 	# not have and would blow the bounds out to the size of a cutting box.
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		var parent: CSGShape3D = panel.get_parent() as CSGShape3D
 		assert_null(parent, "%s is a brush inside another panel, not a panel" % panel.name)
 	assert_gt(_car.get_node("Cabin").get_child_count(), 1, "the cabin is shaped by brushes")
@@ -127,8 +142,8 @@ func test_the_greenhouse_is_narrower_than_the_body() -> void:
 	# van. Asserted because it is produced by two rotated subtraction brushes whose
 	# angle is easy to get backwards, and getting it backwards flares the roof out
 	# instead, which looks wrong in a way that is hard to name in a screenshot.
-	var cabin: AABB = _panel("Cabin").get_aabb()
-	var body: AABB = _panel("Body").get_aabb()
+	var cabin: AABB = _box("Cabin")
+	var body: AABB = _box("Body")
 	assert_lt(cabin.size.x, body.size.x, "the greenhouse must be inset from the flanks")
 	assert_lt(cabin.size.z, body.size.z, "and shorter than the car")
 
@@ -137,11 +152,10 @@ func test_the_wheels_are_under_the_arches_and_not_beside_them() -> void:
 	# Four separate panels positioned by hand, so a sign error puts a wheel inside
 	# the sill or a metre out in the room. Checked against the body's own width
 	# rather than a number written here, so it survives the car being reshaped.
-	var body: AABB = _panel("Body").global_transform * _panel("Body").get_aabb()
+	var body: AABB = _world_box("Body")
 	var ground: float = _car.bounds().position.y
 	for named: String in ["WheelFrontLeft", "WheelFrontRight", "WheelRearLeft", "WheelRearRight"]:
-		var wheel: CSGShape3D = _panel(named)
-		var box: AABB = wheel.global_transform * wheel.get_aabb()
+		var box: AABB = _world_box(named)
 		assert_almost_eq(box.position.y, ground, TOLERANCE, "%s must reach the floor" % named)
 		assert_gt(box.end.y, body.position.y, "%s must reach up into its arch" % named)
 		assert_lt(absf(box.get_center().x), body.size.x * 0.5, "%s is tucked in" % named)
@@ -200,7 +214,7 @@ func test_a_panel_can_be_baked_to_a_real_mesh() -> void:
 	# the one line that turns a panel into an ArrayMesh a MeshInstance3D can carry,
 	# and it is worth knowing the day it stops working rather than the day somebody
 	# needs it.
-	var baked: ArrayMesh = _panel("Hood").bake_static_mesh()
+	var baked: ArrayMesh = (_panel("Hood") as CSGShape3D).bake_static_mesh()
 	assert_not_null(baked, "a panel must bake down to a real mesh")
 	if baked != null:
 		assert_gt(baked.get_surface_count(), 0, "and the mesh must have something in it")
@@ -214,7 +228,7 @@ func test_the_glass_panels_are_glass() -> void:
 	# [method Car.kind_of]. What this pins is that the groups are actually on the
 	# nodes, which is the half of that arrangement a script cannot check itself.
 	for named: String in ["Windshield", "RearGlass", "SideGlass"]:
-		var panel: CSGShape3D = _panel(named)
+		var panel: Node3D = _panel(named)
 		assert_not_null(panel, "the car has no %s" % named)
 		if panel != null:
 			assert_eq(_car.kind_of(panel), Surface.Kind.GLASS, named)
@@ -222,7 +236,7 @@ func test_the_glass_panels_are_glass() -> void:
 
 func test_the_wheels_are_wheels() -> void:
 	for named: String in ["WheelFrontLeft", "WheelFrontRight", "WheelRearLeft", "WheelRearRight"]:
-		var panel: CSGShape3D = _panel(named)
+		var panel: Node3D = _panel(named)
 		assert_not_null(panel, "the car has no %s" % named)
 		if panel != null:
 			assert_eq(_car.kind_of(panel), Surface.Kind.WHEEL, named)
@@ -232,7 +246,7 @@ func test_everything_else_is_bodywork() -> void:
 	# The default, which is what makes adding a panel safe: a new wing gets the
 	# sponge without anybody remembering to say so.
 	for named: String in ["Body", "Hood", "Deck", "Roof", "Cabin"]:
-		var panel: CSGShape3D = _panel(named)
+		var panel: Node3D = _panel(named)
 		assert_not_null(panel, "the car has no %s" % named)
 		if panel != null:
 			assert_eq(_car.kind_of(panel), Surface.Kind.BODY, named)
@@ -242,7 +256,7 @@ func test_every_panel_of_the_car_has_a_cleaner_for_it() -> void:
 	# The property that matters more than any individual assignment above: there
 	# is no panel a player cannot finish because no bottle claims it.
 	var belt: ToolBelt = ToolBelt.new()
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		var cleaner: DetailingTool.Id = Surface.cleaner_for(_car.kind_of(panel))
 		assert_true(belt.index_of(cleaner) >= 0, "%s has no cleaner on the belt" % panel.name)
 
@@ -261,7 +275,7 @@ func test_the_real_car_carries_every_kind_the_fixture_stands_in_for() -> void:
 	# whole surface is not.
 	for kind: Surface.Kind in [Surface.Kind.BODY, Surface.Kind.GLASS, Surface.Kind.WHEEL]:
 		var found: int = 0
-		for panel: CSGShape3D in _car.panels():
+		for panel: Node3D in _car.panels():
 			if _car.kind_of(panel) == kind:
 				found += 1
 		assert_gt(found, 0, "the real car has no panel of kind %d left" % kind)
@@ -276,7 +290,7 @@ func test_the_trim_is_on_the_car_but_is_not_a_panel() -> void:
 	# Asserting only the second half would pass just as well on a car that had
 	# lost its underside altogether.
 	var named: Array[String] = []
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		named.append(panel.name)
 	for trim: String in ["Undercarriage", "WheelWells"]:
 		assert_not_null(_car.get_node_or_null(NodePath(trim)), "the car has no %s" % trim)

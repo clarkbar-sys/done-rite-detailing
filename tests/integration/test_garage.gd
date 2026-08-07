@@ -162,10 +162,18 @@ func test_every_panel_of_the_car_is_something_a_ray_can_find() -> void:
 	# radius it started with — a bug that looks exactly like the feature not being
 	# wired up. It used to be one hand-built box shape that could go stale; it is
 	# now a property on each panel that can be forgotten one panel at a time.
-	var panels: Array[CSGShape3D] = _car().panels()
+	#
+	# [method Car.panels] deliberately does not read the flag — see its docs: a
+	# panel with the box unticked has to fail here rather than quietly leave the
+	# car. So this is where the blockout's half of the contract is held, and it is
+	# a CSG assertion about a CSG car, cast to say so.
+	var panels: Array[Node3D] = _car().panels()
 	assert_gt(panels.size(), 0, "the car needs panels")
-	for panel: CSGShape3D in panels:
-		assert_true(panel.use_collision, "%s must be something a ray can hit" % panel.name)
+	for panel: Node3D in panels:
+		var shape: CSGShape3D = panel as CSGShape3D
+		assert_not_null(shape, "%s is not CSG; this test is about the blockout" % panel.name)
+		if shape != null:
+			assert_true(shape.use_collision, "%s must be something a ray can hit" % panel.name)
 
 
 func test_the_standoff_ray_finds_the_car_and_can_name_what_it_hit() -> void:
@@ -186,9 +194,13 @@ func test_the_standoff_ray_finds_the_car_and_can_name_what_it_hit() -> void:
 	assert_false(hit.is_empty(), "a ray at the car's mid-height must find the car")
 	if hit.is_empty():
 		return
+	# Checked against `panels()` rather than against a type: what point 4 of the
+	# panel contract promises is that the collider IS a panel, and a mesh car's
+	# would be a StaticBody3D rather than a CSGShape3D.
 	var struck: Object = hit["collider"]
-	var panel: CSGShape3D = struck as CSGShape3D
-	assert_not_null(panel, "what a ray hits must be a panel, not an anonymous body")
+	var panel: Node3D = struck as Node3D
+	assert_not_null(panel, "what a ray hits must be a node in the room")
+	assert_true(_car().panels().has(panel), "what a ray hits must be a panel of the car")
 	if panel != null:
 		assert_eq(panel.name, &"Body", "level at mid-height, side on, the ray meets the tub")
 
@@ -199,7 +211,7 @@ func test_no_panel_is_scaled() -> void:
 	# physics server asks not to be handed, and CSG generates its body from the
 	# panel's own transform. The room's walls are unit boxes scaled into place;
 	# the car is authored at its real size precisely so this never comes up.
-	for panel: CSGShape3D in _car().panels():
+	for panel: Node3D in _car().panels():
 		var scaling: Vector3 = panel.global_transform.basis.get_scale()
 		assert_almost_eq(
 			scaling.distance_to(Vector3.ONE), 0.0, TOLERANCE, "%s is scaled" % panel.name

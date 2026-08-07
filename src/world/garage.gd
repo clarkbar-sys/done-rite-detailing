@@ -79,13 +79,15 @@
 ##
 ## [b]Which is why the car has to be something a ray can hit.[/b] It is the only
 ## thing out here that is — the ground has no collider and nothing else is
-## modelled. It no longer needs a hand-built collider to be it:
-## every panel of the [Car] is a CSG root with [member CSGShape3D.use_collision]
-## set, so the body is generated from the same brushes that make the mesh and
-## cannot drift from it. That deleted a [BoxShape3D] that used to sit beside the
-## mesh carrying the car's size a second time, along with the test whose whole
-## job was catching the two disagreeing — and it means the ray now measures to
-## the panel it actually hit rather than to a box drawn around everything.
+## modelled. It no longer needs a hand-built collider to be it: every panel of the
+## [Car] is its own collider — today by [member CSGShape3D.use_collision], which
+## generates the body from the same brushes that make the mesh so the two cannot
+## drift apart, and on a mesh car by the [StaticBody3D] the panel is rooted in.
+## Either way the body comes with the panel. That deleted a [BoxShape3D] that used
+## to sit beside the mesh carrying the car's size a second time, along with the
+## test whose whole job was catching the two disagreeing — and it means the ray
+## now measures to the panel it actually hit rather than to a box drawn around
+## everything.
 ##
 ## [b]The viewmodel hangs off this camera, and is kept inside the near plane
 ## rather than given a camera of its own.[/b] A mesh parented to a camera punches
@@ -162,10 +164,12 @@
 ## [method _resolve_aim] answers it on the next tick — which also means a finger
 ## dragged across the glass costs one raycast per tick rather than one per event.
 ##
-## [i]The panel it names is real.[/i] Every piece of the [Car] is a CSG root with
-## its own collider, so the hit comes back as [code]"Hood"[/code] or
+## [i]The panel it names is real.[/i] Every piece of the [Car] carries a collider
+## of its own, so the hit comes back as [code]"Hood"[/code] or
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
-## grime work needs and the reason [signal aimed] carries a name at all.
+## grime work needs and the reason [signal aimed] carries a name at all. That the
+## collider [i]is[/i] the panel is the whole of what [method Car.panels] promises;
+## nothing here has to know what the panel is made of.
 ##
 ## [i]And a press that misses by a hair is caught before any of that.[/i] The aim
 ## is answered in three tiers, each strictly wider than the one above it, and
@@ -551,7 +555,7 @@ var _sweep: AimSweep = null
 var _racket: ToolRacket = null
 var _grime: Grime = null
 var _routine: AttractRoutine = null
-var _running_order: Array[CSGShape3D] = []
+var _running_order: Array[Node3D] = []
 var _aiming: bool = false
 var _aim_at: Vector2 = Vector2.ZERO
 var _marked: String = ""
@@ -823,11 +827,14 @@ func _take_up_aiming() -> void:
 
 ## Puts mud on the car, a frame after there is a car to put it on.
 ##
-## [b]The wait is the whole function.[/b] Every mask is sized from its panel's
-## [method CSGShape3D.get_aabb] and CSG meshes are built deferred, so a car asked
-## during [method Node._ready] reports panels with no size — and a mask built
-## against a zero box is a projection with nothing to divide by. [Car] documents
-## the same trap for [method Car.bounds], which is where it was first paid for.
+## [b]The wait is the whole function.[/b] Every mask is sized from its panel's own
+## box and CSG meshes are built deferred, so a car asked during [method
+## Node._ready] reports panels with no size — and a mask built against a zero box
+## is a projection with nothing to divide by. [Car] documents the same trap for
+## [method Car.bounds], which is where it was first paid for, along with the note
+## that it is the blockout's and not the panel contract's: a car whose panels are
+## meshes would be exact on the frame it was instanced. The wait stays because the
+## room hosts whichever car it is handed and a frame costs nothing here.
 ##
 ## Started and not awaited by the caller: [method _ready] has nothing further to
 ## do about grime, and making it wait would push every screen's first frame
@@ -1107,10 +1114,10 @@ func _under_the_finger(from: Vector3, facing: Vector3, reach: float) -> Dictiona
 func _nearest_on_the_car(
 	space: PhysicsDirectSpaceState3D, from: Vector3, facing: Vector3
 ) -> Dictionary:
-	var panels: Array[CSGShape3D] = _car.panels()
+	var panels: Array[Node3D] = _car.panels()
 	var boxes: Array[AABB] = []
-	for panel: CSGShape3D in panels:
-		boxes.append(panel.global_transform * panel.get_aabb())
+	for panel: Node3D in panels:
+		boxes.append(_box_around(panel))
 	var nearest: int = NearestPoint.nearest_box(boxes, from, facing)
 	if nearest < 0:
 		return {}
@@ -1205,7 +1212,7 @@ func _take_up_the_demo() -> void:
 	_running_order = _car.panels()
 	_running_order.sort_custom(_bigger_first)
 	var kinds: Array[Surface.Kind] = []
-	for panel: CSGShape3D in _running_order:
+	for panel: Node3D in _running_order:
 		kinds.append(_car.kind_of(panel))
 	_routine = AttractRoutine.new(kinds, attract_seconds_per_pass)
 	_routine.lapped.connect(_on_lapped)
@@ -1216,8 +1223,22 @@ func _take_up_the_demo() -> void:
 ## of the same car needs no transform, and the boxes are the same either way for a
 ## car nobody has scaled — which [code]tests/integration/test_garage.gd[/code]
 ## already holds.
-func _bigger_first(first: CSGShape3D, second: CSGShape3D) -> bool:
-	return first.get_aabb().get_volume() > second.get_aabb().get_volume()
+func _bigger_first(first: Node3D, second: Node3D) -> bool:
+	var one: AABB = _car.skin_of(first).get_aabb()
+	var other: AABB = _car.skin_of(second).get_aabb()
+	return one.get_volume() > other.get_volume()
+
+
+## The world-space box around [param panel], read off its skin — see [method
+## Car.skin_of], and [method Car.bounds] for why the transform has to come off the
+## same node the box did.
+##
+## Here rather than at each of the two call sites because both of them are asking
+## "where is this panel, roughly", and the answer got one node longer the day a
+## panel stopped having to be its own geometry.
+func _box_around(panel: Node3D) -> AABB:
+	var skin: GeometryInstance3D = _car.skin_of(panel)
+	return skin.global_transform * skin.get_aabb()
 
 
 ## One tick of the demo: hold whatever the pass calls for, walk the eye round to
@@ -1230,8 +1251,8 @@ func _run_the_demo(delta: float) -> void:
 	if _routine == null:
 		return
 	_routine.advance(delta)
-	var panel: CSGShape3D = _running_order[_routine.stop()]
-	var box: AABB = panel.global_transform * panel.get_aabb()
+	var panel: Node3D = _running_order[_routine.stop()]
+	var box: AABB = _box_around(panel)
 	# Asked of the belt every tick rather than wired to a swap, for the reason
 	# [method _sight_the_aim] reads the belt every tick: `equip` refuses the tool
 	# already in hand, so this is a comparison and not a swap, and there is no

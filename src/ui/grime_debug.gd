@@ -103,7 +103,7 @@ func bind(grime: Grime) -> void:
 		old.queue_free()
 	if grime == null:
 		return
-	for panel: CSGShape3D in grime.panels():
+	for panel: Node3D in grime.panels():
 		var map: GrimeMap = grime.map_of(panel)
 		if map == null:
 			continue

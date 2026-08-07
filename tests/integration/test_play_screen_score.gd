@@ -108,8 +108,8 @@ func _scoreboard() -> ScoreHud:
 
 ## One panel of [param kind] on the real car, asked for by what it is made of
 ## rather than by name — see [code]test_play_screen_wash.gd[/code] on why.
-func _a_panel_of(kind: Surface.Kind) -> CSGShape3D:
-	for panel: CSGShape3D in _car().panels():
+func _a_panel_of(kind: Surface.Kind) -> Node3D:
+	for panel: Node3D in _car().panels():
 		if _car().kind_of(panel) == kind:
 			return panel
 	return null
@@ -117,20 +117,27 @@ func _a_panel_of(kind: Surface.Kind) -> CSGShape3D:
 
 ## The whole of [param panel]'s widest face, as a brush radius in metres — a
 ## sweep this wide finishes patches rather than nibbling at one.
-func _whole_face_of(panel: CSGShape3D) -> float:
-	var box: AABB = panel.get_aabb()
+func _whole_face_of(panel: Node3D) -> float:
+	var box: AABB = _car().skin_of(panel).get_aabb()
 	return maxf(box.size.x, maxf(box.size.y, box.size.z))
+
+
+## Where a panel's box actually is, in the room — off its skin rather than off the
+## panel, which is [method Car.skin_of]'s whole reason for existing.
+func _box_around(panel: Node3D) -> AABB:
+	var skin: GeometryInstance3D = _car().skin_of(panel)
+	return skin.global_transform * skin.get_aabb()
 
 
 ## Washes the top of a body panel flat, and returns how many patches that
 ## finished. Flat rather than through the crosshair for the reason the wash suite
 ## gives: this is a test about scoring, not about aiming.
 func _wash_a_panel_flat() -> int:
-	var body: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var body: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(body, "the car has no bodywork")
 	if body == null:
 		return 0
-	var box: AABB = body.global_transform * body.get_aabb()
+	var box: AABB = _box_around(body)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var finished: int = 0
 	for _sweep: int in SWEEPS:
@@ -194,11 +201,11 @@ func test_the_score_and_the_ding_are_on_the_same_run() -> void:
 ## is the work itself.
 func test_the_score_moves_while_cleaning_before_anything_finishes() -> void:
 	await _start()
-	var body: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var body: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(body, "the car has no bodywork")
 	if body == null:
 		return
-	var box: AABB = body.global_transform * body.get_aabb()
+	var box: AABB = _box_around(body)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	# A tenth of the panel and a light touch: enough mud moves to be worth paying
 	# for, nowhere near enough to take a patch all the way clean.
@@ -215,10 +222,10 @@ func test_the_score_moves_while_cleaning_before_anything_finishes() -> void:
 ## ringing the corner like one.
 func test_the_wage_does_not_flash_the_corner() -> void:
 	await _start()
-	var body: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var body: Node3D = _a_panel_of(Surface.Kind.BODY)
 	if body == null:
 		return
-	var box: AABB = body.global_transform * body.get_aabb()
+	var box: AABB = _box_around(body)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var narrow: float = _whole_face_of(body) * 0.1
 	for _sweep: int in 8:

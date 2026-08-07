@@ -121,7 +121,7 @@ func _car_box() -> AABB:
 ## written down here.
 func _panel_names() -> Array[String]:
 	var names: Array[String] = []
-	for panel: CSGShape3D in _car().panels():
+	for panel: Node3D in _car().panels():
 		names.append(String(panel.name))
 	return names
 
