@@ -467,8 +467,8 @@ func _build(tool: DetailingTool, carry: ToolCarry) -> MeshInstance3D:
 ## opinion on — the size, the plane it starts as, the material it wears — is
 ## unchanged, which is why the swap can be this small.
 ##
-## The two spray bottles: a [ToolModel] is a [MeshInstance3D] carrying a mesh
-## exported out of Blender, fitted into the same [member DetailingTool.extent] box
+## The two spray bottles: a [ToolModel] is a [MeshInstance3D] carrying an
+## imported mesh, fitted into the same [member DetailingTool.extent] box
 ## the [CylinderMesh] filled. Asked by whether the tool names a model rather than
 ## by its id, so the third bottle is a row in the catalogue and not an edit here.
 func _instance_for(tool: DetailingTool) -> MeshInstance3D:

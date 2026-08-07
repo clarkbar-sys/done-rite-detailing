@@ -22,15 +22,24 @@ extends GutTest
 ## [code]test_view_model.gd[/code] measures its sizes at.
 const TOLERANCE: float = 0.0001
 
-## How square-on a vertex normal has to be to the triangle it belongs to.
+## How closely a fitted normal has to agree with the direction the fit's own
+## arithmetic puts it — the inverse transpose of a diagonal fit, which is the
+## component-wise divide [ToolModel] documents. A dot product, so this is about
+## a hundredth of a degree, and what is left at that scale is float32 rounding:
+## measured, the worst vertex on either bottle agrees to 0.9999998.
+const TURNED: float = 0.9999
+
+## And how far a normal that was [i]not[/i] turned has to be from that, which is
+## what stops the test above from passing on a fit that copied the array across
+## untouched.
 ##
-## These meshes are flat shaded — measured on the source asset, every vertex
-## normal agrees with its own face to within a millionth — so this is a tight
-## fence rather than a generous one, and it is what makes the fit's
-## inverse-transpose divide something a test can see. Measured with the divide
-## taken out: the real fit falls to 0.93 and the lopsided fit below to 0.61,
-## which is a bottle lit as though it were still the shape it was in Blender.
-const SQUARE_ON: float = 0.999
+## Asserted rather than assumed because it is not a given: it depends entirely on
+## how lopsided the fit is, and the tyre bottle's is nearly uniform. Measured,
+## worst vertex, fit left out: 0.925 for the window bottle and 0.993 for the tyre
+## bottle at their catalogue extents, 0.614 and 0.814 at [constant LOPSIDED]. The
+## first of those is the thin margin this constant sits inside, and the reason
+## the same measurement is made at both extents.
+const UNTURNED_MAX: float = 0.999
 
 ## A fit nothing on the belt would ever ask for: a bottle stretched to a metre
 ## tall while it stays a tenth of a metre across. Here because the two real
@@ -62,32 +71,44 @@ func _built(tool: DetailingTool, extent: Vector3) -> ToolModel:
 	return built
 
 
-## The worst agreement between a vertex normal and the triangle it sits on,
-## across every triangle of [param mesh].
+## The mesh inside [param model_path]'s imported scene.
 ##
-## The absolute dot product, because these bottles are exported double-sided and
-## their winding is not consistent — half the faces have a normal pointing the
-## other way down the same line, which says nothing about whether the fit turned
-## it correctly. What is being measured is the angle between the normal and its
-## own surface, and that is what the sign is being dropped from.
-func _worst_normal(mesh: Mesh) -> float:
-	var arrays: Array = mesh.surface_get_arrays(0)
-	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+## Loaded here rather than borrowed from [ToolModel], on purpose: what the
+## normal tests below measure is the arithmetic that class does to this array, so
+## a test that read the array back through it would be grading the fit against
+## itself.
+func _source_mesh(model_path: String) -> Mesh:
+	var scene: Node = (load(model_path) as PackedScene).instantiate()
+	autofree(scene)
+	for child: Node in scene.get_children():
+		var found: MeshInstance3D = child as MeshInstance3D
+		if found != null:
+			return found.mesh
+	return null
+
+
+## The fit [ToolModel] will use for [param tool] at [param extent] — its
+## documented contract, which is the catalogue's box over the source mesh's own.
+func _fit_of(tool: DetailingTool, extent: Vector3) -> Vector3:
+	return extent / _source_mesh(tool.model).get_aabb().size
+
+
+## The worst agreement, over every vertex of every surface, between the normal
+## [param fitted] ended up with and the source normal turned by [param by].
+##
+## Pass the reciprocal of the fit and this measures whether the fit turned its
+## normals correctly; pass [constant Vector3.ONE] and it measures how wrong
+## leaving them alone would have been. A signed dot product, because a turn is
+## what is being checked and a normal that came out backwards is not a pass.
+func _worst_turned(fitted: Mesh, source: Mesh, by: Vector3) -> float:
 	var worst: float = 1.0
-	for triangle: int in indices.size() / 3:
-		var first: int = indices[triangle * 3]
-		var second: int = indices[triangle * 3 + 1]
-		var third: int = indices[triangle * 3 + 2]
-		var across: Vector3 = vertices[second] - vertices[first]
-		var down: Vector3 = vertices[third] - vertices[first]
-		var face: Vector3 = across.cross(down)
-		if face.is_zero_approx():
-			continue
-		face = face.normalized()
-		for corner: int in [first, second, third]:
-			worst = minf(worst, absf(face.dot(normals[corner].normalized())))
+	for surface: int in source.get_surface_count():
+		var was: Array = source.surface_get_arrays(surface)
+		var now: Array = fitted.surface_get_arrays(surface)
+		var before: PackedVector3Array = was[Mesh.ARRAY_NORMAL]
+		var after: PackedVector3Array = now[Mesh.ARRAY_NORMAL]
+		for at: int in before.size():
+			worst = minf(worst, after[at].dot((before[at] * by).normalized()))
 	return worst
 
 
@@ -122,56 +143,82 @@ func test_a_model_is_centred_where_the_cylinder_was() -> void:
 
 func test_the_fit_ignores_whatever_scale_the_export_was_saved_at() -> void:
 	# The reason the fit reads the mesh's own box instead of the node scale the
-	# [code].glb[/code] carries: both bottles are exported from a unit cylinder
-	# scaled by the window cleaner's extent read as half-extents, so honouring that
-	# would ship one bottle at twice its size and the other at the wrong one
-	# entirely. Asked by fitting the same asset into a box nothing else would ask
-	# for, and requiring it to land there.
+	# [code].glb[/code] carries: the window bottle is a unit cylinder with its
+	# extent on the node as half-extents, so honouring that would ship it at twice
+	# its size, and the tyre bottle is a real sprayer in real metres, which is a
+	# third size again. Asked by fitting each asset into a box nothing else would
+	# ask for, and requiring it to land there.
 	for tool: DetailingTool in _modelled():
 		var box: AABB = _built(tool, LOPSIDED).get_aabb()
 		assert_almost_eq(box.size.x, LOPSIDED.x, TOLERANCE, "%s: width" % tool.display_name)
 		assert_almost_eq(box.size.y, LOPSIDED.y, TOLERANCE, "%s: height" % tool.display_name)
 
 
-func test_two_tools_with_the_same_source_still_come_out_different_sizes() -> void:
-	# Both bottles are the same mesh in two liveries, and the catalogue gives them
-	# different extents on purpose — [method ViewModel._held_pose] leans them apart
-	# so a glance at the corner of the screen tells them apart. A fit that took its
-	# size from the file rather than from the catalogue would make them identical
-	# and nothing else would notice.
+func test_the_catalogue_and_not_the_file_is_what_makes_the_bottles_different_sizes() -> void:
+	# The catalogue gives the two bottles different extents on purpose — [method
+	# ViewModel._held_pose] leans them apart so a glance at the corner of the
+	# screen tells them apart — and the files they are drawn from say nothing
+	# about that. They are not even close to agreeing: the window bottle is a
+	# 2 x 2.33 x 2 unit cylinder and the tyre bottle is a 27 cm sprayer in real
+	# metres, so a fit that took its size from the file would put a bottle in the
+	# player's hand that is taller than they are.
 	var window: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.WINDOW_CLEANER]
 	var tire: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.TIRE_ENGINE_CLEANER]
 	var window_box: AABB = _built(window, window.extent).get_aabb()
 	var tire_box: AABB = _built(tire, tire.extent).get_aabb()
 	assert_gt(tire_box.size.y, window_box.size.y, "the tyre bottle is the taller of the two")
+	assert_lt(tire_box.size.y, 0.5, "and neither of them is furniture")
+
+
+func test_a_model_made_of_several_parts_arrives_with_all_of_them() -> void:
+	# The tyre bottle is six modelled parts — body, neck, nozzle, two caps and a
+	# trigger — flattened into one mesh of six surfaces by
+	# [code]scripts/build-tire-cleaner.py[/code], because [method
+	# ToolModel._first_mesh] takes one mesh and would otherwise hand the player a
+	# bottle with no trigger on it. Both halves of that are asserted here: the
+	# bake keeps the parts in one mesh, and the fit keeps every one of them.
+	for tool: DetailingTool in _modelled():
+		var source: Mesh = _source_mesh(tool.model)
+		var fitted: Mesh = _built(tool, tool.extent).mesh
+		assert_gt(source.get_surface_count(), 0, "%s: the import found no surface" % tool.model)
+		assert_eq(
+			fitted.get_surface_count(),
+			source.get_surface_count(),
+			"%s: the fit dropped a part of the model" % tool.display_name
+		)
 
 
 # ---- what the model brings that a cylinder could not -------------------------
 
 
-func test_the_models_own_texture_survives_the_fit() -> void:
+func test_the_models_own_textures_survive_the_fit() -> void:
 	# The whole reason these are models. The fit rebuilds every surface vertex by
 	# vertex, so the material has to be carried across by hand — and a fit that
 	# dropped it would leave a correctly-sized white bottle, which looks enough
-	# like a design decision to survive a review.
+	# like a design decision to survive a review. Every surface and not just the
+	# first: the tyre bottle wears six materials, and five of them going missing
+	# is the same bug wearing a smaller hat.
 	for tool: DetailingTool in _modelled():
 		var mesh: Mesh = _built(tool, tool.extent).mesh
 		assert_not_null(mesh, "%s has no mesh at all" % tool.display_name)
 		if mesh == null:
 			continue
-		var surface: StandardMaterial3D = mesh.surface_get_material(0) as StandardMaterial3D
-		assert_not_null(surface, "%s: the import's material" % tool.display_name)
-		if surface == null:
-			continue
-		assert_not_null(surface.albedo_texture, "%s: and its texture" % tool.display_name)
+		for at: int in mesh.get_surface_count():
+			var surface: StandardMaterial3D = mesh.surface_get_material(at) as StandardMaterial3D
+			assert_not_null(surface, "%s: the import's material %d" % [tool.display_name, at])
+			if surface == null:
+				continue
+			assert_not_null(surface.albedo_texture, "%s: and texture %d" % [tool.display_name, at])
 
 
 func test_the_two_bottles_do_not_share_one_texture() -> void:
-	# They are the same geometry in two liveries, and the livery is the only thing
-	# telling them apart at a glance once both are the same shape. Asserted because
-	# the exported PNGs are both named after the window cleaner — see
-	# [code]assets/models/cleaning_spray/[/code] — which is exactly the sort of
-	# thing that quietly becomes one texture on the next re-export.
+	# Two bottles that came out of the same tin of paint are one bottle as far as
+	# a glance at the corner of the screen is concerned. Kept as a test after the
+	# tyre bottle stopped being a re-skin of the window one, because what it
+	# guards is not that history: both are extracted into
+	# [code]assets/models/cleaning_spray/[/code] as PNGs named after the
+	# [code].glb[/code] they came out of, and a re-export that renames one onto
+	# the other's file is silent everywhere else.
 	var textures: Array[Texture2D] = []
 	for tool: DetailingTool in _modelled():
 		var surface: StandardMaterial3D = (
@@ -184,25 +231,56 @@ func test_the_two_bottles_do_not_share_one_texture() -> void:
 # ---- the arithmetic the fit has to get right --------------------------------
 
 
-func test_normals_still_stand_off_the_surface_they_belong_to() -> void:
+func test_normals_are_turned_by_the_inverse_of_the_fit() -> void:
 	# A normal carried through a non-uniform scale unchanged no longer stands off
-	# its own face, and what that looks like is a bottle lit as though it were the
-	# shape it was in Blender. Measured against the triangles of the fitted mesh
-	# rather than against the source, so it is the fit being asked and not the
-	# exporter.
+	# the surface it belongs to, and what that looks like is a bottle lit as though
+	# it were still the shape it was in Blender.
+	#
+	# Measured against where the fit's own arithmetic puts each normal rather than
+	# against the face it sits on, and that is a deliberate change: the tyre
+	# bottle is smooth shaded, so its normals are not square-on to their own
+	# triangles in the source either and "square-on to the face" stopped being a
+	# statement about the fit. Turning each source normal by the reciprocal of the
+	# fit says the same thing about flat and smooth shading alike.
 	for tool: DetailingTool in _modelled():
-		var worst: float = _worst_normal(_built(tool, tool.extent).mesh)
-		assert_gt(worst, SQUARE_ON, "%s: a normal has come off its face" % tool.display_name)
+		var source: Mesh = _source_mesh(tool.model)
+		var fitted: Mesh = _built(tool, tool.extent).mesh
+		var by: Vector3 = Vector3.ONE / _fit_of(tool, tool.extent)
+		var worst: float = _worst_turned(fitted, source, by)
+		assert_gt(worst, TURNED, "%s: a normal is not where the fit puts it" % tool.display_name)
 
 
 func test_normals_survive_a_fit_far_more_lopsided_than_any_tool_asks_for() -> void:
-	# The same measurement where the error would be large. At the real extents a
-	# normal left untransformed is wrong by about 20°, which is visible but is
-	# within a threshold somebody might loosen; at this one it is wrong by 50° and
-	# no plausible threshold hides it.
+	# The same measurement where the error would be large. The tyre bottle's real
+	# fit is nearly uniform — 1.08, 1.12, 1.37 — so a normal left alone is only
+	# about 7° out there, which is a small enough error to hide behind a threshold
+	# somebody nudges; at this fit it is 35° out and nothing hides it.
 	for tool: DetailingTool in _modelled():
-		var worst: float = _worst_normal(_built(tool, LOPSIDED).mesh)
-		assert_gt(worst, SQUARE_ON, "%s: a normal has come off its face" % tool.display_name)
+		var source: Mesh = _source_mesh(tool.model)
+		var fitted: Mesh = _built(tool, LOPSIDED).mesh
+		var by: Vector3 = Vector3.ONE / _fit_of(tool, LOPSIDED)
+		var worst: float = _worst_turned(fitted, source, by)
+		assert_gt(worst, TURNED, "%s: a normal is not where the fit puts it" % tool.display_name)
+
+
+func test_a_fit_that_left_the_normals_alone_would_fail_the_two_tests_above() -> void:
+	# What keeps those two honest. They compare the fitted normals against a
+	# turn computed here, and if that turn were close enough to no turn at all
+	# they would both pass over a class that copied the array across untouched —
+	# which is the exact bug they exist for. So: measure the same worst vertex
+	# against the untouched normal, and require it to miss.
+	for tool: DetailingTool in _modelled():
+		for extent: Vector3 in [tool.extent, LOPSIDED]:
+			var fitted: Mesh = _built(tool, extent).mesh
+			var worst: float = _worst_turned(fitted, _source_mesh(tool.model), Vector3.ONE)
+			assert_lt(
+				worst,
+				UNTURNED_MAX,
+				(
+					"%s at %v: the fit is too near uniform to prove anything"
+					% [tool.display_name, extent]
+				)
+			)
 
 
 func test_a_model_that_is_not_there_is_an_empty_proxy_rather_than_a_broken_belt() -> void:

@@ -166,15 +166,21 @@ size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 44
 text = "How to Play"
 
-; The credit for the cars, along the bottom of the menu.
+; The credits for the borrowed models, along the bottom of the menu.
 ;
-; CC-BY 4.0 is the licence the ten models in assets/models/cars/ arrive under and
-; attribution is a condition of it, not a courtesy — so it has to be somewhere a
-; player can actually read, and this is the screen every player passes through on
-; the way to the bay. The same line is in README.md and in
-; assets/models/cars/ATTRIBUTION.txt; this is the copy the licence is actually
-; satisfied by, because the other two ship to whoever clones the repo rather than
-; to whoever plays the game.
+; CC-BY 4.0 is the licence the ten models in assets/models/cars/ arrive under —
+; and the licence the tyre cleaner's bottle arrives under too — and attribution
+; is a condition of it, not a courtesy. So it has to be somewhere a player can
+; actually read, and this is the screen every player passes through on the way to
+; the bay. The same lines are in README.md and in the two ATTRIBUTION.txt files
+; beside the assets; this is the copy the licence is actually satisfied by,
+; because the other two ship to whoever clones the repo rather than to whoever
+; plays the game.
+;
+; One line per work, and the second one links the author's page rather than the
+; model's: the car pack has a skfb.ly short link and the bottle does not, and its
+; full URL is 62 characters of hex that would wrap the line on a phone. The
+; direct link to the model is in the ATTRIBUTION.txt beside it and in README.md.
 ;
 ; Bottom-left and quiet on purpose. It is not a design element and it is not a
 ; secret: the licence asks for the title, the author and the licence, "reasonable
@@ -201,7 +207,7 @@ offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_font_sizes/font_size = 20
-text = "Car models: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) — CC BY 4.0"
+text = "Car models: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) — CC BY 4.0\nSpray bottle: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0"
 autowrap_mode = 3
 
 [node name="Build" type="Label" parent="."]

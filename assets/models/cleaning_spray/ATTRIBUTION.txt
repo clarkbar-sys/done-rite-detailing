@@ -1,0 +1,6 @@
+tire_cleaner.glb is a processed derivative of "Kitchen Spray"
+(https://sketchfab.com/3d-models/kitchen-spray-2a5debf2fd58487e91fce90487c22e26) by Jesus Osco (https://sketchfab.com/gsus.vfx),
+licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+See scripts/build-tire-cleaner.py for what the processing does.
+
+Every other model in this folder is the project's own.
