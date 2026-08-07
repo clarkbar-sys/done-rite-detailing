@@ -355,7 +355,7 @@ jobs:
       # re-exported, so what gets published is provably the bundle that ran
       # the "no tests, no GUT" check, not a fresh export of the same commit.
       - name: Download the web bundle
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: done-rite-detailing-web
           path: ${{ env.WEB_DIR }}
