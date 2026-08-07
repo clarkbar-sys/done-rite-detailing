@@ -930,11 +930,19 @@ func _take_up_aiming() -> void:
 ## Started and not awaited by the caller: [method _ready] has nothing further to
 ## do about grime, and making it wait would push every screen's first frame
 ## behind this.
+##
+## [b]A physics frame and not an idle one, since [code]#144[/code].[/b] Laying the
+## mud on now casts a few tens of thousands of rays at the car to find out where a
+## player can reach ([method Grime.lay_on]), and a space state may only be queried
+## while physics is stepping — the same constraint that put the walk and the aim on
+## that clock. Awaiting [signal SceneTree.physics_frame] resumes inside exactly the
+## window [method _physics_process] runs in, which is the window the query is legal
+## in.
 func _lay_on_the_grime() -> void:
-	await get_tree().process_frame
+	await get_tree().physics_frame
 	if not is_instance_valid(_grime) or not is_instance_valid(_car):
 		return
-	_grime.lay_on(_car)
+	_lay_the_mud_on()
 	# Here rather than in `_ready()` for the reason the grime itself is: the running
 	# order is sorted by how big each panel is, and a panel asked before its CSG has
 	# been built reports a zero box — so a demo set up a frame earlier would work the
@@ -1440,7 +1448,37 @@ func _press_the_glass(work: Vector3) -> void:
 ## exactly this, and it is the only line of the attract mode that reaches past the
 ## controls a player has.
 func _on_lapped() -> void:
-	_grime.lay_on(_car)
+	_lay_the_mud_on()
+
+
+## Mud on the car, and only where somebody standing in this room could get a tool
+## onto it.
+##
+## [b]The room is the only thing that knows the band[/b], which is why the poses
+## are worked out here and handed over rather than reached for from inside
+## [Grime]: the walk's fence ([member standoff_radius_min] to
+## [member orbit_radius]) and its lift ([member eye_height_min] to
+## [member eye_height_max]) are this class's exports, and a grime that read them
+## would be a second class with an opinion about where the player may stand.
+##
+## [b]The narrowest tool decides the margin, not the widest.[/b] A texel is only
+## finished when all three passes have been over it, so the radius that matters is
+## the one that reaches least far — the sponge's [member scrub_radius_metres],
+## today. Handing over the jet's would seed mud in a ring that can be washed and
+## never foamed, which is a panel nobody can finish and the exact failure this
+## whole change is about. [PanelReach]'s class docs have the argument at length.
+##
+## Called again by [method _on_lapped], where it costs almost nothing: the poses
+## are the same array and the panels are the same panels, so [Grime] hands back the
+## mask it already measured.
+func _lay_the_mud_on() -> void:
+	_grime.lay_on(
+		_car,
+		PanelReach.eyes(
+			_car.bounds(), standoff_radius_min, orbit_radius, eye_height_min, eye_height_max
+		),
+		minf(wash_radius_metres, minf(scrub_radius_metres, buff_radius_metres))
+	)
 
 
 ## Measures how far the car actually is and lets [Standoff] close the gap.

@@ -95,6 +95,13 @@ var _maps: Array[GrimeMap] = []
 var _flashes: Array[PatchFlash] = []
 var _panels: Array[Node3D] = []
 var _skins: Array[GeometryInstance3D] = []
+## Where a tool can be got onto each panel, parallel to [member _panels] and empty
+## on a car nobody measured. Kept after [method lay_on] has spent it, so a car that
+## is dirtied again does not pay to be looked at twice — see [method _reach_across].
+var _reaches: Array[PanelReach] = []
+## The eye poses [member _reaches] was measured from, for the same reason: it is
+## how "the same question as last time" is recognised.
+var _eyes: PackedVector3Array = PackedVector3Array()
 
 
 ## Dims every panel's finished-patch flashes.
@@ -110,34 +117,142 @@ func _process(delta: float) -> void:
 		flash.fade(delta)
 
 
-## Puts mud on every panel of [param car].
+## Puts mud on every panel of [param car] — on the parts of every panel the player
+## can get a tool onto, when there is a way to find out which those are.
 ##
 ## Must be called after the car has had a frame to build its CSG — see the class
 ## docs. Calling it twice replaces what was there, which is what a "reset the
 ## car" would want and is otherwise nobody's business.
 ##
+## [param eyes] is every pose the player's eye may take up around this car
+## ([method PanelReach.eyes]) and [param brush_metres] is how wide the narrowest
+## tool reaches. Given both, this looks at the car from each of those poses through
+## the same [method PhysicsDirectSpaceState3D.intersect_ray] the trigger is spent
+## with, and each panel's map is seeded only where something was seen — which is
+## the whole of [code]#144[/code], and the reason a car has an underside that is
+## not muddy and a percentage that can reach a hundred.
+##
+## [b]Both default to nothing, and that default is the old behaviour exactly.[/b]
+## A caller with no physics world to cast in — every unit test, the fixtures, the
+## panel-contract suite — gets a full panel, which is what those want and what this
+## did before. Nothing here decides the band the eye is allowed into: that is the
+## room's, and it arrives already sampled, so this class never has to know a
+## [Garage] exists.
+##
 ## The skins are kept alongside the maps rather than looked up again on every
 ## press: the arrays are already parallel, one more of them costs a pointer per
 ## panel, and it means [method _work] does no tree-walking on a physics tick.
-func lay_on(car: Car) -> void:
-	_panels = car.panels()
-	_skins = []
+func lay_on(
+	car: Car, eyes: PackedVector3Array = PackedVector3Array(), brush_metres: float = 0.0
+) -> void:
+	var parts: Array[Node3D] = car.panels()
+	var skins: Array[GeometryInstance3D] = []
+	for panel: Node3D in parts:
+		skins.append(car.skin_of(panel))
+	# Before the arrays below are replaced, because the answer may be the one
+	# already in them — see [method _reach_across].
+	var reaches: Array[PanelReach] = _reach_across(car, parts, skins, eyes, brush_metres)
+	_panels = parts
+	_skins = skins
+	_reaches = reaches
+	_eyes = eyes
 	_maps = []
 	_flashes = []
 	var shader: Shader = load(SHADER) as Shader
-	for panel: Node3D in _panels:
-		var skin: GeometryInstance3D = car.skin_of(panel)
+	for index: int in _panels.size():
+		var skin: GeometryInstance3D = _skins[index]
 		var box: AABB = skin.get_aabb()
 		var pixels: int = PanelResolution.tile_pixels_for(box)
-		var map: GrimeMap = GrimeMap.new(box, pixels, patches_per_tile)
+		var reach: PanelReach = null if _reaches.is_empty() else _reaches[index]
+		var map: GrimeMap = GrimeMap.new(box, pixels, patches_per_tile, reach)
 		# Sized from the map rather than from `patches_per_tile` and
 		# `BoxProjection.COLUMNS`, which is the same arithmetic in a second place —
 		# see [method GrimeMap.patch_grid].
 		var flash: PatchFlash = PatchFlash.new(map.patch_grid())
-		_skins.append(skin)
 		_maps.append(map)
 		_flashes.append(flash)
-		skin.material_overlay = _overlay(shader, map, flash, box, car.kind_of(panel))
+		skin.material_overlay = _overlay(shader, map, flash, box, car.kind_of(_panels[index]))
+
+
+## Where a tool can be got onto each panel of [param car], measured by looking at
+## it from every pose in [param eyes] and growing what was seen by
+## [param brush_metres] — or an empty array when there is nothing to measure with,
+## which [method lay_on] reads as "all of it".
+##
+## [b]This is the physics half, and it is here rather than in [PanelReach] because
+## a space state belongs to a node in a tree.[/b] Everything that can be worked out
+## without one — where to stand, what to aim at, where a hit lands in the atlas,
+## how far to grow it — is in that class, where a unit test can reach it. What is
+## left here is the loop and the query, and the query is deliberately the same
+## [method PhysicsDirectSpaceState3D.intersect_ray] [method Garage._under_the_finger]
+## spends the trigger through: reachability is then defined by the code that
+## actually decides what a press lands on, rather than by a second model of the car
+## that can disagree with it.
+##
+## [b]Cast on the physics clock.[/b] A space state may only be queried while
+## physics is stepping, which is why [method Garage._lay_on_the_grime] waits for a
+## physics frame rather than an idle one before calling in here.
+##
+## [b]Measured on this hardware, against the pack's own trimesh colliders.[/b] The
+## sedan the bay parks comes out at 78 eye poses — 96 sampled, eighteen dropped for
+## standing on the car — against a 312-point lattice, which is 24,336 rays at the
+## 3.6 µs a landed [method PhysicsDirectSpaceState3D.intersect_ray] costs on these
+## colliders ([code]scripts/perf-probe.gd[/code] has that number and how it was
+## taken). The whole of [method lay_on] — the rays, the dilation, and seven maps
+## seeded and cut back — is 140-150 ms on the sedan and 185 ms on the pickup, which
+## is the longest style in the pack at 35,100 rays. Seeding the maps alone, which
+## is what a re-lay off the cached mask costs, is 15 ms of that.
+##
+## It is paid once, on the frame after the room is ready, against a load that is
+## already building ten thousand triangles of collider — [MeshCar]'s class docs
+## have that at 2.8-3.4 ms a car. Nothing about it is per frame.
+##
+## [b]And it is not paid twice for the same car.[/b] The attract loop dirties the
+## car again every time the demo finishes it ([method Garage._on_lapped]), which is
+## the same panels seen from the same band — so the answer from last time is handed
+## back when both are unchanged. Recomputing would be a quarter-second hitch behind
+## the title card for a mask that cannot have moved.
+func _reach_across(
+	car: Car,
+	parts: Array[Node3D],
+	skins: Array[GeometryInstance3D],
+	eyes: PackedVector3Array,
+	brush_metres: float
+) -> Array[PanelReach]:
+	if eyes.is_empty() or brush_metres <= 0.0:
+		return []
+	if parts == _panels and eyes == _eyes and _reaches.size() == parts.size():
+		return _reaches
+	var grid: Vector2i = GrimeMap.patch_grid_for(patches_per_tile)
+	var found: Array[PanelReach] = []
+	var into: Array[Transform3D] = []
+	var index_of: Dictionary = {}
+	for index: int in parts.size():
+		found.append(PanelReach.new(skins[index].get_aabb(), grid))
+		into.append(skins[index].global_transform.affine_inverse())
+		index_of[parts[index]] = index
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	for target: Vector3 in PanelReach.targets(car.bounds()):
+		for eye: Vector3 in eyes:
+			var hit: Dictionary = space.intersect_ray(
+				PhysicsRayQueryParameters3D.create(eye, target)
+			)
+			if hit.is_empty():
+				continue
+			var landed: Node = hit["collider"]
+			if not index_of.has(landed):
+				continue
+			var found_at: int = index_of[landed]
+			var where: Vector3 = hit["position"]
+			var outward: Vector3 = hit["normal"]
+			# Into the skin's own space and not the panel root's, and the normal by the
+			# basis alone — the same conversion [method _work] does on every press, and
+			# for the same two reasons it gives.
+			var to_panel: Transform3D = into[found_at]
+			found[found_at].saw(to_panel * where, (to_panel.basis * outward).normalized())
+	for reach: PanelReach in found:
+		reach.spread(brush_metres)
+	return found
 
 
 ## Whether [method lay_on] has run. False on a room that never took up grime —
@@ -189,38 +304,62 @@ func flash_of(panel: Node) -> PatchFlash:
 ## much as the whole shell. That is the wrong answer for a score and the right
 ## one for a progress bar over a fixed amount of work, which is what this is
 ## while there is nothing spending it.
+##
+## [b]A panel with nothing reachable on it is left out of the average
+## entirely[/b], rather than counted as a zero — see [method GrimeMap.has_reach].
+## Counted, it would be a panel that is permanently spotless and permanently
+## unpolished at the same time, dragging one average down and holding the other up,
+## and neither reading would be about anything a player did.
 func remaining() -> float:
-	if _maps.is_empty():
-		return 0.0
 	var left: float = 0.0
+	var counted: int = 0
 	for map: GrimeMap in _maps:
+		if not map.has_reach():
+			continue
 		left += map.remaining()
-	return left / float(_maps.size())
+		counted += 1
+	if counted == 0:
+		return 0.0
+	return left / float(counted)
 
 
 ## How much of the car is under product right now, as [code]0..1[/code]. Goes up
 ## under the cleaners and back down under the rag — see [method GrimeMap.product].
 func product() -> float:
-	if _maps.is_empty():
-		return 0.0
 	var on: float = 0.0
+	var counted: int = 0
 	for map: GrimeMap in _maps:
+		if not map.has_reach():
+			continue
 		on += map.product()
-	return on / float(_maps.size())
+		counted += 1
+	if counted == 0:
+		return 0.0
+	return on / float(counted)
 
 
 ## How much of the car is buffed to a shine, as [code]0..1[/code].
 ##
 ## The progress number, and the one a bar should be reading: it only ever rises,
 ## and unlike [method remaining] it does not call a car finished when the mud
-## comes off. Unweighted for the same reason [method remaining] is.
+## comes off. Unweighted, and blind to panels with nothing reachable on them, for
+## the reasons [method remaining] gives.
+##
+## [b]It reaches one now.[/b] Before [PanelReach] there was no way to buff the
+## underside of a shell or the air inside a panel's box, so this asymptoted
+## somewhere under a half and there was no honest percentage to show anybody. It is
+## what [code]src/ui/score_hud.gd[/code] prints as the done readout.
 func shine() -> float:
-	if _maps.is_empty():
-		return 0.0
 	var buffed: float = 0.0
+	var counted: int = 0
 	for map: GrimeMap in _maps:
+		if not map.has_reach():
+			continue
 		buffed += map.shine()
-	return buffed / float(_maps.size())
+		counted += 1
+	if counted == 0:
+		return 0.0
+	return buffed / float(counted)
 
 
 ## How much work the whole car has had done on it in [param stage], ever,
