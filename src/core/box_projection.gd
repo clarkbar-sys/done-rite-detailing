@@ -108,8 +108,8 @@ static func tile_axes(face: Face) -> Vector2i:
 ## axis, for a panel whose box is [param box] in the same space as the point.
 ##
 ## Clamped, because a point may legitimately sit slightly outside the box it is
-## being measured against: [method CSGShape3D.get_aabb] is the box around a
-## built mesh and a ray hits the mesh, so rounding at a corner can put the hit a
+## being measured against: [method VisualInstance3D.get_aabb] is the box around
+## a mesh and a ray hits the mesh, so rounding at a corner can put the hit a
 ## float's width past the face. Clamping puts it on the edge of the tile, which
 ## is where it is.
 static func tile_uv(box: AABB, point: Vector3, face: Face) -> Vector2:

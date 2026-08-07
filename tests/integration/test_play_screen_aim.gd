@@ -147,7 +147,7 @@ func _car_box() -> AABB:
 ## after somebody adds a wing.
 func _panel_names() -> Array[String]:
 	var names: Array[String] = []
-	for panel: CSGShape3D in _car().panels():
+	for panel: Node3D in _car().panels():
 		names.append(String(panel.name))
 	return names
 
@@ -330,7 +330,7 @@ func test_a_press_on_the_car_puts_the_crosshair_on_the_car() -> void:
 
 
 func test_a_press_on_the_car_names_the_panel_it_hit() -> void:
-	# The whole reason the car is twelve CSG roots instead of one: a hit comes back
+	# The whole reason the car is separate panels instead of one solid: a hit comes back
 	# as a piece of the car with a name, which is what the grime work will hang
 	# off. Asserted against the car's own list rather than against the string
 	# "Hood", so reshaping the car cannot make this quietly meaningless.

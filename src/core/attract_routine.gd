@@ -59,8 +59,9 @@ const MIN_SECONDS: float = 0.05
 ##
 ## Short of the whole thing on purpose. The aim wanders the panel's bounding box
 ## and a bounding box is bigger than the panel inside it — every one of them, but
-## a wing mirror's especially — so a sweep that ran to the edges would spend a
-## good part of every pass pointed at the air beside the bodywork.
+## a wheel's especially, where most of the box is the empty corners of the arch —
+## so a sweep that ran to the edges would spend a good part of every pass pointed
+## at the air beside the bodywork.
 const REACH: float = 0.8
 
 ## How many times the aim crosses the panel while working down it. Three, which

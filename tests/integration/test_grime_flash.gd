@@ -52,24 +52,38 @@ func before_each() -> void:
 
 
 ## Every panel of [param kind], in the order the car lists them.
-func _panels_of(kind: Surface.Kind) -> Array[CSGShape3D]:
-	var found: Array[CSGShape3D] = []
-	for panel: CSGShape3D in _car.panels():
+func _panels_of(kind: Surface.Kind) -> Array[Node3D]:
+	var found: Array[Node3D] = []
+	for panel: Node3D in _car.panels():
 		if _car.kind_of(panel) == kind:
 			found.append(panel)
 	return found
 
 
 ## One panel of [param kind], or null if the car has none.
-func _a_panel_of(kind: Surface.Kind) -> CSGShape3D:
-	var found: Array[CSGShape3D] = _panels_of(kind)
+func _a_panel_of(kind: Surface.Kind) -> Node3D:
+	var found: Array[Node3D] = _panels_of(kind)
 	return null if found.is_empty() else found[0]
+
+
+## The skin of a panel: the node its box and its overlay are actually on — see
+## [method Car.skin_of], and its twin in
+## [code]tests/integration/test_grime.gd[/code] for why it is asked of the car
+## rather than assumed to be the panel.
+func _skin(panel: Node3D) -> GeometryInstance3D:
+	return _car.skin_of(panel)
+
+
+## Where a panel's box actually is, in the room.
+func _box_around(panel: Node3D) -> AABB:
+	var skin: GeometryInstance3D = _skin(panel)
+	return skin.global_transform * skin.get_aabb()
 
 
 ## The middle of the top of a panel, in world space — where a tool pointed down at
 ## the car from above would land.
-func _on_top_of(panel: CSGShape3D) -> Vector3:
-	var box: AABB = panel.global_transform * panel.get_aabb()
+func _on_top_of(panel: Node3D) -> Vector3:
+	var box: AABB = _box_around(panel)
 	return Vector3(box.get_center().x, box.end.y, box.get_center().z)
 
 
@@ -77,13 +91,13 @@ func _on_top_of(panel: CSGShape3D) -> Vector3:
 ## wants a patch finished gets one whatever size the panel is — measured off the
 ## panel for the reason its twin in
 ## [code]tests/integration/test_grime.gd[/code] records.
-func _whole_face_of(panel: CSGShape3D) -> float:
-	return (panel.global_transform * panel.get_aabb()).size.length()
+func _whole_face_of(panel: Node3D) -> float:
+	return _box_around(panel).size.length()
 
 
 ## Washes a panel flat from above, which is the only pass that finishes patches
 ## without needing one of the other two to have run first.
-func _wash_flat(panel: CSGShape3D) -> void:
+func _wash_flat(panel: Node3D) -> void:
 	for _sweep: int in 60:
 		_grime.wash(panel, _on_top_of(panel), Vector3.UP, _whole_face_of(panel), 0.1)
 
@@ -97,8 +111,8 @@ func test_every_panel_gets_its_own_flashes_to_sample() -> void:
 	# at once. Checked against the shader's uniform rather than against
 	# [method Grime.flash_of], because the uniform is the one the game reads.
 	var seen: Array[RID] = []
-	for panel: CSGShape3D in _car.panels():
-		var paint: ShaderMaterial = panel.material_overlay as ShaderMaterial
+	for panel: Node3D in _car.panels():
+		var paint: ShaderMaterial = _skin(panel).material_overlay as ShaderMaterial
 		assert_not_null(paint, "%s has no grime material" % panel.name)
 		if paint == null:
 			continue
@@ -116,14 +130,14 @@ func test_the_flashes_are_diced_the_same_way_the_mask_is() -> void:
 	# One grid, two consumers. The shader samples both maps through the same atlas
 	# coordinates, so a flash image of a different shape would light the square
 	# next to the one that rang — see [method GrimeMap.patch_grid].
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		var grid: Vector2i = _grime.map_of(panel).patch_grid()
 		var image: Image = _grime.flash_of(panel).image()
 		assert_eq(Vector2i(image.get_width(), image.get_height()), grid, String(panel.name))
 
 
 func test_a_fresh_car_has_nothing_lit_on_it() -> void:
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		assert_eq(_grime.flash_of(panel).lit(), 0, String(panel.name))
 
 
@@ -141,7 +155,7 @@ func test_finishing_a_patch_lights_the_patch_it_finished() -> void:
 	# The visual half of the ding, and the reason it is fed from where the signal
 	# is emitted rather than from a listener: the square that lights and the bell
 	# that rings are two uses of one list, so they cannot come apart.
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
@@ -165,7 +179,7 @@ func test_a_square_lit_by_the_water_says_it_was_the_water() -> void:
 	# Three passes, three colours — see `flash_tint` in `grime.gdshader`. A stage
 	# that did not survive the trip from the signal to the pixel would pop the
 	# wrong colour, which is the kind of wrong nothing errors about.
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
@@ -184,7 +198,7 @@ func test_washing_the_bonnet_lights_nothing_on_the_boot_lid() -> void:
 	# [code]test_grime.gd[/code]'s central assertion, asked of the light rather
 	# than of the mask: two panels of the same kind, because a shared flash map
 	# would be likeliest between the panels a projection treats alike.
-	var body: Array[CSGShape3D] = _panels_of(Surface.Kind.BODY)
+	var body: Array[Node3D] = _panels_of(Surface.Kind.BODY)
 	assert_gt(body.size(), 1, "the car needs two body panels for this to mean anything")
 	if body.size() < 2:
 		return
@@ -201,7 +215,7 @@ func test_the_flashes_go_out_on_their_own() -> void:
 	# calling [method PatchFlash.fade] directly, because what is being pinned is
 	# that [method Grime._process] is wired to it at all — the unit tests already
 	# own the decay itself.
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return

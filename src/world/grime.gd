@@ -6,13 +6,32 @@
 ## inside would put it in the way of everything that walks the car's children
 ## looking for panels ([method Car.panels]).
 ##
-## [b]It is laid on a frame late, on purpose.[/b] Every map is sized from its
-## panel's [method CSGShape3D.get_aabb], and CSG meshes are built deferred — a
-## panel asked during [method Node._ready] reports a zero box, and a zero box is
-## a projection that divides by nothing. [Car] documents that at length and its
-## own [method Car.bounds] carries the same warning. So [method lay_on] is called
-## after a frame has passed and [method is_laid] is how a caller finds out
-## whether it has happened yet.
+## [b]It is laid on a frame late, on purpose — while the car is CSG.[/b] Every
+## map is sized from its panel's box, and CSG meshes are built deferred: a panel
+## asked during [method Node._ready] reports a zero box, and a zero box is a
+## projection that divides by nothing. [Car] documents that at length and its own
+## [method Car.bounds] carries the same warning, along with the note that it is
+## the blockout's tax and not the panel contract's — a panel skinned with a
+## [MeshInstance3D] is exact immediately. So [method lay_on] is called after a
+## frame has passed and [method is_laid] is how a caller finds out whether it has
+## happened yet.
+##
+## [b]It reads a panel through [method Car.skin_of].[/b] What it needs off a panel
+## is a box and an overlay slot, and neither is on the panel's root once the root
+## is a [StaticBody3D] rather than a [CSGShape3D] — [Car]'s class docs have the
+## whole shape. Nothing else here changes: a panel is still whatever the raycast
+## handed back, which is what [method map_of] is keyed on.
+##
+## [b]Each map is sized off its own panel, not off one flat number.[/b]
+## [method lay_on] asks [PanelResolution] for a tile resolution per panel rather
+## than handing every one of them the same [code]tile_pixels[/code] — a fixed
+## number tuned for a CSG blockout's dozen similar-sized doors and wings put a
+## [MeshCar]'s [code]Body[/code], which is most of the car, at the same texel
+## density as its wheels, roughly doubling the effective texel size on the panel
+## a player looks at most. [PanelResolution]'s class docs have the density target
+## and the clamps; what matters here is that the wheels do not get any coarser
+## for it — the floor is the old flat number, so the only panel this can move is
+## the one big enough to want it.
 ##
 ## [b]An overlay and not an override.[/b] [member GeometryInstance3D.material_overlay]
 ## draws this over the panel's real material instead of replacing it, so the
@@ -60,36 +79,32 @@ signal patch_finished(panel: String, patch: int, stage: GrimeMap.Stage)
 ## Where the overlay comes from.
 const SHADER: String = "res://src/world/grime.gdshader"
 
-## The resolution of one face of a panel's atlas, so its mask is three of these
-## across and two down.
-##
-## 64 is about 3 cm a texel on the side of the car, which is finer than the jet
-## of water that writes into it and coarse enough that the whole car is a
-## megabyte or so. It is a blockout's number: the thing that will want raising is
-## a real mesh with panel gaps and badge recesses to keep the water out of.
-@export var tile_pixels: int = 64
-
-## How finely each face is diced for the ding. Four is sixteen patches a face and
-## ninety-six a panel — a car's worth of small, frequent rewards rather than
-## twelve big ones.
+## How finely each face is diced for the ding. Five is twenty-five patches a
+## face and a hundred and fifty a panel — tuned against seven [MeshCar] panels
+## rather than the twelve the blockout had, so a full car still rings roughly
+## the same number of times overall: 12 panels x 4 x 4 x 6 = 1,152 patches on
+## the blockout against 7 x 5 x 5 x 6 = 1,050 on a mesh car, about 91% of the
+## old total and the same ballpark of dings across a job. [method
+## GrimeMap.patches] is the exact arithmetic.
 ##
 ## The knob for how the whole thing feels: at 1 it rings once a face, at 8 it
 ## rings constantly. Nothing about correctness changes with it.
-@export var patches_per_tile: int = 4
+@export var patches_per_tile: int = 5
 
 var _maps: Array[GrimeMap] = []
 var _flashes: Array[PatchFlash] = []
-var _panels: Array[CSGShape3D] = []
+var _panels: Array[Node3D] = []
+var _skins: Array[GeometryInstance3D] = []
 
 
 ## Dims every panel's finished-patch flashes.
 ##
 ## [b]The one thing here that runs on a clock.[/b] Everything else in this class
 ## happens because a tool was held; a flash happens because one was held a moment
-## ago, and something has to take it away again. It is a loop over twelve panels
-## doing a single integer comparison each while nothing is lit — [method
+## ago, and something has to take it away again. It is a loop over the car's
+## panels doing a single integer comparison each while nothing is lit — [method
 ## PatchFlash.fade] returns early and uploads nothing — so an untouched car costs
-## a dozen branches a frame rather than a dozen texture uploads.
+## a handful of branches a frame rather than a handful of texture uploads.
 func _process(delta: float) -> void:
 	for flash: PatchFlash in _flashes:
 		flash.fade(delta)
@@ -100,20 +115,29 @@ func _process(delta: float) -> void:
 ## Must be called after the car has had a frame to build its CSG — see the class
 ## docs. Calling it twice replaces what was there, which is what a "reset the
 ## car" would want and is otherwise nobody's business.
+##
+## The skins are kept alongside the maps rather than looked up again on every
+## press: the arrays are already parallel, one more of them costs a pointer per
+## panel, and it means [method _work] does no tree-walking on a physics tick.
 func lay_on(car: Car) -> void:
 	_panels = car.panels()
+	_skins = []
 	_maps = []
 	_flashes = []
 	var shader: Shader = load(SHADER) as Shader
-	for panel: CSGShape3D in _panels:
-		var map: GrimeMap = GrimeMap.new(panel.get_aabb(), tile_pixels, patches_per_tile)
+	for panel: Node3D in _panels:
+		var skin: GeometryInstance3D = car.skin_of(panel)
+		var box: AABB = skin.get_aabb()
+		var pixels: int = PanelResolution.tile_pixels_for(box)
+		var map: GrimeMap = GrimeMap.new(box, pixels, patches_per_tile)
 		# Sized from the map rather than from `patches_per_tile` and
 		# `BoxProjection.COLUMNS`, which is the same arithmetic in a second place —
 		# see [method GrimeMap.patch_grid].
 		var flash: PatchFlash = PatchFlash.new(map.patch_grid())
+		_skins.append(skin)
 		_maps.append(map)
 		_flashes.append(flash)
-		panel.material_overlay = _overlay(shader, map, flash, panel.get_aabb(), car.kind_of(panel))
+		skin.material_overlay = _overlay(shader, map, flash, box, car.kind_of(panel))
 
 
 ## Whether [method lay_on] has run. False on a room that never took up grime —
@@ -123,19 +147,19 @@ func is_laid() -> bool:
 
 
 ## Every panel that has mud on it, in the order [method map_of] indexes them.
-func panels() -> Array[CSGShape3D]:
+func panels() -> Array[Node3D]:
 	return _panels
 
 
 ## The map for one panel, or [code]null[/code] if that node is not a panel of the
 ## car this grime was laid on.
 ## Cast on the way in rather than taken as given. [member _panels] is an
-## [code]Array[CSGShape3D][/code], and searching a typed array for something that
-## is not of its type is an engine error rather than a miss — so a stray hit on
-## the driveway, which is a normal thing for a player to produce, would print
-## rather than answer.
+## [code]Array[Node3D][/code], and searching a typed array for something that is
+## not of its type is an engine error rather than a miss — so a stray hit on the
+## driveway, which is a normal thing for a player to produce, would print rather
+## than answer.
 func map_of(panel: Node) -> GrimeMap:
-	var index: int = _panels.find(panel as CSGShape3D)
+	var index: int = _panels.find(panel as Node3D)
 	if index < 0:
 		return null
 	return _maps[index]
@@ -151,7 +175,7 @@ func map_of(panel: Node) -> GrimeMap:
 ##
 ## Cast on the way in for the reason [method map_of] is.
 func flash_of(panel: Node) -> PatchFlash:
-	var index: int = _panels.find(panel as CSGShape3D)
+	var index: int = _panels.find(panel as Node3D)
 	if index < 0:
 		return null
 	return _flashes[index]
@@ -161,8 +185,8 @@ func flash_of(panel: Node) -> PatchFlash:
 ## panel equally rather than weighted by area.
 ##
 ## Unweighted deliberately: a mask is the same number of texels whatever size the
-## panel is, so "half the car" here means half the texels, and a wing mirror
-## counts as much as a door. That is the wrong answer for a score and the right
+## panel is, so "half the car" here means half the texels, and a wheel counts as
+## much as the whole shell. That is the wrong answer for a score and the right
 ## one for a progress bar over a fixed amount of work, which is what this is
 ## while there is nothing spending it.
 func remaining() -> float:
@@ -206,8 +230,10 @@ func shine() -> float:
 ## three readings above it. Those answer "how far through is the car", so a
 ## panel-average is the honest shape and a car with one spotless wing is not
 ## finished. This answers "how much has been done", and half a patch of washing
-## is half a patch of washing whichever panel it happened on — dividing by twelve
-## would make the same stroke worth less on a car with more pieces.
+## is half a patch of washing whichever panel it happened on — dividing by the
+## panel count would make the same stroke worth less on a car with more pieces,
+## which is exactly the trap the swap from a twelve-panel blockout to a
+## seven-panel model would have sprung.
 ##
 ## Monotonic, so a caller reads it twice and pays for the difference. That is the
 ## whole intended use: cleaning is a thing that is true across frames rather than
@@ -269,6 +295,11 @@ func buff(
 ## The three public methods above differ in nothing but which stage they name, so
 ## the world-to-panel conversion — the part that is easy to get subtly wrong —
 ## exists exactly once.
+##
+## [b]The hit is put into the [i]skin's[/i] space and not the root's.[/b] They are
+## one node on the CSG car and two on a mesh one, and the map was measured off the
+## skin's box — so converting through the root would wash a spot the mask is not
+## on the moment an importer leaves a mesh sitting at an offset inside its body.
 func _work(
 	panel: Node,
 	world_point: Vector3,
@@ -277,12 +308,12 @@ func _work(
 	amount: float,
 	stage: GrimeMap.Stage
 ) -> int:
-	var shape: CSGShape3D = panel as CSGShape3D
-	var index: int = _panels.find(shape)
+	var part: Node3D = panel as Node3D
+	var index: int = _panels.find(part)
 	if index < 0:
 		return 0
 	var map: GrimeMap = _maps[index]
-	var into: Transform3D = shape.global_transform.affine_inverse()
+	var into: Transform3D = _skins[index].global_transform.affine_inverse()
 	# The normal is turned by the basis alone — it is a direction, and putting it
 	# through the full transform would add the panel's position to it and send
 	# every touch to whichever face the car happens to be parked toward.
@@ -302,7 +333,7 @@ func _work(
 	var flash: PatchFlash = _flashes[index]
 	for patch: int in finished:
 		flash.flare(patch, stage)
-		patch_finished.emit(String(shape.name), patch, stage)
+		patch_finished.emit(String(part.name), patch, stage)
 	return finished.size()
 
 

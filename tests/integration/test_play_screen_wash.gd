@@ -32,6 +32,28 @@ const RESOLVE_FRAMES: int = 4
 ## are about whether water is flowing rather than about how fast.
 const WASH_FRAMES: int = 60
 
+## How far over the roofline a press has to aim, in metres, to be past every tier
+## that answers off real geometry — see [method _at_the_sky].
+##
+## [b]Measured across all ten styles at the design resolution, at the settled
+## shot, rather than reasoned about[/b] — because the two edges it has to sit
+## between are only a few tenths of a metre apart and neither of them is the same
+## number on every car:
+##
+## [codeblock]
+## 0.3   the exact ray misses all ten, and a 0.4 m sweep catches all ten
+## 0.4   a 0.4 m sweep still catches the three tallest (minivan, offroad, pickup)
+## 0.5   everything misses, and the press is 66 to 152 px down the frame
+## 0.6   everything misses, and the press is 43 to 130 px down the frame
+## 0.8   everything misses, and the press is 3 px ABOVE the top of it on a minivan
+## [/codeblock]
+##
+## Six tenths: half again the power wash's own 0.4 m window, which is the tool
+## this press is made with, and still 43 px inside the picture on the tallest car
+## in the pack. [method _at_the_sky] re-asserts that second half on every use
+## rather than trusting this table to stay true.
+const CLEARS_THE_SWEEP: float = 0.6
+
 var _main: Control = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
@@ -98,8 +120,8 @@ func _bell() -> Chime:
 
 ## The panel called [param named], or null — the car names its own pieces, so a
 ## test can ask for the bonnet rather than for "the third child".
-func _panel(named: String) -> CSGShape3D:
-	for panel: CSGShape3D in _car().panels():
+func _panel(named: String) -> Node3D:
+	for panel: Node3D in _car().panels():
 		if String(panel.name) == named:
 			return panel
 	return null
@@ -108,8 +130,8 @@ func _panel(named: String) -> CSGShape3D:
 ## One panel of [param kind] on the real car. Asked for by what it is made of
 ## rather than by name, so reshaping or renaming the blockout cannot make a test
 ## about the bell quietly become a test about nothing.
-func _a_panel_of(kind: Surface.Kind) -> CSGShape3D:
-	for panel: CSGShape3D in _car().panels():
+func _a_panel_of(kind: Surface.Kind) -> Node3D:
+	for panel: Node3D in _car().panels():
 		if _car().kind_of(panel) == kind:
 			return panel
 	return null
@@ -141,17 +163,37 @@ func _at_the_car() -> Vector2:
 	return _on_screen(_car().global_position)
 
 
-## Just over the roof: a press that hits nothing, and so one the room answers
-## with the nearest bodywork rather than with a hit.
+## Well over the roof: a press no tier of [method Garage._under_the_finger] can
+## answer off real geometry, and so one the room answers with a corner of the
+## nearest panel's bounding box.
 ##
-## Measured off the car's own bounding box rather than written down as an offset.
-## A press has to clear the roof to miss and stay in frame to be a press at all,
-## and the gap between those two is small — half a metre higher than this is off
-## the top of a 720-line frame, which is a test that fails for a reason that has
-## nothing to do with washing.
+## [b]It has to clear the swept sphere and not merely the exact ray[/b], which is
+## what [constant CLEARS_THE_SWEEP] is and what this used to get wrong. It was
+## 0.3 m, which is inside the window a 0.4 m sweep reaches — measured in
+## [code]tests/integration/test_play_screen_sweep.gd[/code], whose own constants
+## record that at the power wash's radius the car is found up to 0.4 m over the
+## roofline on the three tallest styles and lost from 0.45 m on all ten. On the
+## blockout the press missed anyway, on the
+## shape of that particular roof; against the ten cars the bay parks now it lands
+## on one, and a test whose subject is "a mark that came off a box spends no
+## water" was quietly asserting something else. [constant CLEARS_THE_SWEEP] has
+## the table it was re-measured from.
+##
+## Measured off the car's own bounding box rather than written down as an offset,
+## because the ten styles differ by 70 cm in height. On screen is asserted rather
+## than assumed for the same reason: a press off the top of the frame is not a
+## press at all, and the headroom above the roof is a different number on a
+## minivan than on a sport car.
 func _at_the_sky() -> Vector2:
 	var middle: Vector3 = _car().global_position
-	return _on_screen(Vector3(middle.x, _car().bounds().end.y + 0.3, middle.z))
+	var over: Vector3 = Vector3(middle.x, _car().bounds().end.y + CLEARS_THE_SWEEP, middle.z)
+	var at: Vector2 = _on_screen(over)
+	var view: SubViewport = _camera().get_viewport() as SubViewport
+	assert_true(
+		Rect2(Vector2.ZERO, Vector2(view.size)).has_point(at),
+		"the press at %v is off the picture and would not be a press at all" % at
+	)
+	return at
 
 
 func _touch(at: Vector2, pressed: bool) -> void:
@@ -204,8 +246,15 @@ func _settle() -> void:
 ## bonnet and does not reach the corner of one on the car's whole shell. A fixed
 ## radius here silently stopped finishing patches the moment these tests started
 ## asking for "a body panel" instead of naming the bonnet.
-func _whole_face_of(panel: CSGShape3D) -> float:
-	return (panel.global_transform * panel.get_aabb()).size.length()
+func _whole_face_of(panel: Node3D) -> float:
+	return _box_around(panel).size.length()
+
+
+## Where a panel's box actually is, in the room — off its skin rather than off the
+## panel, which is [method Car.skin_of]'s whole reason for existing.
+func _box_around(panel: Node3D) -> AABB:
+	var skin: GeometryInstance3D = _car().skin_of(panel)
+	return skin.global_transform * skin.get_aabb()
 
 
 # ---- is there mud at all -----------------------------------------------------
@@ -248,7 +297,9 @@ func test_letting_go_stops_the_water() -> void:
 
 func test_a_mark_on_a_bounding_box_is_not_somewhere_water_can_go() -> void:
 	# The one case `surface` still refuses. A press well over the roof reaches no
-	# geometry at all, even after the second probe ray, so the crosshair ends up on
+	# geometry at all — not by the exact ray, not by the swept sphere
+	# ([constant CLEARS_THE_SWEEP] is what puts it past that) and not by the second
+	# probe ray — so the crosshair ends up on
 	# a point clamped onto a bounding box with a normal invented facing the player.
 	# [BoxProjection] fed that normal picks a face off a measurement nobody took,
 	# so it would wash a texel that has nothing to do with where the mark is.
@@ -292,7 +343,7 @@ func test_only_the_power_wash_takes_mud_off() -> void:
 ## glass, as it happens, which was measured here rather than guessed at. A test
 ## that assumed the bodywork and reached for the sponge would have quietly become
 ## a test that the sponge does nothing.
-func _panel_under(at: Vector2) -> CSGShape3D:
+func _panel_under(at: Vector2) -> Node3D:
 	# An array rather than a plain local: a GDScript lambda captures locals by
 	# value, so a `String` assigned inside this one would never come back out.
 	var seen: Array[String] = [""]
@@ -322,7 +373,7 @@ func test_the_wrong_cleaner_for_a_surface_does_nothing() -> void:
 	# a wash, because before one there would be no bare paint and this would pass
 	# for the wrong reason.
 	await _settle()
-	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	var panel: Node3D = await _panel_under(_at_the_car())
 	assert_not_null(panel, "the press landed on nothing")
 	if panel == null:
 		return
@@ -338,7 +389,7 @@ func test_the_right_cleaner_for_a_surface_covers_it() -> void:
 	# And the other half, so the test above cannot pass because the middle pass is
 	# broken for everything.
 	await _settle()
-	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	var panel: Node3D = await _panel_under(_at_the_car())
 	assert_not_null(panel, "the press landed on nothing")
 	if panel == null:
 		return
@@ -352,7 +403,7 @@ func test_the_rag_turns_that_into_shine() -> void:
 	# stack: a thumb on the glass three times with three different tools, and a
 	# car that is measurably further along than it was.
 	await _settle()
-	var panel: CSGShape3D = await _panel_under(_at_the_car())
+	var panel: Node3D = await _panel_under(_at_the_car())
 	assert_not_null(panel, "the press landed on nothing")
 	if panel == null:
 		return
@@ -389,12 +440,12 @@ func test_a_patch_coming_clean_rings_the_bell() -> void:
 	# red the day somebody turns the water down. That a held press reaches the
 	# paint at all is the tests above.
 	await _settle()
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	assert_not_null(hood, "the car has no bodywork")
 	if hood == null:
 		return
 	var before: int = _bell().rings()
-	var box: AABB = hood.global_transform * hood.get_aabb()
+	var box: AABB = _box_around(hood)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var finished: int = 0
 	for _sweep: int in 60:
@@ -409,10 +460,10 @@ func test_a_burst_of_patches_is_not_a_burst_of_bells() -> void:
 	# this asserts the screen leaves that judgement to it rather than filtering
 	# on its own or, worse, ringing per texel.
 	await _settle()
-	var hood: CSGShape3D = _a_panel_of(Surface.Kind.BODY)
+	var hood: Node3D = _a_panel_of(Surface.Kind.BODY)
 	if hood == null:
 		return
-	var box: AABB = hood.global_transform * hood.get_aabb()
+	var box: AABB = _box_around(hood)
 	var on_top: Vector3 = Vector3(box.get_center().x, box.end.y, box.get_center().z)
 	var before: int = _bell().rings()
 	var finished: int = 0

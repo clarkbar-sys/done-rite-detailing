@@ -1,0 +1,49 @@
+[gd_scene load_steps=3 format=3]
+
+; The mesh car: an empty node and a pane of glass, because everything else about
+; this scene arrives from assets/models/cars/<style>.glb when the node is ready.
+; src/world/mesh_car.gd has the whole argument — what the pack hands over, why
+; each part becomes a StaticBody3D with the mesh inside it, and why the paint is
+; a copy of the pack's own material rather than a sub-resource in here.
+;
+; It is named "Car" and not "MeshCar" on purpose. The garage instances one of
+; these under the unique name %Car and types it as a Car, so replacing the
+; blockout with it (#139) was a change of which scene that instance points at and
+; nothing else in the room's own tree.
+
+[ext_resource type="Script" path="res://src/world/mesh_car.gd" id="1_meshcar"]
+
+; The windows, and one of the two materials on the car that this game supplies
+; rather than the pack. Light bluish-green — the same numbers tests/fixtures/blockout_car.tscn
+; gives the blockout's glass, which is where the decision was taken (#58) after
+; near-black windows read as holes in the car rather than as glass.
+;
+; Opaque, unlike the pack's 68%-alpha original: these bodies are outside-only
+; shells, so anything you can see through the windscreen is the inside of the far
+; door. Culling stays disabled, which is the pack's own setting for a shell with
+; no thickness — a single-sided window vanishes when you walk round to the other
+; flank.
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glass"]
+albedo_color = Color(0.35, 0.62, 0.58, 1)
+metallic = 0.3
+roughness = 0.12
+cull_mode = 2
+
+; `style` is pinned rather than left empty, which is the one line that decides
+; whether the bay parks the same car every time or one of the ten at random.
+; Pinned for now so playtesting is repeatable: a random draw means the car under
+; the tools changes between one run and the next, and "is that the paint or is
+; that the car" is not a question a playtest should have to answer. Change the
+; word to try another style, or delete the line to go back to a random draw —
+; src/world/mesh_car.gd still picks one of the ten when this is empty, and
+; tests/integration/test_mesh_car.gd still holds it to that.
+;
+; The sedan because it is the middle of the range in every direction that matters
+; — 1.35 m tall against 1.04 m of sport car and 1.77 m of minivan — so a shot
+; that reads right on it is the least likely to be hiding a problem at either end.
+; tests/integration/test_garage_styles.gd is what holds the other nine, and it
+; sets this export itself rather than relying on the draw.
+[node name="Car" type="Node3D"]
+script = ExtResource("1_meshcar")
+style = "sedan"
+glass = SubResource("StandardMaterial3D_glass")

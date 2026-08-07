@@ -51,7 +51,7 @@
 ## [b]The look lives in the scene file.[/b] The two meshes and the shades of bark
 ## and leaf are [code]@export[/code]s carried by
 ## [code]src/world/grove.tscn[/code], the way the car's paint is carried by
-## [code]src/world/car.tscn[/code] — so the wood can be recoloured, or the
+## [code]tests/fixtures/blockout_car.tscn[/code] — so the wood can be recoloured, or the
 ## spheres given more segments, without opening a script.
 class_name Grove
 extends Node3D

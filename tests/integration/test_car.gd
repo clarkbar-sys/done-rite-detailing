@@ -1,4 +1,21 @@
-## Integration test for the car — the CSG blockout that replaced the green box.
+## Integration test for the blockout — the CSG car that replaced the green box,
+## and that the driveway parked until [code]#139[/code] put a real model there.
+##
+## [b]It is a fixture now, and this suite is why it is still worth having.[/b]
+## [code]tests/fixtures/blockout_car.tscn[/code] is the only car in the repo that
+## answers the panel contract out of CSG — geometry that generates its own body,
+## with the groups authored on the nodes rather than read off a name — and
+## [code]src/world/car.gd[/code]'s class docs claim that contract holds for both
+## kinds of car. Half of that claim is checked here and the other half in
+## [code]tests/integration/test_mesh_car.gd[/code]. Delete this file and the CSG
+## half becomes a paragraph nobody can fail.
+##
+## What it is [i]not[/i] any more is a test of the car the player washes. The
+## shape assertions below say "this fixture is still the 4.3 × 1.9 × 1.4 m car
+## every clearance in [code]src/world/garage.gd[/code] was first tuned against",
+## which is a fact about a reference and no longer a fact about the game.
+## [code]tests/integration/test_garage_styles.gd[/code] is where the shot is held
+## against the car that actually ships.
 ##
 ## Under tests/integration/ because every assertion here needs a frame to have
 ## happened: CSG meshes are built deferred, so a panel has no [AABB] to give
@@ -8,7 +25,7 @@
 ## and pinned by its own test rather than left to be rediscovered.
 extends GutTest
 
-const CAR: String = "res://src/world/car.tscn"
+const CAR: String = "res://tests/fixtures/blockout_car.tscn"
 
 ## Close enough for a blockout: a centimetre. The shape is a design decision
 ## being asserted, not arithmetic — the tolerances elsewhere are 0.0001 because
@@ -16,8 +33,11 @@ const CAR: String = "res://src/world/car.tscn"
 const TOLERANCE: float = 0.01
 
 ## What the green box was, and what the room, the camera's standing distance and
-## every clearance in the suite were tuned against. The blockout is allowed to be
-## any shape it likes inside this; it is not allowed to grow.
+## every clearance in the suite were first tuned against. The blockout is allowed
+## to be any shape it likes inside this; it is not allowed to grow. Kept as an
+## assertion after the blockout became a fixture, because a reference that has
+## quietly changed size is worse than no reference: half the numbers in
+## [code]src/world/garage.gd[/code] cite it.
 const LENGTH: float = 4.3
 const WIDTH: float = 1.9
 const HEIGHT: float = 1.4
@@ -36,11 +56,26 @@ func before_each() -> void:
 	await wait_process_frames(1)
 
 
-func _panel(named: String) -> CSGShape3D:
-	for panel: CSGShape3D in _car.panels():
+func _panel(named: String) -> Node3D:
+	for panel: Node3D in _car.panels():
 		if panel.name == named:
 			return panel
 	return null
+
+
+## The panel's own box, off its skin — which on this car is the panel itself, and
+## on a mesh one would be the [MeshInstance3D] under it. Through [method
+## Car.skin_of] rather than off the node, because that is the contract every
+## consumer reads a panel's box through and a test that reached past it would go
+## on passing after the contract stopped holding.
+func _box(named: String) -> AABB:
+	return _car.skin_of(_panel(named)).get_aabb()
+
+
+## The same box, where it actually is in the room.
+func _world_box(named: String) -> AABB:
+	var skin: GeometryInstance3D = _car.skin_of(_panel(named))
+	return skin.global_transform * skin.get_aabb()
 
 
 func test_the_car_instantiates() -> void:
@@ -67,7 +102,7 @@ func test_it_is_made_of_panels_a_detailer_would_name() -> void:
 	# a rename in the editor from silently breaking a raycast that asked for
 	# "Hood" — the failure would otherwise be a tool that quietly cleans nothing.
 	var named: Array[String] = []
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		named.append(panel.name)
 	for expected: String in [
 		"Body",
@@ -91,7 +126,7 @@ func test_panels_are_csg_roots_and_not_the_brushes_inside_them() -> void:
 	# windscreen and shape the arches are CSGShape3Ds too, and they sit metres
 	# outside the car — counting one as a panel would give it a collider it must
 	# not have and would blow the bounds out to the size of a cutting box.
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		var parent: CSGShape3D = panel.get_parent() as CSGShape3D
 		assert_null(parent, "%s is a brush inside another panel, not a panel" % panel.name)
 	assert_gt(_car.get_node("Cabin").get_child_count(), 1, "the cabin is shaped by brushes")
@@ -127,8 +162,8 @@ func test_the_greenhouse_is_narrower_than_the_body() -> void:
 	# van. Asserted because it is produced by two rotated subtraction brushes whose
 	# angle is easy to get backwards, and getting it backwards flares the roof out
 	# instead, which looks wrong in a way that is hard to name in a screenshot.
-	var cabin: AABB = _panel("Cabin").get_aabb()
-	var body: AABB = _panel("Body").get_aabb()
+	var cabin: AABB = _box("Cabin")
+	var body: AABB = _box("Body")
 	assert_lt(cabin.size.x, body.size.x, "the greenhouse must be inset from the flanks")
 	assert_lt(cabin.size.z, body.size.z, "and shorter than the car")
 
@@ -137,11 +172,10 @@ func test_the_wheels_are_under_the_arches_and_not_beside_them() -> void:
 	# Four separate panels positioned by hand, so a sign error puts a wheel inside
 	# the sill or a metre out in the room. Checked against the body's own width
 	# rather than a number written here, so it survives the car being reshaped.
-	var body: AABB = _panel("Body").global_transform * _panel("Body").get_aabb()
+	var body: AABB = _world_box("Body")
 	var ground: float = _car.bounds().position.y
 	for named: String in ["WheelFrontLeft", "WheelFrontRight", "WheelRearLeft", "WheelRearRight"]:
-		var wheel: CSGShape3D = _panel(named)
-		var box: AABB = wheel.global_transform * wheel.get_aabb()
+		var box: AABB = _world_box(named)
 		assert_almost_eq(box.position.y, ground, TOLERANCE, "%s must reach the floor" % named)
 		assert_gt(box.end.y, body.position.y, "%s must reach up into its arch" % named)
 		assert_lt(absf(box.get_center().x), body.size.x * 0.5, "%s is tucked in" % named)
@@ -200,7 +234,7 @@ func test_a_panel_can_be_baked_to_a_real_mesh() -> void:
 	# the one line that turns a panel into an ArrayMesh a MeshInstance3D can carry,
 	# and it is worth knowing the day it stops working rather than the day somebody
 	# needs it.
-	var baked: ArrayMesh = _panel("Hood").bake_static_mesh()
+	var baked: ArrayMesh = (_panel("Hood") as CSGShape3D).bake_static_mesh()
 	assert_not_null(baked, "a panel must bake down to a real mesh")
 	if baked != null:
 		assert_gt(baked.get_surface_count(), 0, "and the mesh must have something in it")
@@ -210,11 +244,11 @@ func test_a_panel_can_be_baked_to_a_real_mesh() -> void:
 
 
 func test_the_glass_panels_are_glass() -> void:
-	# Read off groups set in `car.tscn` rather than off panel names — see
+	# Read off groups set in `blockout_car.tscn` rather than off panel names — see
 	# [method Car.kind_of]. What this pins is that the groups are actually on the
 	# nodes, which is the half of that arrangement a script cannot check itself.
 	for named: String in ["Windshield", "RearGlass", "SideGlass"]:
-		var panel: CSGShape3D = _panel(named)
+		var panel: Node3D = _panel(named)
 		assert_not_null(panel, "the car has no %s" % named)
 		if panel != null:
 			assert_eq(_car.kind_of(panel), Surface.Kind.GLASS, named)
@@ -222,7 +256,7 @@ func test_the_glass_panels_are_glass() -> void:
 
 func test_the_wheels_are_wheels() -> void:
 	for named: String in ["WheelFrontLeft", "WheelFrontRight", "WheelRearLeft", "WheelRearRight"]:
-		var panel: CSGShape3D = _panel(named)
+		var panel: Node3D = _panel(named)
 		assert_not_null(panel, "the car has no %s" % named)
 		if panel != null:
 			assert_eq(_car.kind_of(panel), Surface.Kind.WHEEL, named)
@@ -232,7 +266,7 @@ func test_everything_else_is_bodywork() -> void:
 	# The default, which is what makes adding a panel safe: a new wing gets the
 	# sponge without anybody remembering to say so.
 	for named: String in ["Body", "Hood", "Deck", "Roof", "Cabin"]:
-		var panel: CSGShape3D = _panel(named)
+		var panel: Node3D = _panel(named)
 		assert_not_null(panel, "the car has no %s" % named)
 		if panel != null:
 			assert_eq(_car.kind_of(panel), Surface.Kind.BODY, named)
@@ -242,29 +276,32 @@ func test_every_panel_of_the_car_has_a_cleaner_for_it() -> void:
 	# The property that matters more than any individual assignment above: there
 	# is no panel a player cannot finish because no bottle claims it.
 	var belt: ToolBelt = ToolBelt.new()
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		var cleaner: DetailingTool.Id = Surface.cleaner_for(_car.kind_of(panel))
 		assert_true(belt.index_of(cleaner) >= 0, "%s has no cleaner on the belt" % panel.name)
 
 
-func test_the_real_car_carries_every_kind_the_fixture_stands_in_for() -> void:
-	# THE CONTRACT BETWEEN THE FIXTURE AND REALITY, and the reason this file stays
-	# on `src/world/car.tscn` while `test_grime.gd` moved off it.
+func test_a_whole_car_carries_every_kind_the_fixture_stands_in_for() -> void:
+	# THE CONTRACT BETWEEN A FIXTURE AND A WHOLE CAR, and the reason this file
+	# stays on `tests/fixtures/blockout_car.tscn` while `test_grime.gd` moved off
+	# it.
 	#
 	# The rules of the job are tested against `tests/fixtures/plain_car.tscn`,
 	# which has a slab of each kind and always will. That is only safe while the
-	# real car also has one of each — the day somebody re-models the glass and the
-	# group does not come with it, every test over there goes on passing and the
-	# window cleaner stops working in the game. This is what fails instead.
+	# cars the game builds also have one of each — the day somebody re-models the
+	# glass and the group does not come with it, every test over there goes on
+	# passing and the window cleaner stops working in the game. This is what fails
+	# instead, for the blockout; `test_mesh_car.gd` holds the same property over
+	# all ten styles of the car that ships.
 	#
 	# By kind and not by name on purpose: renaming a panel is allowed, losing a
 	# whole surface is not.
 	for kind: Surface.Kind in [Surface.Kind.BODY, Surface.Kind.GLASS, Surface.Kind.WHEEL]:
 		var found: int = 0
-		for panel: CSGShape3D in _car.panels():
+		for panel: Node3D in _car.panels():
 			if _car.kind_of(panel) == kind:
 				found += 1
-		assert_gt(found, 0, "the real car has no panel of kind %d left" % kind)
+		assert_gt(found, 0, "this car has no panel of kind %d left" % kind)
 
 
 # ---- trim: seen, never cleaned -------------------------------------------------
@@ -276,7 +313,7 @@ func test_the_trim_is_on_the_car_but_is_not_a_panel() -> void:
 	# Asserting only the second half would pass just as well on a car that had
 	# lost its underside altogether.
 	var named: Array[String] = []
-	for panel: CSGShape3D in _car.panels():
+	for panel: Node3D in _car.panels():
 		named.append(panel.name)
 	for trim: String in ["Undercarriage", "WheelWells"]:
 		assert_not_null(_car.get_node_or_null(NodePath(trim)), "the car has no %s" % trim)
@@ -284,7 +321,7 @@ func test_the_trim_is_on_the_car_but_is_not_a_panel() -> void:
 
 
 func test_marking_a_node_trim_covers_everything_under_it() -> void:
-	# The property that lets `car.tscn` put the group on two combiners instead of
+	# The property that lets `blockout_car.tscn` put the group on two combiners instead of
 	# on sixteen brushes. Built here rather than read off the car, because what is
 	# being pinned is _gather's behaviour and not the scene's current shape: a
 	# plain Node3D holding CSG is a grouping somebody could add in the editor
@@ -297,6 +334,28 @@ func test_marking_a_node_trim_covers_everything_under_it() -> void:
 	_car.add_child(holder)
 	assert_eq(_car.panels().size(), before, "a trim node hides its children as well as itself")
 	holder.queue_free()
+
+
+func test_every_panel_of_the_blockout_is_something_a_ray_can_find() -> void:
+	# A CSG mesh is invisible to a raycast unless the panel asks for collision, and
+	# a standoff cast at a car like that measures nothing, finds no hit and holds
+	# whatever radius it started with — a bug that looks exactly like the feature
+	# not being wired up. It is a property on each panel, so it can be forgotten
+	# one panel at a time.
+	#
+	# [method Car.panels] deliberately does not read the flag — see its docs: a
+	# panel with the box unticked has to fail here rather than quietly leave the
+	# car. This lived in `tests/integration/test_garage.gd` while the blockout was
+	# what the driveway parked, and moved here with the blockout: the room's copy
+	# is now the same assertion about a StaticBody3D with a shape in it, which is
+	# how a mesh car answers the same half of the contract.
+	var panels: Array[Node3D] = _car.panels()
+	assert_gt(panels.size(), 0, "the car needs panels")
+	for panel: Node3D in panels:
+		var shape: CSGShape3D = panel as CSGShape3D
+		assert_not_null(shape, "%s is not CSG; this file is the blockout's" % panel.name)
+		if shape != null:
+			assert_true(shape.use_collision, "%s must be something a ray can hit" % panel.name)
 
 
 func test_the_trim_has_no_collider_for_a_tool_to_find() -> void:

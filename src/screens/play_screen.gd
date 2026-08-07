@@ -243,9 +243,9 @@ func _process(_delta: float) -> void:
 	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
 	_garage.steer(turn, lift)
 	var grime: Grime = _garage.grime()
-	# Only while the masks are up. The number costs a walk over twelve panels and
-	# nothing is reading it otherwise, so a game nobody has pressed the key in
-	# does not pay for the readout.
+	# Only while the masks are up. The number costs a walk over every panel of the
+	# car and nothing is reading it otherwise, so a game nobody has pressed the key
+	# in does not pay for the readout.
 	if _masks.is_shown() and grime != null:
 		_masks.report(grime.remaining(), grime.shine())
 	_pay_for_the_work(grime)
