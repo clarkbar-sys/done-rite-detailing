@@ -354,6 +354,17 @@ func test_pressing_it_opens_neither_door() -> void:
 	assert_eq(_faded.size(), 0, "and it must not touch the theme it is about to silence")
 
 
+func test_a_tap_on_it_actually_reaches_it() -> void:
+	# Through a real touch and not `pressed.emit()` — see
+	# tests/integration/test_title_screen.gd's twin of this test for why
+	# `pressed.emit()` alone cannot catch a `CenterContainer` left at the
+	# engine's default `mouse_filter` swallowing the tap before it arrives.
+	Sound.set_muted(false)
+	_tap(_sound_toggle().get_global_rect().get_center())
+	await wait_process_frames(1)
+	assert_true(Sound.muted, "a tap on the corner must reach the sound toggle")
+
+
 # ---- touch: the phone-shaped half of "do these buttons work" -----------------
 
 

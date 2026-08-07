@@ -216,6 +216,20 @@ func test_pressing_it_does_not_ask_for_the_menu() -> void:
 	assert_eq(_requested.size(), 0, "muting is not starting")
 
 
+func test_a_tap_on_it_actually_reaches_it() -> void:
+	# Through a real touch and not `pressed.emit()`, on purpose: the corner sits
+	# behind `%Center`, and a `CenterContainer` left at the engine's default
+	# `mouse_filter` (`stop`) claims every point inside its own full-rect bounds
+	# for itself before a sibling drawn earlier in the tree ever sees it — even
+	# where none of its own children are actually drawn. `pressed.emit()` calls
+	# the handler directly and cannot catch that; only a tap routed through the
+	# real GUI pass can.
+	Sound.set_muted(false)
+	_tap(_sound_toggle().get_global_rect().get_center())
+	await wait_process_frames(1)
+	assert_true(Sound.muted, "a tap on the corner must reach the sound toggle")
+
+
 # ---- touch: the phone-shaped half of "does Start work" -----------------------
 
 

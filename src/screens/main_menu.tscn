@@ -31,6 +31,12 @@ unique_name_in_owner = true
 layout_mode = 0
 script = ExtResource("4_sound")
 
+; `mouse_filter = 2` (ignore) rather than the engine's default `stop`: this is
+; full-rect, so left at the default it would claim every point on the screen
+; for itself — including the sound toggle's corner, where none of its own
+; children are actually drawn — before a sibling earlier in the tree ever saw
+; the press. Play and How to Play are unaffected either way: a child control's
+; own filter, not its container's, decides whether it reacts to a point over it.
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -38,6 +44,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="Column" type="VBoxContainer" parent="Center"]
 layout_mode = 2
