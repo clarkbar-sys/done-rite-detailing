@@ -216,7 +216,9 @@
 ## thumb's width up the glass on purpose, and over a low car that regularly puts
 ## the ray in the sky — and what it buys is not a hit where there was none, but a
 ## hit with a [i]measured normal[/i] where the bottom tier could only invent one.
-## [AimSweep] has the whole argument, including why it is not the first tier.
+## [AimSweep] has the whole argument, including why it is not the first tier;
+## [AimHold] has why that tier alone is taken once per aim rather than once per
+## tick, which is four milliseconds a press against the car pack's trimeshes.
 ##
 ## [b]And the tools that work the paint draw their own sight.[/b] The water the
 ## power wash throws, the product the two bottles spray, the suds the sponge
@@ -597,6 +599,7 @@ var _drive: OrbitDrive = null
 var _standoff: Standoff = null
 var _sight: ToolSight = null
 var _sweep: AimSweep = null
+var _held: AimHold = AimHold.new()
 var _racket: ToolRacket = null
 var _grime: Grime = null
 var _routine: AttractRoutine = null
@@ -749,8 +752,13 @@ func aim_at(where: Vector2) -> void:
 ##
 ## Holding the glass is firing and letting go is not — so this is the release
 ## half of the trigger, and the thing that will one day also stop the water.
+##
+## The swept answer goes with it, so the next press starts by asking rather than by
+## inheriting — see [method AimHold.drop], which has why that is a release-time job
+## and not a press-time one.
 func release_aim() -> void:
 	_aiming = false
+	_held.drop()
 
 
 ## What the aim is drawn with, or [code]null[/code] on a screen that never took up
@@ -1151,6 +1159,16 @@ func _reach_of(held: DetailingTool.Id) -> float:
 ## came back empty, it has no exact answer left to steal. [param reach] is how wide
 ## the tool in hand works ([method _reach_of]), which is the window it forgives by.
 ##
+## [b]And the middle tier is the one that is not cast every tick.[/b] It goes
+## through [AimHold], which hands back what the last sweep down this aim found for
+## as long as the aim has not moved — the whole of [code]#145[/code]'s fix, and a
+## statement about how often rather than about what. That class carries the
+## numbers; the short of it is four milliseconds a sweep against the car pack's
+## trimeshes, bought sixty times a second by a thumb hovering over a roofline to be
+## told the same thing every time. The other two tiers are cast every tick exactly
+## as they were, and the hold is dropped by the smallest movement of eye or aim
+## that could change the answer — so a moving press is as exact as it ever was.
+##
 ## The nearest-panel fallback stays underneath both, unchanged, because it is the
 ## only one of the three that always answers: a sphere the width of a sponge is
 ## bounded by definition, and a press at the horizon should still put the mark on
@@ -1164,7 +1182,9 @@ func _under_the_finger(from: Vector3, facing: Vector3, reach: float) -> Dictiona
 	if not hit.is_empty():
 		hit["surface"] = true
 		return hit
-	var swept: Dictionary = _sweep.onto(space, from, facing, reach)
+	if not _held.holds(from, facing, reach):
+		_held.keep(_sweep.onto(space, from, facing, reach), from, facing, reach)
+	var swept: Dictionary = _held.answer()
 	if not swept.is_empty():
 		return swept
 	return _nearest_on_the_car(space, from, facing)

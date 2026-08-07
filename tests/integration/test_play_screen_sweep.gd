@@ -343,6 +343,23 @@ func _press(at: Vector2) -> void:
 	await wait_physics_frames(WASH_FRAMES)
 
 
+## Slides the aiming finger to [param at] without letting go — an
+## [InputEventScreenDrag] on the same index [method _touch] presses with, which is
+## what [method PlayScreen._finger_dragged] routes to [method Garage.aim_at].
+##
+## [b]A drag and not a second press[/b], because a second press is not what a
+## sliding thumb produces and the play screen would ignore it anyway: the first
+## finger down claims the aim and holds it until it lifts, so a fresh
+## [InputEventScreenTouch] arriving while one is down goes nowhere. Anything
+## testing what happens to a held press when the aim moves has to move it this way.
+func _drag(at: Vector2) -> void:
+	var dragged: InputEventScreenDrag = InputEventScreenDrag.new()
+	dragged.position = _thumb_for(at)
+	Input.parse_input_event(dragged)
+	Input.flush_buffered_events()
+	await wait_physics_frames(RESOLVE_FRAMES)
+
+
 func _lift() -> void:
 	_touch(Vector2.ZERO, false)
 	await wait_physics_frames(RESOLVE_FRAMES)
@@ -501,4 +518,54 @@ func test_a_press_on_the_car_is_still_answered_by_the_exact_ray() -> void:
 	var off_the_line: float = mark.distance_to(NearestPoint.on_ray(ray[0], ray[1], mark))
 	assert_lt(
 		off_the_line, 0.01, "the mark sits %s m off the aim, so a sweep answered" % off_the_line
+	)
+
+
+# ---- and the aim that moves under a finger that never lifts -------------------
+
+
+func test_an_aim_that_slides_off_the_car_stops_working_the_paint() -> void:
+	# [b]The guard on [code]#145[/code].[/b] The middle tier is no longer cast on
+	# every physics tick: [AimHold] keeps what the last sweep down this aim found
+	# and hands it back until the aim moves, which turns a held press from sixty
+	# four-millisecond sweeps a second into one. The whole risk of that is an answer
+	# that outlives its question — the water going on landing where the player used
+	# to be pointing — and this is the test that fails when it does.
+	#
+	# [b]Stated as "does the water move" rather than as "where is the mark".[/b] A
+	# stale mark is not a cosmetic bug; it is the trigger being spent on paint
+	# nobody is aiming at, which is the thing a player would actually see. It is
+	# also the only reading that separates the tiers cleanly here — measured, a
+	# fresh sweep and the fallback's own probe put the mark 0.35 m and 0.25 m off
+	# the aim respectively, and a tenth of a metre is far too fine a line to hang a
+	# suite on.
+	#
+	# [b]The press is only held long enough to take one sweep before it moves on[/b],
+	# rather than washing for a second first. Both orders catch the bug and only one
+	# of them catches it loudly: a spot that has already had a second of water on it
+	# has almost no mud left to lose, so the same regression shows up as a couple of
+	# ten-thousandths instead of as a visible hole in the roof.
+	await _settle()
+	var near: Vector2 = _over_the_roof(NEAR_MISS_METRES)
+	_the_ray_missed(near)
+	_touch(_thumb_for(near), true)
+	await wait_physics_frames(RESOLVE_FRAMES)
+	assert_true(_marker().is_marking(), "the near miss marked nothing, so nothing was swept")
+	var washed: float = _grime().remaining()
+	assert_lt(washed, 1.0, "the near miss moved no mud, so there is nothing here to stop")
+	# Up in the sky and off to one side: far outside any tool's window, and far
+	# enough off the centreline that the fallback's own probe declines too — so the
+	# only thing left out there is a box corner with an invented normal, which the
+	# trigger refuses. Both of those are asserted rather than assumed, because this
+	# test means nothing if the new aim is one that can be worked anyway.
+	var away: Vector2 = _well_clear_of_the_car()
+	_the_sweep_missed(away)
+	_the_post_missed(away)
+	await _drag(away)
+	await wait_physics_frames(WASH_FRAMES)
+	assert_almost_eq(
+		_grime().remaining(),
+		washed,
+		TOLERANCE,
+		"the jet went on washing the roofline for a second after the aim had left it"
 	)
