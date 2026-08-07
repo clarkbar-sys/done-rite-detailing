@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.11.0...v1.12.0) (2026-08-07)
+
+
+### Features
+
+* **world:** park the Generic Passenger Car Pack in the bay instead of the blockout ([#140](https://github.com/clarkbar-sys/done-rite-detailing/issues/140)) ([c0523c8](https://github.com/clarkbar-sys/done-rite-detailing/commit/c0523c8ad2b3b7f9fad728dd9ba4d79421fd07db))
+* **world:** put the exported spray bottles in the player's hands ([#132](https://github.com/clarkbar-sys/done-rite-detailing/issues/132)) ([dba8161](https://github.com/clarkbar-sys/done-rite-detailing/commit/dba816150aa875320390e12e646ebd4765b4e6a6))
+
 ## [1.11.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.10.0...v1.11.0) (2026-08-05)
 
 
