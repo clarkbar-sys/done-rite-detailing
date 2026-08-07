@@ -238,6 +238,84 @@ func test_the_car_is_sat_on_the_tarmac_and_not_in_it() -> void:
 	assert_almost_eq(box.position.y, tarmac, TOLERANCE, "the tyres must be on the drive")
 
 
+func test_the_room_hands_back_the_car_it_parked() -> void:
+	# The accessor the menu picks its car through. Typed as [Car] on purpose — this
+	# room hosts whichever car it is handed, and every fixture under
+	# tests/fixtures/ is one — so what is asserted is that it is the same node the
+	# unique name resolves to, not that it is a [MeshCar].
+	assert_eq(_garage.car(), _car(), "the room must hand back the car standing in it")
+
+
+func test_the_bay_can_park_a_different_one_of_the_ten() -> void:
+	# What the menu's arrows drive. The room is already running by then — the car
+	# is parked, the camera is aimed at it and the walk is measured from it — so
+	# this is a swap under all of that rather than a second room.
+	var parked: MeshCar = _garage.car() as MeshCar
+	assert_not_null(parked, "the bay must park a MeshCar for a style to mean anything")
+	if parked == null:
+		return
+	var other: String = CarChoice.stepped(parked.style, 1, MeshCar.STYLES)
+	_garage.show_style(other)
+	assert_eq(parked.style, other, "the bay ignored the style it was shown")
+	assert_eq(_garage.car(), parked, "the car was replaced rather than restyled")
+
+
+func test_a_car_parked_by_the_arrows_is_sat_on_the_tarmac_too() -> void:
+	# The one thing a swap could not inherit from the car it replaced. Every style
+	# is authored about its own mid-height and they are 1.04 m to 1.77 m tall, so a
+	# car dropped in at the last one's height is up to 18 cm through the drive or
+	# hovering over it. Garage.show_style re-parks for exactly this, and all ten are
+	# walked because the pair that breaks it is whichever two are furthest apart.
+	var drive: Node3D = _garage.get_node("View/World/Ground/Driveway") as Node3D
+	var tarmac: float = drive.position.y + drive.scale.y * 0.5
+	for style: String in MeshCar.STYLES:
+		_garage.show_style(style)
+		var box: AABB = _garage.car().bounds()
+		assert_almost_eq(box.position.y, tarmac, TOLERANCE, "the %s is not on the drive" % style)
+
+
+func test_showing_the_style_that_is_already_parked_changes_nothing() -> void:
+	# The menu calls this on the way in with whatever the room drew, so the
+	# no-op has to be a real one: a rebuild here would throw away the car the
+	# player is looking at and put an identical one back, one frame later and one
+	# paint colour along.
+	var parked: MeshCar = _garage.car() as MeshCar
+	if parked == null:
+		return
+	var panels: Array[Node3D] = parked.panels()
+	var colour: Color = parked.paint.albedo_color
+	_garage.show_style(parked.style)
+	assert_eq(parked.panels(), panels, "the car was rebuilt for no reason")
+	assert_eq(parked.paint.albedo_color, colour, "and repainted while it was at it")
+
+
+func test_a_car_parked_by_the_arrows_is_still_something_a_ray_can_find() -> void:
+	# Point 4 of the car contract, asked again after a swap. A restyle that left the
+	# old bodies in the physics space — or built the new ones without shapes — is a
+	# room where the standoff measures a car that is not there and every tool goes
+	# through the paint. `remove_child` before `queue_free` is what makes the first
+	# half of that true, and neither half is visible without a ray to ask.
+	var parked: MeshCar = _garage.car() as MeshCar
+	if parked == null:
+		return
+	_garage.show_style(CarChoice.stepped(parked.style, 1, MeshCar.STYLES))
+	# A physics step, so the bodies the swap just built are in the space a query
+	# can see — and the ones it removed are out of it.
+	await wait_physics_frames(1)
+	var focus: Vector3 = parked.global_position
+	var probe: Vector3 = focus + Vector3(4.0, 0.0, 0.0)
+	var space: PhysicsDirectSpaceState3D = _camera().get_world_3d().direct_space_state
+	var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(probe, focus))
+	assert_false(hit.is_empty(), "a level ray missed the car the arrows parked")
+	if hit.is_empty():
+		return
+	# Through an Object first: a Dictionary hands back Variant, and this project's
+	# warning levels treat casting one straight to a node as unsafe.
+	var struck: Object = hit["collider"]
+	var panel: Node3D = struck as Node3D
+	assert_true(parked.panels().has(panel), "the ray met a panel of the car that left")
+
+
 func test_no_panel_is_scaled() -> void:
 	# The rule the old hand-built collider existed to satisfy, now enforced across
 	# every panel instead: a non-uniformly scaled shape is the one thing the
