@@ -266,6 +266,7 @@ top of that script, then re-run `make test build` before pushing.
 project.godot          engine + project settings (typed-GDScript gates live here)
 export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make build-web`
 assets/brand/          the logo the game shares with the business it is named after
+assets/models/cars/    the ten cars the bay parks, baked out of the pack credited below
 src/core/              cross-cutting code (shared helpers, game states, process-global facts)
 src/main/              the entry scene — owns the state machine and swaps screens
 src/screens/           one scene per game state, all of them a `GameScreen`
@@ -313,6 +314,23 @@ attaches both to the release. The [link above](#play-it) is always current
 
 Found a vulnerability? See [SECURITY.md](./SECURITY.md) — please do **not** open a
 public issue for security reports.
+
+## Credits
+
+The car the bay parks is one of ten styles baked out of
+**"Generic passenger car pack"** (https://skfb.ly/6sUFy) by **Comrade1280**,
+licensed under
+[Creative Commons Attribution 4.0](http://creativecommons.org/licenses/by/4.0/).
+
+Attribution is a condition of that licence rather than a courtesy, so the same
+credit is in three places: in the game, along the bottom of the main menu;
+beside the assets, in
+[`assets/models/cars/ATTRIBUTION.txt`](./assets/models/cars/ATTRIBUTION.txt);
+and here. The models in `assets/models/cars/` are processed derivatives — see
+`scripts/build-car-pack.py` — and remain under CC-BY 4.0.
+
+Everything else in this repository is the project's own and is covered by the
+licence below.
 
 ## License
 

@@ -16,9 +16,12 @@
 ## keep working across two renderers. And a viewport cannot be asserted on
 ## headlessly — where an [Image] can, which is why washing the bonnet and
 ## checking that the boot lid is untouched is a unit test in this project rather
-## than a screenshot somebody looked at once. At 64² a tile the whole car is
-## about 1.2 MB and a brush touches a few hundred pixels a tick; there is no
-## performance problem here to solve yet.
+## than a screenshot somebody looked at once. At 64² a tile the CSG blockout's
+## twelve panels are about 1.15 MB altogether, and a brush touches a few hundred
+## pixels a tick; there is no performance problem here to solve yet. A
+## [MeshCar]'s seven panels, sized per panel by [PanelResolution] rather than at
+## one flat number, come to under 1 MB even at every panel's ceiling — see that
+## class's docs for the arithmetic.
 ##
 ## [b]Four buckets in three channels, and they always add up to one.[/b] A texel
 ## is not "how dirty" — it is how a unit of surface is divided between four
@@ -232,10 +235,11 @@ func shine() -> float:
 ## in patches' worth.
 ##
 ## [b]Patches' worth rather than texel-units, and that is the whole point of the
-## number.[/b] A unit is a mask-resolution detail — it changes with
-## [member Grime.tile_pixels] and it means nothing to anything outside this file
-## — where a patch is the size the rest of the game already reasons in: it is
-## what [signal Grime.patch_finished] counts, what the ding rides on and what the
+## number.[/b] A unit is a mask-resolution detail — it changes with the tile
+## resolution [PanelResolution] hands this map, per panel, and it means nothing
+## to anything outside this file — where a patch is the size the rest of the
+## game already reasons in: it is what [signal Grime.patch_finished] counts,
+## what the ding rides on and what the
 ## square on the car is drawn at. So one patch's worth of washing reads 1.0 here,
 ## and a caller that pays per patch can pay for part of one without knowing how
 ## big a texel is.

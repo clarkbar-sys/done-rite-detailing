@@ -123,6 +123,71 @@ func test_the_logo_is_framed_rather_than_pasted_on() -> void:
 	assert_eq(box.bg_color, Brand.PANEL, "the card must be the site's panel colour")
 
 
+# ---- the credit the cars arrive under ----------------------------------------
+
+
+func test_the_car_pack_is_credited_where_a_player_can_read_it() -> void:
+	# CC-BY 4.0 is the licence assets/models/cars/ arrives under and attribution
+	# is a condition of it, not a courtesy. A file in the repository does not
+	# discharge that — the person playing the game never sees one — so the credit
+	# has to be on a screen, and this is the screen every player passes through.
+	#
+	# All three parts by name, because the licence asks for all three and a line
+	# that lost one of them would still look like a credit: the title of the work,
+	# who made it, and what licence it is under. Substrings rather than the whole
+	# string, so the wording around them stays the .tscn's business.
+	var credits: Label = _screen.get_node("%Credits") as Label
+	assert_not_null(credits, "the menu must carry the credit for the cars")
+	if credits == null:
+		return
+	for required: String in ["Generic passenger car pack", "Comrade1280", "CC BY 4.0"]:
+		assert_string_contains(credits.text, required, "the credit must name %s" % required)
+
+
+func test_the_credit_is_actually_on_the_screen() -> void:
+	# A label with the right words in it, laid out off the bottom of the picture,
+	# is not attribution. The design height rather than the window's, for the
+	# reason the rules screen uses it: `window/stretch/aspect` is "expand", so a
+	# taller screen gets more room and never less — a line that fits at the design
+	# resolution fits everywhere.
+	var credits: Label = _screen.get_node("%Credits") as Label
+	assert_gt(credits.size.x, 0.0, "the credit must be laid out, not collapsed")
+	var box: Rect2 = credits.get_global_rect()
+	assert_gte(box.position.x, 0.0, "the credit runs off the left of the screen")
+	var design: Vector2i = get_tree().root.content_scale_size
+	assert_lte(box.end.y, float(design.y), "the credit is off the bottom of the picture")
+	assert_true(credits.is_visible_in_tree(), "the credit must be drawn")
+
+
+func test_the_font_can_draw_the_credit() -> void:
+	# The same bug `tests/integration/test_how_to_play.gd` pins, in the one place
+	# on this screen where the copy is not plain ASCII: this project ships no font
+	# of its own, so every label is drawn in Godot's built-in Open Sans, and a
+	# glyph it does not have is a tofu box in a released build rather than an error
+	# anybody would see. The credit carries curly quotes and an em dash.
+	var credits: Label = _screen.get_node("%Credits") as Label
+	var font: Font = credits.get_theme_font("font")
+	for i: int in credits.text.length():
+		var glyph: int = credits.text.unicode_at(i)
+		assert_true(
+			font.has_char(glyph),
+			(
+				"the credit wants U+%04X (%s), which %s cannot draw"
+				% [glyph, char(glyph), font.get_font_name()]
+			)
+		)
+
+
+func test_the_credit_is_legible_over_a_lit_driveway() -> void:
+	# It is laid over the bay working itself, which is tarmac, grass, sky and a
+	# car of whatever colour was drawn — so muted grey on its own is legible
+	# against about half of that. The outline is what makes it a promise rather
+	# than a hope, and it is the same treatment the score wears over the same room.
+	var credits: Label = _screen.get_node("%Credits") as Label
+	assert_eq(credits.get_theme_color("font_color"), Brand.MUTED)
+	assert_gt(credits.get_theme_constant("outline_size"), 0, "grey type needs a shadow here")
+
+
 # ---- two buttons, and only one of them is the answer -------------------------
 
 

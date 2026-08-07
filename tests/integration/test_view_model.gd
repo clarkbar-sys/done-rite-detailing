@@ -63,9 +63,11 @@ func _camera() -> Camera3D:
 
 
 ## The car's bounding box in world space. [Car.bounds] rather than an [AABB] off
-## a mesh: the car is twelve CSG panels now, and it is wider than the bodywork
-## by the reach of the wing mirrors — which only makes the clearances below more
-## conservative.
+## a mesh: a car is a handful of separate panels, and an axis-aligned box round
+## one is wider than the bodywork because every car in the pack tapers at the
+## nose and the tail — which only makes the clearances below more conservative.
+## Deliberately not "the mirrors": the blockout had them and were the widest
+## thing on it, and no car in the pack has any.
 func _car_box() -> AABB:
 	var car: Car = _garage.get_node("%Car") as Car
 	return car.bounds()

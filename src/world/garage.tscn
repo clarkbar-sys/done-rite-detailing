@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://src/world/garage.gd" id="1_garage"]
 [ext_resource type="Script" path="res://src/world/view_model.gd" id="2_view_model"]
-[ext_resource type="PackedScene" path="res://src/world/car.tscn" id="3_car"]
+[ext_resource type="PackedScene" path="res://src/world/mesh_car.tscn" id="3_car"]
 [ext_resource type="Shader" path="res://src/world/sky.gdshader" id="4_sky"]
 [ext_resource type="Script" path="res://src/world/lens.gd" id="5_lens"]
 [ext_resource type="PackedScene" path="res://src/world/grove.tscn" id="6_grove"]
@@ -146,9 +146,16 @@ material_override = SubResource("StandardMaterial3D_grass")
 ; camera rather than repeating them.
 [node name="Grove" parent="View/World/Ground" instance=ExtResource("6_grove")]
 
+; The car, in the middle of the drive, on the floor — and the floor is the only
+; part of that this file can state. Every car in the pack is authored about its
+; own mid-height (see src/world/mesh_car.gd), and the ten styles are 1.04 m to
+; 1.77 m tall, so the one number that used to sit here — 0.7, half the blockout's
+; height — now buries a minivan 18 cm into the tarmac or floats a sport car the
+; same distance above it. The height is therefore worked out from the car's own
+; box by Garage._park_the_car(), which has the argument, and what is written here
+; is where on the drive it stands.
 [node name="Car" parent="View/World" instance=ExtResource("3_car")]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
 
 ; keep_aspect 0 is KEEP_WIDTH, so the 75 below is the angle measured *across* the
 ; frame and the angle up and down falls out of the viewport's shape. That is the

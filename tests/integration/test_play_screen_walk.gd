@@ -61,14 +61,42 @@ const HELD_REACH: float = 0.45
 ## from a box than a face is, and the standoff is a servo easing toward a target
 ## rather than a solve.
 ##
-## [b]The numbers are chosen to fail a circle.[/b] That is the only thing they
-## are for. Held at the radius that suits the flanks, a fixed circle passes 1.0 m
-## from the nose, which is under the first; held at the radius that suits the
-## nose it passes 3.41 m from the flanks, which is over the second. The walk as
-## it stands ranges 2.18 m to 3.01 m over a lap — measured, by widening each of
-## these until it failed and reading the number back — and sits inside both.
+## [b]The near end is what fails a circle.[/b] Held at the radius that suits the
+## nose, a fixed circle passes about a metre from the flanks of every car in the
+## pack — well under the first of these, which is the assertion that catches it.
+##
+## [b]Re-measured across all ten styles for [code]#139[/code][/b], because the bay
+## now parks one of them at random and the old band was a fact about a blockout
+## with a near-vertical bumper. Half a lap from the parked stance, right hand
+## down, clearance to the car's own box:
+##
+## [codeblock]
+## offroad   1.90 .. 2.58     sedan     1.93 .. 2.83     minivan  2.00 .. 2.96
+## wagon     1.92 .. 2.99     hatchback 2.03 .. 3.00     suv      1.89 .. 3.01
+## pickup    1.79 .. 3.05     coupe     2.00 .. 3.24     compact  2.06 .. 3.64
+## sport     1.92 .. 3.69
+## [/codeblock]
+##
+## [b]The far end of that is a finding and not noise.[/b] The standoff holds
+## [member Garage.standoff_metres] measured [i]along the panel's own normal[/i] —
+## which is what stops it cutting corners — and a pack car's nose is raked where
+## the blockout's was a flat slab. Square on to a slope, 2.2 m of clearance is
+## more than 2.2 m of ground, so off the nose of a sport car or a pickup the
+## radius runs all the way out to [member Garage.orbit_radius] and the fence, not
+## the ray, is what stops it. The shot is still on the drive and still pointed at
+## the car; it is looser for a second of a lap than the blockout ever was.
+## Worth retuning on its own terms rather than inside a swap — see the note on
+## [method Garage._hold_the_standoff].
+##
+## So the far end is widened to bracket the measured range with a little room, and
+## it stops carrying any of the "not a circle" argument — at 3.8 m a circle held
+## at the offroad's nose radius would squeak under it. That job is
+## [constant NOT_A_CIRCLE]'s and always was the stronger half of it: the radius
+## has to visibly change over a lap, and measured, it changes by 1.70 m on the
+## offroad and by 2.58 m on the pickup against a threshold of half a metre. A
+## circle fails that by three lengths.
 const NEAREST: float = 1.5
-const FURTHEST: float = 3.25
+const FURTHEST: float = 3.8
 
 ## How much the radius has to differ between the ends of the car and its flanks
 ## before the walk counts as following the car's shape rather than a circle drawn
@@ -149,10 +177,13 @@ func _pad() -> MotionPad:
 ## The car's bounding box in world space — read off the car rather than written
 ## down again here, so it keeps meaning "the car" after somebody reshapes it.
 ##
-## [Car.bounds] rather than an [AABB] off a mesh, because the car is twelve
-## CSG panels now and there is no one visual instance left to ask. It is wider
-## than the bodywork by the reach of the wing mirrors, which only makes every
-## clearance below more conservative.
+## [Car.bounds] rather than an [AABB] off a mesh, because a car is a handful of
+## separate panels and there is no one visual instance left to ask. An
+## axis-aligned box is wider than the bodywork it is drawn round — every car in
+## the pack tapers at the nose and the tail — which only makes every clearance
+## below more conservative. It is deliberately not "the mirrors": the blockout's
+## mirrors were the widest thing on it and no car in the pack has any, so the
+## slack here is the shape of the car rather than a fitting on it.
 func _car_box() -> AABB:
 	return _car().bounds()
 
@@ -362,10 +393,13 @@ func test_a_walk_round_the_car_keeps_its_distance_and_its_room() -> void:
 	# paying for their own.
 	#
 	# The first two are the reason [Standoff] exists. A fixed radius that clears
-	# the 2.15 m nose of this car stands 2.15 m off its doors; one that hugs the
-	# doors passes straight through the bumper. The third is the same fact from
-	# the other side — if the radius never changed, the walk would be a circle and
-	# one of the first two would already have failed. The fourth is the clipping
+	# the nose of a car — 1.6 m to 2.6 m out, depending which of the ten is parked
+	# — stands that far off its doors, which are barely a metre from the middle;
+	# one that hugs the doors passes straight through the bumper. The third is the
+	# same fact from the other side, and since #139 it is the one that carries the
+	# argument outright: [constant FURTHEST] is now wide enough for a circle at the
+	# nose's radius to squeeze under, and a radius that never changed still fails
+	# here by a wide margin. The fourth is the clipping
 	# promise from [code]test_play_screen.gd[/code], which used to be one
 	# measurement at one parked position and now has to hold everywhere, including
 	# where the standoff pulls in tightest.

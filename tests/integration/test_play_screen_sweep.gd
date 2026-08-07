@@ -43,24 +43,56 @@ const WASH_FRAMES: int = 60
 ## How far above the roofline the near-miss presses aim, in metres.
 ##
 ## [b]A band, and every edge of it was measured against the settled shot rather
-## than reasoned about.[/b] Swept at the power wash's own 0.4 m the car is found
-## up to 0.3 m over the roofline and lost from 0.4 m; at the 0.6 m
-## [constant WIDE_ENOUGH] uses it is found up to 0.5 m and lost from 0.6 m; the
-## exact ray misses from 0.1 m upward; and the aim leaves the top of a 720-line
-## frame past about 1.0 m. A quarter of a metre is inside all of those with room
-## on both sides, which is what makes it the press this suite is about — and
-## [method _the_ray_missed] re-asserts the important edge on every use rather than
-## trusting this paragraph to stay true.
+## than reasoned about.[/b] Re-measured across all ten styles for [code]#139[/code],
+## because the bay no longer parks one blockout of one size — it draws one of ten
+## cars that stand 1.04 m (sport) to 1.77 m (minivan) tall, and every edge below
+## is a different number on each of them:
+##
+## [codeblock]
+## 0.10  the exact ray already misses all ten
+## 0.25  a 0.4 m sweep catches all ten, a 0.6 m sweep catches all ten,
+##       and the press is 122 (minivan) to 206 (sport) px down the frame
+## 0.40  a 0.4 m sweep still catches the three tallest
+##       (minivan, offroad, pickup)
+## 0.45  a 0.4 m sweep has lost all ten
+## [/codeblock]
+##
+## A quarter of a metre is inside all of those with room on both sides, which is
+## what makes it the press this suite is about — and [method _the_ray_missed]
+## re-asserts the important edge on every use rather than trusting this table to
+## stay true.
 const NEAR_MISS_METRES: float = 0.25
 
-## How far above the roofline the presses that must [i]not[/i] be caught aim.
+## Where the presses that must [i]not[/i] be caught aim, as a fraction of the way
+## across and down the picture: high up, and well off to one side of the car.
 ##
-## Measured in the same pass: past 0.6 m no sphere this suite casts reaches the
-## car, and past 1.0 m the aim is off the picture and stops being a press at all.
-## Eight tenths sits between the two, and [method _the_sweep_missed] asserts the
-## lower edge on every use — so a retune that widened the tools would fail here
-## loudly instead of quietly turning this into a second near-miss test.
-const WELL_CLEAR_METRES: float = 0.8
+## [b]Not "N metres over the roofline", which is what this was until
+## [code]#139[/code].[/b] A press straight over the middle of the car is the worst
+## place in the frame to put this one, and the reason is
+## [method Garage._nearest_on_the_car]: the fallback plants a post at the nearest
+## point on the nearest panel's box and casts a second ray a tenth past it, so an
+## aim that comes down the car's own centreline has a post directly over the roof
+## and a probe that runs straight into it. That probe hitting is a mark off real
+## paint with a real normal — which is a tool that works, and this test's whole
+## subject is the branch where nothing real answers at all.
+##
+## The blockout hid it: one car, one shape, and 0.8 m over its roofline happened
+## to clear the post as well as the sweep. Against the ten the bay parks now there
+## is no height that works — measured across every style at the settled shot, the
+## band where the exact ray, a [constant WIDE_ENOUGH] sphere and the fallback's own
+## probe all decline [i]and[/i] the aim is still inside a 720-line frame is
+## 0.80–0.95 m on a coupe and 0.60–0.75 m on a minivan, and those do not overlap.
+## Aiming up and to the side removes the question instead of retuning it: the post
+## is then a box corner out in open air, and the probe misses on all ten with the
+## aim passing 1.88 m (compact) to 2.32 m (wagon) from the middle of the car.
+##
+## A fifth across and a seventh down, so the press is well inside the picture
+## rather than hugging an edge a letterbox could crop. Measured there on all ten:
+## the exact ray misses, a 0.4 m sweep misses, a 0.6 m sweep misses, the probe
+## misses — and a 1.2 m sphere does reach, which is what says this is a bounded
+## margin and not an aim pointed at nothing.
+const WELL_CLEAR_ACROSS: float = 0.2
+const WELL_CLEAR_DOWN: float = 0.15
 
 ## A sphere far too small to bridge [constant NEAR_MISS_METRES], and one
 ## comfortably wide enough. Neither is any tool's real radius on purpose: what is
@@ -175,6 +207,22 @@ func _over_the_roof(above: float) -> Vector2:
 	return at
 
 
+## Where a press aims when it is plainly not pointing at the car —
+## [constant WELL_CLEAR_ACROSS] across and [constant WELL_CLEAR_DOWN] down the
+## picture, which is up in the sky and off to one side of it.
+##
+## Taken off the frame rather than off the car, unlike [method _over_the_roof],
+## and that is the point rather than an inconsistency: a near miss is a distance
+## from the bodywork and has to be measured off it, while this press is defined by
+## being nowhere near the car at all. The car is in the middle of the picture on
+## every one of the ten styles, so a corner of the frame is clear of all of them
+## without having to know which one was drawn. [method _the_sweep_missed] and
+## [method _the_post_missed] assert that on every use.
+func _well_clear_of_the_car() -> Vector2:
+	var frame: Vector2 = Vector2(_view().size)
+	return Vector2(frame.x * WELL_CLEAR_ACROSS, frame.y * WELL_CLEAR_DOWN)
+
+
 ## The world ray a press aiming at [param at] casts, as an origin and a direction
 ## — the same two the room works out in [method Garage._resolve_aim].
 func _ray_through(at: Vector2) -> Array[Vector3]:
@@ -213,6 +261,43 @@ func _the_sweep_missed(at: Vector2) -> void:
 			"a %s m sphere reached the car from %v, so this is not the fallback's press"
 			% [WIDE_ENOUGH, at]
 		)
+	)
+
+
+## Asserts that the nearest-panel fallback has nothing real to rest on either at
+## [param at] — the third and last thing that has to be true for a press to reach
+## the one answer in the whole room that is allowed to be approximate.
+##
+## [b]The tier below the two above, restated the way they are.[/b]
+## [method Garage._nearest_on_the_car] does not simply hand back a box corner: it
+## plants a post at the nearest point on the nearest panel's box and casts a
+## second ray a [constant Garage.PAST_THE_POST] fraction past it, and if that
+## finds paint the mark is real, the normal is measured and a tool pressed there
+## works. Only when the probe misses too is the mark the invented one this test is
+## named for.
+##
+## Without this the test asserts "no water" against a press that three tiers deep
+## might still be answered off real geometry — which is exactly how it broke on
+## the car pack, silently, on whichever of the ten styles the room happened to
+## draw.
+func _the_post_missed(at: Vector2) -> void:
+	var ray: Array[Vector3] = _ray_through(at)
+	var boxes: Array[AABB] = []
+	for panel: Node3D in _car().panels():
+		var skin: GeometryInstance3D = _car().skin_of(panel)
+		boxes.append(skin.global_transform * skin.get_aabb())
+	var nearest: int = NearestPoint.nearest_box(boxes, ray[0], ray[1])
+	assert_gte(nearest, 0, "the fallback found no panel at all to be nearest to")
+	if nearest < 0:
+		return
+	var post: Vector3 = NearestPoint.in_box_from_ray(boxes[nearest], ray[0], ray[1])
+	var reach: Vector3 = post - ray[0]
+	var probe: Dictionary = _space().intersect_ray(
+		PhysicsRayQueryParameters3D.create(ray[0], ray[0] + reach * Garage.PAST_THE_POST)
+	)
+	assert_true(
+		probe.is_empty(),
+		"the fallback's own probe reached the car from %v, so this mark is real paint" % at
 	)
 
 
@@ -270,7 +355,7 @@ func _settle() -> void:
 ## Whether [param who] is one of the car's own panels, asked of the car rather
 ## than by name — so this keeps meaning the same thing after somebody adds a wing.
 func _is_a_panel(who: Object) -> bool:
-	for panel: CSGShape3D in _car().panels():
+	for panel: Node3D in _car().panels():
 		if panel == who:
 			return true
 	return false
@@ -382,13 +467,15 @@ func test_a_press_that_just_clears_the_roof_now_washes_it() -> void:
 
 
 func test_a_press_well_clear_of_the_car_is_still_the_nearest_panel_and_still_dry() -> void:
-	# The tier below, unchanged and deliberately so. Three metres over the roof is
-	# far outside any tool's window, so the sweep declines and the fallback answers
-	# with a box corner faced at the player — a mark, because "nothing" is not a
-	# useful thing to mark, and no water, because that normal was invented.
+	# The tier below, unchanged and deliberately so. A press up in the sky and off
+	# to one side is far outside any tool's window, so the sweep declines, and it
+	# is far enough off the car's centreline that the fallback's own probe declines
+	# too — leaving a box corner faced at the player. A mark, because "nothing" is
+	# not a useful thing to mark, and no water, because that normal was invented.
 	await _settle()
-	var at: Vector2 = _over_the_roof(WELL_CLEAR_METRES)
+	var at: Vector2 = _well_clear_of_the_car()
 	_the_sweep_missed(at)
+	_the_post_missed(at)
 	await _press(at)
 	assert_true(_marker().is_marking(), "the press still marks the nearest bodywork")
 	assert_almost_eq(_grime().remaining(), 1.0, TOLERANCE, "a box corner spent water")

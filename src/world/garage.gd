@@ -7,11 +7,28 @@
 ## of it is waiting on an artist; the shapes and their sizes are the design
 ## decision, and a real mesh drops in later without moving anything else.
 ##
-## The car used to be one of those boxes. It is now a CSG blockout in the same
-## 4.3 × 1.9 × 1.4 m envelope and the same place, for the same reason — a shape
-## nobody has to open Blender to change. What it is made of, and why it is made
-## of twelve separate pieces, is [code]src/world/car.gd[/code]'s business; this
-## scene only cares that it is a thing with a position and an outline.
+## The car used to be one of those boxes, and then it was a CSG blockout in a
+## 4.3 × 1.9 × 1.4 m envelope standing in for one. It is now a [MeshCar]: one of
+## the ten models in [code]assets/models/cars/[/code] — pinned to the sedan in
+## [code]src/world/mesh_car.tscn[/code] so a playtest gets the same car twice, and
+## painted at random every time this room is instanced. That pin is one line in
+## that scene file and the room is written as though it were not there: the
+## clearances below still have to hold for all ten, because the line is a
+## playtesting convenience and not a fact about the bay. What it is made of is
+## [code]src/world/car.gd[/code]'s business and [code]src/world/mesh_car.gd[/code]'s;
+## this scene only cares that it is a thing with a position and an outline.
+##
+## [b]Which is now ten outlines, and that is the interesting part of the swap.[/b]
+## The blockout was one size forever, so every clearance in this file could be
+## checked once and written down. The pack is 3.26 m of compact to 5.19 m of
+## pickup, and 1.04 m of sport car to 1.77 m of minivan — so nothing below may
+## hold a number that was really a fact about the blockout. Where the car is sat
+## comes off its own box ([method _park_the_car]), how far the eye stands off it
+## comes off a ray that measures the car in front of it ([method _hold_the_standoff]),
+## and the clearances the [ViewModel] depends on are asserted against
+## [method Car.bounds] rather than against 4.3 × 1.9 × 1.4 —
+## [code]tests/integration/test_garage_styles.gd[/code] does that at both
+## extremes, which is where a shot that only works on a sedan fails.
 ##
 ## [b]Why the [SubViewport][/b]. In the root viewport, 2D always composites over
 ## 3D — and [code]src/main/main.tscn[/code] has a full-screen [ColorRect]
@@ -66,26 +83,34 @@
 ## exception is putting the mud back at the end of a lap ([method _on_lapped]),
 ## which is a cabinet restarting rather than something a player does.
 ##
-## [b]The rail is not a circle, though, and that is the interesting half.[/b] The
-## car is 4.3 m long and 1.9 m wide, so one fixed radius is either scraping the
-## doors or standing a metre and a half off the bumper. What is held instead is
-## the gap between the eye and the bodywork: every physics frame a ray goes out
-## level toward the middle of the car, and [Standoff] eases the radius until the
-## paint is [member standoff_metres] away square on. The camera hugs the
-## car's outline rather than a circle drawn around it, and now that the green box
-## has become a car with a tapered nose and wing mirrors, the ray finds those too
-## — exactly as the previous version of this paragraph said it would. Nothing
-## here says "box" anywhere.
+## [b]The rail is not a circle, though, and that is the interesting half.[/b] A
+## car is between three and five metres long and about two wide, so one fixed
+## radius is either scraping the doors or standing a metre and a half off the
+## bumper. What is held instead is the gap between the eye and the bodywork:
+## every physics frame a ray goes out level toward the middle of the car, and
+## [Standoff] eases the radius until the paint is [member standoff_metres] away
+## square on. The camera hugs the car's outline rather than a circle drawn around
+## it, and the pack's cars have a tapered nose, a swept tail and wheel arches, so
+## the ray finds those — exactly as the earliest version of this paragraph said it
+## would when the car was still a green box. Nothing here says "box" anywhere,
+## which is what lets the same rail hold for a pickup and for a sport car.
+##
+## Note what that also means for [i]which[/i] car is parked here: the rail is
+## measured and not written down, so a style two metres longer than the last one
+## changes nothing in this file. It is the reason the swap to the pack was a
+## change of one [code]ext_resource[/code] line in
+## [code]src/world/garage.tscn[/code].
 ##
 ## [b]Which is why the car has to be something a ray can hit.[/b] It is the only
 ## thing out here that is — the ground has no collider and nothing else is
-## modelled. It no longer needs a hand-built collider to be it:
-## every panel of the [Car] is a CSG root with [member CSGShape3D.use_collision]
-## set, so the body is generated from the same brushes that make the mesh and
-## cannot drift from it. That deleted a [BoxShape3D] that used to sit beside the
-## mesh carrying the car's size a second time, along with the test whose whole
-## job was catching the two disagreeing — and it means the ray now measures to
-## the panel it actually hit rather than to a box drawn around everything.
+## modelled. It needs no hand-built collider to be it: every panel of the [Car] is
+## its own collider — on the [MeshCar] parked here by the [StaticBody3D] the panel
+## is rooted in, carrying a trimesh of the panel's own triangles, and on the
+## blockout that preceded it by [member CSGShape3D.use_collision]. Either way the
+## body comes with the panel. That deleted a [BoxShape3D] that used to sit beside
+## the mesh carrying the car's size a second time, along with the test whose whole
+## job was catching the two disagreeing — and it means the ray now measures to the
+## panel it actually hit rather than to a box drawn around everything.
 ##
 ## [b]The viewmodel hangs off this camera, and is kept inside the near plane
 ## rather than given a camera of its own.[/b] A mesh parented to a camera punches
@@ -106,10 +131,20 @@
 ## [i]Why it isn't needed yet.[/i] Because the eye is kept far enough from the
 ## car that nothing in the room can get between it and the lens, and that is a
 ## measurement rather than a hope. Parked at [member eye_position] the anchor
-## stands 0.79 m clear of the car's box — the nearest thing in the room to it by
-## a wide margin, since the edge of the modeled ground is metres away — and
+## stands 0.79 m clear of the blockout's box — the nearest thing in the room to
+## it by a wide margin, since the edge of the modeled ground is metres away — and
 ## 0.50 m in front of a 0.05 m near plane; the longest held proxy, the power
 ## wash wand, still finishes 0.50 m clear of the car.
+##
+## [i]Re-measured across the ten cars that replaced it[/i], because that 0.79 was
+## one car's number and this is the kind of margin that gets quietly spent. The
+## parked stance leaves the anchor between 0.68 m (the pickup and the SUV, both
+## 2.07 m across) and 0.93 m (the compact, 1.61 m across) clear of the bodywork,
+## and once the standoff has eased the walk out to its own gap it is 1.75 m to
+## 2.39 m on every style. The tightest parked figure is the two biggest cars in
+## the pack, which is the direction a margin is meant to run, and even that 0.68 m
+## is 23 cm past the 0.45 m a held tool reaches — against the blockout's 34 cm.
+## The walk, where the reach was nearly spent once before, has metres.
 ##
 ## [i]And the eye has since learned to walk[/i], which is what the previous
 ## version of this paragraph said would end it. It didn't, and the reason is
@@ -121,8 +156,11 @@
 ## hope, it is just a number the standoff now keeps rather than the scene file.
 ## All of it is asserted against the car's own bounding box: the parked anchor in
 ## [code]tests/integration/test_play_screen.gd[/code], every angle of a lap in
-## [code]tests/integration/test_play_screen_walk.gd[/code], and every proxy
-## corner in [code]tests/integration/test_view_model.gd[/code]. The day something
+## [code]tests/integration/test_play_screen_walk.gd[/code], every proxy
+## corner in [code]tests/integration/test_view_model.gd[/code], and both ends of
+## the pack in [code]tests/integration/test_garage_styles.gd[/code] — the last of
+## those because the other three run against whichever of the ten the room drew,
+## which is coverage nobody can reproduce. The day something
 ## needs the eye nearer the paint than a held tool is long, those go red and the
 ## second viewport gets built then — with something real to look at rather than
 ## as insurance against a camera that cannot move.
@@ -162,10 +200,12 @@
 ## [method _resolve_aim] answers it on the next tick — which also means a finger
 ## dragged across the glass costs one raycast per tick rather than one per event.
 ##
-## [i]The panel it names is real.[/i] Every piece of the [Car] is a CSG root with
-## its own collider, so the hit comes back as [code]"Hood"[/code] or
+## [i]The panel it names is real.[/i] Every piece of the [Car] carries a collider
+## of its own, so the hit comes back as [code]"Hood"[/code] or
 ## [code]"DoorLeft"[/code] rather than as "the car" — which is the thing the
-## grime work needs and the reason [signal aimed] carries a name at all.
+## grime work needs and the reason [signal aimed] carries a name at all. That the
+## collider [i]is[/i] the panel is the whole of what [method Car.panels] promises;
+## nothing here has to know what the panel is made of.
 ##
 ## [i]And a press that misses by a hair is caught before any of that.[/i] The aim
 ## is answered in three tiers, each strictly wider than the one above it, and
@@ -318,10 +358,14 @@ const NO_SIDE_TO_IT: float = 0.35
 ## look at yet, and a camera below the floor renders the room from outside it.
 @export var eye_height_min: float = 1.1
 
-## The highest the eye may be driven. Above the car's 1.4 m roof by a metre, so
-## the roof and the bonnet can be looked down at. Not a matter of taste: past
-## about here the ray below starts measuring to the roof rather than to a
-## flank, and the eye leans in over the car instead of standing beside it.
+## The highest the eye may be driven. Above the tallest roof in the pack — the
+## minivan's, at 1.77 m — so the roof and the bonnet can be looked down at on any
+## of the ten. Not a matter of taste: past about here the ray below starts
+## measuring to the roof rather than to a flank, and the eye leans in over the car
+## instead of standing beside it. It was picked against the blockout's 1.4 m roof
+## and it holds, with less room over a minivan and more over a sport car; what
+## keeps it honest is that the ray is cast at the car's [i]own[/i] mid-height
+## rather than at a fixed one — see [method _hold_the_standoff].
 @export var eye_height_max: float = 2.4
 
 ## How much clear air to keep between the eye and the nearest bodywork, in
@@ -330,8 +374,10 @@ const NO_SIDE_TO_IT: float = 0.35
 ## A long way back from the 0.95 m the parked stance stands at
 ## ([member eye_position]), and the number came out of a browser rather than out
 ## of a spreadsheet. At the parked distance a 75° lens sees 1.84 m of frame, and
-## the car is 1.9 m wide: walking around it at that range is a wall of green
-## sliding sideways, with no way to tell a door from a wing. Screenshotted, on an
+## a car is about two metres wide — the pack runs 1.61 m to 2.07 m across, and the
+## blockout it was measured against was 1.9 m: walking around any of them at that
+## range is a wall of paint sliding sideways, with no way to tell a door from a
+## wing. Screenshotted, on an
 ## emulated Pixel 7, which is where this got settled. At 2.2 m the frame is
 ## 3.4 m, the corner of the car and the room behind it are both in shot, and the
 ## movement reads as movement.
@@ -384,8 +430,10 @@ const NO_SIDE_TO_IT: float = 0.35
 ##
 ## Four, so a panel is washed, cleaned and buffed in twelve — short enough that
 ## somebody who glances at the screen sees a whole panel change, long enough that
-## the jet visibly takes territory rather than flicking over. A full lap of a
-## twelve-panel car is a little over two minutes, which is the loop nobody is
+## the jet visibly takes territory rather than flicking over. A full lap is that
+## times three times however many panels the car has: a little over two minutes on
+## the twelve-panel blockout this was tuned on, and about a minute and a half on
+## the seven-panel cars the bay parks now. Either way it is the loop nobody is
 ## expected to sit through and everybody is welcome to.
 @export var attract_seconds_per_pass: float = 4.0
 
@@ -455,8 +503,9 @@ const NO_SIDE_TO_IT: float = 0.35
 ##
 ## [WashJet] changed that. It puts this radius on screen as the patch the water
 ## lands on, and half a metre of radius put a 0.9 m circle of spray at the far
-## end of the jet — wider across than the car's own wheels (0.33 m radius each,
-## see [code]src/world/car.gd[/code]) — which reads as a wheel-sized ball landing
+## end of the jet — wider across than the car's own wheels (0.33 m radius each on
+## the blockout this was measured against, and the pack's are no bigger; see
+## [code]tests/fixtures/blockout_car.tscn[/code]) — which reads as a wheel-sized ball landing
 ## on the paint rather than as a mark. The lesson above still holds; it is just
 ## being applied against a new picture rather than an old one. A fifth of a
 ## metre keeps the jet a size a hand plausibly holds and clears in the same
@@ -551,7 +600,7 @@ var _sweep: AimSweep = null
 var _racket: ToolRacket = null
 var _grime: Grime = null
 var _routine: AttractRoutine = null
-var _running_order: Array[CSGShape3D] = []
+var _running_order: Array[Node3D] = []
 var _aiming: bool = false
 var _aim_at: Vector2 = Vector2.ZERO
 var _marked: String = ""
@@ -575,6 +624,11 @@ var _marked: String = ""
 
 
 func _ready() -> void:
+	# Before anything is placed or pointed at it: every shot in this file is
+	# measured from the car's own position, so a car that has not been sat on the
+	# tarmac yet would be aimed at, walked around and stood off from the wrong
+	# height for the life of the screen.
+	_park_the_car()
 	# The anchor ships hidden in the scene file and is switched on here, because
 	# both screens instance this same scene: a viewmodel is a thing in the hands
 	# of somebody standing in the room, and hanging one off the corner of the
@@ -753,6 +807,39 @@ func grime() -> Grime:
 	return _grime
 
 
+## Sits the car on the driveway: lifts it until the bottom of its own box is on
+## the tarmac, whatever height that car happens to be.
+##
+## [b]The room owns the floor and the car owns its outline, and this is the one
+## line where those two meet.[/b] Every car in the game is authored about its own
+## mid-height — [Car]'s class docs have why, and it is not a stylistic choice: the
+## standoff casts its ray level through [code]%Car[/code]'s position and the
+## camera looks at that same point, so an origin on the floor would aim the shot
+## at the tarmac and measure the car's distance along its own shadow. The cost of
+## that convention is that "where the origin goes" is half the car's height, and
+## the car is the only thing that knows which car it is.
+##
+## The blockout hid that, because there was one of it: it was 1.4 m tall, forever,
+## so [code]y = 0.7[/code] in the scene file was right and looked like a fact
+## about the room. The pack is ten cars between 1.04 m (sport) and 1.77 m
+## (minivan), and that one number buries the tall ones and floats the low ones by
+## up to 18 cm — a wheel sunk into the drive or a car hovering over it, which is
+## the first thing anybody would see and the last thing a test measuring
+## clearances would notice.
+##
+## [b]A car it cannot measure is left exactly where the scene file put it[/b],
+## which is the same answer [method _hold_the_standoff] gives a ray that hit
+## nothing: the honest response to having no measurement is to move nothing. A
+## zero box means a car whose panels have no geometry yet — which on a CSG car is
+## every car during [method Node._ready], see [method Car.bounds] — and lifting
+## one by half of nothing would sink it instead.
+func _park_the_car() -> void:
+	var box: AABB = _car.bounds()
+	if box.size.y <= 0.0:
+		return
+	_car.global_position.y -= box.position.y
+
+
 ## Puts the camera where the orbit says it should be, looking at the car.
 ##
 ## Named for the eye and not for aiming, because aiming is now something the
@@ -823,11 +910,14 @@ func _take_up_aiming() -> void:
 
 ## Puts mud on the car, a frame after there is a car to put it on.
 ##
-## [b]The wait is the whole function.[/b] Every mask is sized from its panel's
-## [method CSGShape3D.get_aabb] and CSG meshes are built deferred, so a car asked
-## during [method Node._ready] reports panels with no size — and a mask built
-## against a zero box is a projection with nothing to divide by. [Car] documents
-## the same trap for [method Car.bounds], which is where it was first paid for.
+## [b]The wait is the whole function.[/b] Every mask is sized from its panel's own
+## box and CSG meshes are built deferred, so a car asked during [method
+## Node._ready] reports panels with no size — and a mask built against a zero box
+## is a projection with nothing to divide by. [Car] documents the same trap for
+## [method Car.bounds], which is where it was first paid for, along with the note
+## that it is the blockout's and not the panel contract's: a car whose panels are
+## meshes would be exact on the frame it was instanced. The wait stays because the
+## room hosts whichever car it is handed and a frame costs nothing here.
 ##
 ## Started and not awaited by the caller: [method _ready] has nothing further to
 ## do about grime, and making it wait would push every screen's first frame
@@ -1107,10 +1197,10 @@ func _under_the_finger(from: Vector3, facing: Vector3, reach: float) -> Dictiona
 func _nearest_on_the_car(
 	space: PhysicsDirectSpaceState3D, from: Vector3, facing: Vector3
 ) -> Dictionary:
-	var panels: Array[CSGShape3D] = _car.panels()
+	var panels: Array[Node3D] = _car.panels()
 	var boxes: Array[AABB] = []
-	for panel: CSGShape3D in panels:
-		boxes.append(panel.global_transform * panel.get_aabb())
+	for panel: Node3D in panels:
+		boxes.append(_box_around(panel))
 	var nearest: int = NearestPoint.nearest_box(boxes, from, facing)
 	if nearest < 0:
 		return {}
@@ -1192,8 +1282,9 @@ func _take_up_the_walk() -> void:
 ##
 ## [b]Biggest panel first, and measured rather than listed.[/b] The whole point of
 ## an attract mode is what somebody sees from across a room, and what they see is
-## the tub, the cabin and the bonnet changing colour — not a wing mirror being
-## detailed for twelve seconds. So the running order is [method Car.panels] sorted
+## the bodywork changing colour — not a lamp lens being detailed for twelve
+## seconds while the car it is on stays filthy. So the running order is
+## [method Car.panels] sorted
 ## by how much car is in each one. A list of panel names in the right order would
 ## be the same thing written down, and it would be wrong the first time somebody
 ## added a window — which is the argument [method Car.kind_of] already makes about
@@ -1205,7 +1296,7 @@ func _take_up_the_demo() -> void:
 	_running_order = _car.panels()
 	_running_order.sort_custom(_bigger_first)
 	var kinds: Array[Surface.Kind] = []
-	for panel: CSGShape3D in _running_order:
+	for panel: Node3D in _running_order:
 		kinds.append(_car.kind_of(panel))
 	_routine = AttractRoutine.new(kinds, attract_seconds_per_pass)
 	_routine.lapped.connect(_on_lapped)
@@ -1216,8 +1307,22 @@ func _take_up_the_demo() -> void:
 ## of the same car needs no transform, and the boxes are the same either way for a
 ## car nobody has scaled — which [code]tests/integration/test_garage.gd[/code]
 ## already holds.
-func _bigger_first(first: CSGShape3D, second: CSGShape3D) -> bool:
-	return first.get_aabb().get_volume() > second.get_aabb().get_volume()
+func _bigger_first(first: Node3D, second: Node3D) -> bool:
+	var one: AABB = _car.skin_of(first).get_aabb()
+	var other: AABB = _car.skin_of(second).get_aabb()
+	return one.get_volume() > other.get_volume()
+
+
+## The world-space box around [param panel], read off its skin — see [method
+## Car.skin_of], and [method Car.bounds] for why the transform has to come off the
+## same node the box did.
+##
+## Here rather than at each of the two call sites because both of them are asking
+## "where is this panel, roughly", and the answer got one node longer the day a
+## panel stopped having to be its own geometry.
+func _box_around(panel: Node3D) -> AABB:
+	var skin: GeometryInstance3D = _car.skin_of(panel)
+	return skin.global_transform * skin.get_aabb()
 
 
 ## One tick of the demo: hold whatever the pass calls for, walk the eye round to
@@ -1230,8 +1335,8 @@ func _run_the_demo(delta: float) -> void:
 	if _routine == null:
 		return
 	_routine.advance(delta)
-	var panel: CSGShape3D = _running_order[_routine.stop()]
-	var box: AABB = panel.global_transform * panel.get_aabb()
+	var panel: Node3D = _running_order[_routine.stop()]
+	var box: AABB = _box_around(panel)
 	# Asked of the belt every tick rather than wired to a swap, for the reason
 	# [method _sight_the_aim] reads the belt every tick: `equip` refuses the tool
 	# already in hand, so this is a comparison and not a swap, and there is no
@@ -1347,6 +1452,27 @@ func _on_lapped() -> void:
 ## A ray that hits nothing leaves the radius alone. That is the honest answer to
 ## having no measurement — the alternative is inventing one, and inventing one
 ## moves the camera on the strength of a query that failed.
+##
+## [b]And the normal is where the pack cars found the edge of this.[/b] Measured
+## over half a lap on each of the ten styles — the table is in
+## [code]tests/integration/test_play_screen_walk.gd[/code] — seven of them keep
+## the eye inside 3.1 m of the car's box, the coupe reaches 3.24 m, and the
+## compact and the sport car reach 3.64 m and 3.69 m. On the sport car and the
+## pickup the radius runs all the way out to [member orbit_radius] at the nose and
+## it is the fence rather than the ray that stops it.
+##
+## The blockout's nose was a flat slab square to the approach, so the projection
+## above was the flat distance; a pack car's is raked, and 2.2 m measured square
+## on to a slope is a good deal more than 2.2 m of tarmac. The eye is standing the
+## gap it was told to keep — it is just that "the gap" and "how far back that puts
+## you" have come apart at the front of a low car.
+##
+## Left as it is for [code]#139[/code] rather than retuned inside a swap: the shot
+## is still over the drive, still aimed at the car, and only loose for the second
+## or so a lap spends at the nose. What it wants is a look at whether the standoff
+## should fall back on the ray's own length where the normal is far off the
+## approach, which is a change to how the camera moves and deserves its own
+## measurements.
 func _hold_the_standoff(delta: float) -> void:
 	var focus: Vector3 = _car.global_position
 	var eye: Vector3 = _orbit.eye(focus)

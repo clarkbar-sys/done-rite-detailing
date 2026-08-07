@@ -81,7 +81,7 @@ func before_each() -> void:
 	# several physics ticks inside a single iteration of the main loop, so all four
 	# of RESOLVE_FRAMES can pass before `process_frame` has been emitted once.
 	#
-	# Found the honest way: adding trim to `car.tscn` put about 3 ms on that build
+	# Found the honest way: adding trim to `blockout_car.tscn` put about 3 ms on that build
 	# and two tests here started failing with `is_laid()` false, while the same
 	# suite passed on its own. `test_play_screen_wash.gd` makes the same wait and
 	# has never flaked, because it counts process frames. This counts neither and

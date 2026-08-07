@@ -1,0 +1,119 @@
+[gd_scene format=3]
+
+; A car with no CSG anywhere in it: four panels, each a StaticBody3D with a
+; MeshInstance3D and a CollisionShape3D under it, plus a piece of trim.
+;
+; WHY THIS EXISTS. Car.panels() used to answer Array[CSGShape3D], and every
+; consumer of it was typed to that — which meant a car made of meshes could not
+; exist, because a MeshInstance3D is not a collider and never will be. The
+; contract is now "a root a ray can hand back, with a skin under it to measure
+; and paint"; src/world/car.gd's class docs have the whole argument. This file
+; is the other half of that contract standing up on its own, so the widening is
+; a thing a test can fail rather than a paragraph somebody believed.
+;
+; It runs the real Car script, exactly as tests/fixtures/plain_car.tscn does.
+; Nothing here is a stand-in for the game's rules — only for its geometry.
+;
+; THE NAMES ARE ISSUE #137's ON PURPOSE. The mesh cars that are coming are built
+; from assets/models/cars/*.glb with nodes called Body, Glass, Optics and
+; Wheel1..4, with Optics and Glass in "glass" and the wheels in "wheel". This is
+; that shape, at four nodes instead of seven, so the day those scenes land the
+; question "does the contract fit them" has already been answered here.
+;
+; AND THE GLASS'S MESH SITS A METRE ABOVE ITS BODY, deliberately. An importer is
+; free to leave a mesh at an offset inside the node that carries its collider,
+; and a box read off one node but placed by the transform of another is the bug
+; that arrangement invites. Everything measured about a panel therefore has to
+; come off its skin — Car.bounds(), the grime map's size and the world-to-panel
+; conversion in Grime._work — and this offset is what makes each of those a
+; different number from the wrong answer instead of the same one.
+
+[ext_resource type="Script" path="res://src/world/car.gd" id="1_meshcar"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_paint"]
+resource_local_to_scene = true
+albedo_color = Color(0.13, 0.66, 0.27, 1)
+roughness = 0.55
+
+[sub_resource type="BoxMesh" id="BoxMesh_body"]
+material = SubResource("StandardMaterial3D_paint")
+size = Vector3(2, 1, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(2, 1, 2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_metre"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_metre"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_lamp"]
+size = Vector3(0.4, 0.4, 0.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lamp"]
+size = Vector3(0.4, 0.4, 0.4)
+
+[node name="Car" type="Node3D" unique_id=920000001]
+script = ExtResource("1_meshcar")
+paint = SubResource("StandardMaterial3D_paint")
+
+; Bodywork: no group, so Car.kind_of reads it as paint by the same defaulting the
+; real car relies on. 2 x 1 x 2 m at the origin, and the only panel wide enough
+; to be in the way of a ray cast in along X at ride height.
+[node name="Body" type="StaticBody3D" parent="." unique_id=920000002]
+
+[node name="BodyMesh" type="MeshInstance3D" parent="Body" unique_id=920000003]
+mesh = SubResource("BoxMesh_body")
+
+[node name="BodyShape" type="CollisionShape3D" parent="Body" unique_id=920000004]
+shape = SubResource("BoxShape3D_body")
+
+; The offset skin. The body sits at y = 2 and the metre cube inside it at y = 1
+; above that, so the glass a player would touch is at y = 3 and every number
+; about it differs from the answer the root's transform would give by exactly a
+; metre.
+[node name="Glass" type="StaticBody3D" parent="." unique_id=920000005 groups=["glass"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+
+[node name="GlassMesh" type="MeshInstance3D" parent="Glass" unique_id=920000006]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("BoxMesh_metre")
+
+[node name="GlassShape" type="CollisionShape3D" parent="Glass" unique_id=920000007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("BoxShape3D_metre")
+
+; A second glass panel under a name that is not "glass", because #137's cars put
+; the headlamps in that group too and "the group is not the node's name" is the
+; half of Car.kind_of that a fixture with one window cannot demonstrate.
+[node name="Optics" type="StaticBody3D" parent="." unique_id=920000008 groups=["glass"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.5)
+
+[node name="OpticsMesh" type="MeshInstance3D" parent="Optics" unique_id=920000009]
+mesh = SubResource("BoxMesh_lamp")
+
+[node name="OpticsShape" type="CollisionShape3D" parent="Optics" unique_id=920000010]
+shape = SubResource("BoxShape3D_lamp")
+
+; Rubber, clear of everything else so a brush on one panel cannot reach another.
+[node name="Wheel1" type="StaticBody3D" parent="." unique_id=920000011 groups=["wheel"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)
+
+[node name="Wheel1Mesh" type="MeshInstance3D" parent="Wheel1" unique_id=920000012]
+mesh = SubResource("BoxMesh_metre")
+
+[node name="Wheel1Shape" type="CollisionShape3D" parent="Wheel1" unique_id=920000013]
+shape = SubResource("BoxShape3D_metre")
+
+; Trim, in the same shape as a panel and in the trim group — so what keeps it out
+; of panels() is the group and nothing else about it. Below the wheel, where it
+; would visibly stretch the bounds if it ever got in.
+[node name="Undertray" type="StaticBody3D" parent="." unique_id=920000014 groups=["trim"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -3.5, 0)
+
+[node name="UndertrayMesh" type="MeshInstance3D" parent="Undertray" unique_id=920000015]
+mesh = SubResource("BoxMesh_metre")
+
+[node name="UndertrayShape" type="CollisionShape3D" parent="Undertray" unique_id=920000016]
+shape = SubResource("BoxShape3D_metre")
