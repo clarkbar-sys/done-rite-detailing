@@ -15,11 +15,18 @@ var _screen: GameScreen = null
 var _requested: Array[GameState] = []
 var _rung: Array[Bell.Voice] = []
 var _window_size_before: Vector2i = Vector2i.ZERO
+var _muted_before: bool = false
 
 
 func before_each() -> void:
 	_requested = []
 	_rung = []
+	# The toggle below opens agreeing with whatever [Sound] was already at — see
+	# src/ui/sound_toggle.gd — so a suite that left the game muted would open
+	# every screen after it silenced, for a reason that has nothing to do with
+	# this one. Put back in after_each, like the window size below.
+	_muted_before = Sound.muted
+	Sound.set_muted(false)
 	# A headless window is 64x64 — smaller than the Start button, small enough
 	# that a tap at the button's own coordinates lands outside the layout
 	# entirely, and the touch tests below then pass or fail for a reason that has
@@ -52,6 +59,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	get_tree().root.size = _window_size_before
+	Sound.set_muted(_muted_before)
 
 
 func _record(state: GameState) -> void:
@@ -64,6 +72,10 @@ func _record_bell(voice: Bell.Voice) -> void:
 
 func _start_button() -> Button:
 	return _screen.get_node("%Start") as Button
+
+
+func _sound_toggle() -> SoundToggle:
+	return _screen.get_node("%Sound") as SoundToggle
 
 
 func _garage() -> Garage:
@@ -184,6 +196,24 @@ func test_start_no_longer_rings_the_counter_bell() -> void:
 	# `tests/integration/test_title_screen_music.gd`'s.
 	_start_button().pressed.emit()
 	assert_eq(_rung.size(), 0, "the bell belongs to the press that starts the job")
+
+
+# ---- the sound toggle: the first of the three corners it sits in -------------
+#
+# The toggle's own size, dressing and effect on [Sound] are
+# tests/integration/test_sound_toggle.gd's job. What is worth pinning here is
+# that the title card actually carries one, and that pressing it is not
+# mistaken by this screen for the press that starts the theme and opens the
+# menu.
+
+
+func test_the_title_card_offers_the_sound_toggle() -> void:
+	assert_not_null(_sound_toggle(), "the title screen must offer a way to mute before Start")
+
+
+func test_pressing_it_does_not_ask_for_the_menu() -> void:
+	_sound_toggle().pressed.emit()
+	assert_eq(_requested.size(), 0, "muting is not starting")
 
 
 # ---- touch: the phone-shaped half of "does Start work" -----------------------
