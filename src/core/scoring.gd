@@ -98,6 +98,17 @@ class_name Scoring
 extends RefCounted
 
 ## What a patch coming clean under the power wash pays.
+##
+## [b]Checked against a [MeshCar], not just against the blockout.[/b] These three
+## constants pay per patch, and #138 moved patch counting from twelve
+## similarly-sized CSG panels to seven — [Grime]'s own docs have the arithmetic,
+## 1,152 patches for a full blockout job against 1,050 for a full mesh-car one,
+## about 91% of the old total. A full job's wage therefore lands at about 91% of
+## the blockout's too (patches × the sum of the three constants below, run
+## multiplier aside) — the same ballpark rather than a different game — so
+## nothing here needed retuning for the swap. If a future change to panel or
+## patch counts moves that ratio outside "roughly the same job", these three are
+## the knob to turn rather than [member Grime.patches_per_tile] a second time.
 const WASH_POINTS: int = 100
 
 ## What a patch coming up to product pays. Above a wash because it is the pass

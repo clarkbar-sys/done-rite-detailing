@@ -22,6 +22,17 @@
 ## whole shape. Nothing else here changes: a panel is still whatever the raycast
 ## handed back, which is what [method map_of] is keyed on.
 ##
+## [b]Each map is sized off its own panel, not off one flat number.[/b]
+## [method lay_on] asks [PanelResolution] for a tile resolution per panel rather
+## than handing every one of them the same [code]tile_pixels[/code] — a fixed
+## number tuned for a CSG blockout's dozen similar-sized doors and wings put a
+## [MeshCar]'s [code]Body[/code], which is most of the car, at the same texel
+## density as its wheels, roughly doubling the effective texel size on the panel
+## a player looks at most. [PanelResolution]'s class docs have the density target
+## and the clamps; what matters here is that the wheels do not get any coarser
+## for it — the floor is the old flat number, so the only panel this can move is
+## the one big enough to want it.
+##
 ## [b]An overlay and not an override.[/b] [member GeometryInstance3D.material_overlay]
 ## draws this over the panel's real material instead of replacing it, so the
 ## green paint, the near-black tyres and the silver rims are all still there
@@ -68,22 +79,17 @@ signal patch_finished(panel: String, patch: int, stage: GrimeMap.Stage)
 ## Where the overlay comes from.
 const SHADER: String = "res://src/world/grime.gdshader"
 
-## The resolution of one face of a panel's atlas, so its mask is three of these
-## across and two down.
-##
-## 64 is about 3 cm a texel on the side of the car, which is finer than the jet
-## of water that writes into it and coarse enough that the whole car is a
-## megabyte or so. It is a blockout's number: the thing that will want raising is
-## a real mesh with panel gaps and badge recesses to keep the water out of.
-@export var tile_pixels: int = 64
-
-## How finely each face is diced for the ding. Four is sixteen patches a face and
-## ninety-six a panel — a car's worth of small, frequent rewards rather than
-## twelve big ones.
+## How finely each face is diced for the ding. Five is twenty-five patches a
+## face and a hundred and fifty a panel — tuned against seven [MeshCar] panels
+## rather than the twelve the blockout had, so a full car still rings roughly
+## the same number of times overall: 12 panels x 4 x 4 x 6 = 1,152 patches on
+## the blockout against 7 x 5 x 5 x 6 = 1,050 on a mesh car, about 91% of the
+## old total and the same ballpark of dings across a job. [method
+## GrimeMap.patches] is the exact arithmetic.
 ##
 ## The knob for how the whole thing feels: at 1 it rings once a face, at 8 it
 ## rings constantly. Nothing about correctness changes with it.
-@export var patches_per_tile: int = 4
+@export var patches_per_tile: int = 5
 
 var _maps: Array[GrimeMap] = []
 var _flashes: Array[PatchFlash] = []
@@ -122,7 +128,8 @@ func lay_on(car: Car) -> void:
 	for panel: Node3D in _panels:
 		var skin: GeometryInstance3D = car.skin_of(panel)
 		var box: AABB = skin.get_aabb()
-		var map: GrimeMap = GrimeMap.new(box, tile_pixels, patches_per_tile)
+		var pixels: int = PanelResolution.tile_pixels_for(box)
+		var map: GrimeMap = GrimeMap.new(box, pixels, patches_per_tile)
 		# Sized from the map rather than from `patches_per_tile` and
 		# `BoxProjection.COLUMNS`, which is the same arithmetic in a second place —
 		# see [method GrimeMap.patch_grid].
