@@ -33,19 +33,45 @@
 ## at this, sound is allowed and the theme is already playing. Nothing here
 ## listens for a press on its own account.
 ##
+## [b]And the credit for the cars is on this screen[/b], along the bottom. The ten
+## models in [code]assets/models/cars/[/code] are CC-BY 4.0, which makes
+## attribution a condition of using them rather than a courtesy, and a licence is
+## not satisfied by a file in a repository the player never sees. This is the
+## screen everybody passes through on the way to the bay, so this is where the
+## line goes; [code]README.md[/code] and
+## [code]assets/models/cars/ATTRIBUTION.txt[/code] carry the same words for
+## whoever clones the repo. The wording lives in
+## [code]src/screens/main_menu.tscn[/code] with the rest of what is on screen —
+## what is done here is the colour, because grey type over a lit driveway needs
+## the shadow [constant Brand.INK] gives it.
+##
 ## Same split as every screen: the [code].tscn[/code] owns layout — what is on
 ## screen, how big, in what order — and this owns brand, sourced from [Brand].
 extends GameScreen
+
+## How dark the shadow under the credit line is. The same 0.7 the score's pops
+## wear over the same room — see [code]src/ui/score_hud.gd[/code] — because it is
+## the same problem: muted grey is legible over tarmac and vanishes over the sky.
+const CREDIT_SHADOW_ALPHA: float = 0.7
+
+## How thick that shadow is, in design pixels. Enough to survive the third-scale
+## a phone renders this design at, which is what the panel readout's outline was
+## picked at.
+const CREDIT_OUTLINE: int = 6
 
 @onready var _build: Label = %Build
 @onready var _play: Button = %Play
 @onready var _how_to_play: Button = %HowToPlay
 @onready var _logo_card: PanelContainer = %LogoCard
+@onready var _credits: Label = %Credits
 
 
 func _ready() -> void:
 	_build.text = BuildInfo.describe()
 	_logo_card.add_theme_stylebox_override("panel", Brand.card())
+	_credits.add_theme_color_override("font_color", Brand.MUTED)
+	_credits.add_theme_color_override("font_outline_color", Color(Brand.INK, CREDIT_SHADOW_ALPHA))
+	_credits.add_theme_constant_override("outline_size", CREDIT_OUTLINE)
 	dress_loud(_play)
 	dress_quiet(_how_to_play)
 	_play.pressed.connect(_on_play_pressed)
