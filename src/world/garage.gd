@@ -9,12 +9,13 @@
 ##
 ## The car used to be one of those boxes, and then it was a CSG blockout in a
 ## 4.3 × 1.9 × 1.4 m envelope standing in for one. It is now a [MeshCar]: one of
-## the ten models in [code]assets/models/cars/[/code] — pinned to the sedan in
-## [code]src/world/mesh_car.tscn[/code] so a playtest gets the same car twice, and
-## painted at random every time this room is instanced. That pin is one line in
-## that scene file and the room is written as though it were not there: the
-## clearances below still have to hold for all ten, because the line is a
-## playtesting convenience and not a fact about the bay. What it is made of is
+## the ten models in [code]assets/models/cars/[/code] — whichever one the player
+## picked off the menu ([CarChoice]), painted at random every time this room is
+## instanced. Which car that is has never been a fact about the bay: it was a draw
+## from ten, then a line pinning the sedan while the room was being playtested
+## (#142), and it is now a choice, and the clearances below have had to hold for
+## all ten throughout. [method show_style] is the one place this room takes any
+## interest in which of them is standing there. What it is made of is
 ## [code]src/world/car.gd[/code]'s business and [code]src/world/mesh_car.gd[/code]'s;
 ## this scene only cares that it is a thing with a position and an outline.
 ##
@@ -813,6 +814,55 @@ func tool_racket() -> ToolRacket:
 ## set of its own.
 func grime() -> Grime:
 	return _grime
+
+
+## What is parked in the bay.
+##
+## Typed as [Car] and not [MeshCar], which is the same promise [code]%Car[/code]
+## itself makes: this room hosts whichever car it is handed, and every fixture
+## under [code]tests/fixtures/[/code] is one. A caller that needs to know which of
+## the ten is standing there is asking a [MeshCar] question and casts for it.
+func car() -> Car:
+	return _car
+
+
+## Parks a different one of the ten in the bay, on a room that is already running.
+##
+## [b]Who this is for.[/b] The menu is played over this room working itself, and
+## [code]#143[/code] made that bay the showroom a player picks their car out of.
+## Nowhere else calls it: the bay the game is played in takes its car from
+## [CarChoice] on the way in and never swaps it, because a car changing shape
+## mid-wash would take the mud, the score and the thing in the player's hands with
+## it. [method MeshCar.restyle] has the argument for the swap itself; what is here
+## is the room's half of it, and it is the room's because all three parts are.
+##
+## [b]The new car is a different height[/b], so it is sat on the tarmac again —
+## the 18 cm between a sport car and a minivan is the whole reason that stopped
+## being a number in a scene file. [b]And a different set of panels[/b], so the
+## mud, the masks and the demo's running order are about a car that no longer
+## exists: [method _lay_on_the_grime] is the same call [method _take_up_aiming]
+## makes and rebuilds all three, a frame later.
+##
+## [b]The demo is stood down first and not repaired after.[/b] [member _running_order]
+## holds the panels the restyle is about to free, and [method _run_the_demo] does
+## nothing at all without a routine — so what a player sees is one frame of a car
+## standing still before the new one is worked on from the top.
+##
+## [b]The walk is deliberately left where it is.[/b] Its radius and height fences
+## are measured from the car's own middle, and re-deriving them would put the eye
+## back at the start of its lap — a camera that jumped to the standing shot every
+## time somebody pressed an arrow. The cost is fences up to 9 cm out against the
+## floor, which is a height above the [i]car[/i] either way and is the thing they
+## were really about.
+func show_style(style_name: String) -> void:
+	var parked: MeshCar = _car as MeshCar
+	if parked == null or parked.style == style_name:
+		return
+	_routine = null
+	_running_order = []
+	parked.restyle(style_name)
+	_park_the_car()
+	_lay_on_the_grime()
 
 
 ## Sits the car on the driveway: lifts it until the bottom of its own box is on

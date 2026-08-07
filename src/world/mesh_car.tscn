@@ -29,21 +29,20 @@ metallic = 0.3
 roughness = 0.12
 cull_mode = 2
 
-; `style` is pinned rather than left empty, which is the one line that decides
-; whether the bay parks the same car every time or one of the ten at random.
-; Pinned for now so playtesting is repeatable: a random draw means the car under
-; the tools changes between one run and the next, and "is that the paint or is
-; that the car" is not a question a playtest should have to answer. Change the
-; word to try another style, or delete the line to go back to a random draw —
-; src/world/mesh_car.gd still picks one of the ten when this is empty, and
-; tests/integration/test_mesh_car.gd still holds it to that.
+; `style` is deliberately absent, and it used to say "sedan". #142 pinned it so a
+; playtest got the same car twice — "is that the paint or is that the car" is not
+; a question a session should have to answer first — and #143 took the pin out,
+; because a pin is nine models nobody can reach without opening this file. What
+; the pin bought is bought better by CarChoice: the bay still parks the same car
+; twice in a row, because the player said so on the menu rather than because a
+; scene file did.
 ;
-; The sedan because it is the middle of the range in every direction that matters
-; — 1.35 m tall against 1.04 m of sport car and 1.77 m of minivan — so a shot
-; that reads right on it is the least likely to be hiding a problem at either end.
-; tests/integration/test_garage_styles.gd is what holds the other nine, and it
-; sets this export itself rather than relying on the draw.
+; So the export stays empty here, which is what "nobody chose" means, and
+; src/world/mesh_car.gd is where that is answered — the player's pick, or one of
+; the ten at random for the one car that is parked before anybody has been asked.
+; Setting it back is still the way to pin a car for an afternoon, and
+; tests/integration/test_garage_styles.gd is the worked example of setting it
+; from outside instead.
 [node name="Car" type="Node3D"]
 script = ExtResource("1_meshcar")
-style = "sedan"
 glass = SubResource("StandardMaterial3D_glass")
