@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://src/screens/main_menu.gd" id="1_menu"]
 [ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
 [ext_resource type="Texture2D" path="res://assets/brand/done-rite-logo.png" id="3_logo"]
+[ext_resource type="Script" path="res://src/ui/sound_toggle.gd" id="4_sound"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -22,6 +23,20 @@ first_person = true
 walkaround = true
 attracting = true
 
+; The same corner control the title card carries — see
+; src/ui/sound_toggle.gd — so the choice a player made there is still visible,
+; and still pressable, one screen later.
+[node name="Sound" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+script = ExtResource("4_sound")
+
+; `mouse_filter = 2` (ignore) rather than the engine's default `stop`: this is
+; full-rect, so left at the default it would claim every point on the screen
+; for itself — including the sound toggle's corner, where none of its own
+; children are actually drawn — before a sibling earlier in the tree ever saw
+; the press. Play and How to Play are unaffected either way: a child control's
+; own filter, not its container's, decides whether it reacts to a point over it.
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -29,6 +44,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="Column" type="VBoxContainer" parent="Center"]
 layout_mode = 2

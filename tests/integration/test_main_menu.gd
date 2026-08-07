@@ -22,12 +22,19 @@ var _requested: Array[GameState] = []
 var _rung: Array[Bell.Voice] = []
 var _faded: Array[float] = []
 var _window_size_before: Vector2i = Vector2i.ZERO
+var _muted_before: bool = false
 
 
 func before_each() -> void:
 	_requested = []
 	_rung = []
 	_faded = []
+	# The menu's own toggle opens agreeing with whatever [Sound] was already at —
+	# see src/ui/sound_toggle.gd — so a suite that left the game muted would open
+	# this screen silenced too, for a reason that has nothing to do with this
+	# one. Put back in after_each, like the window size below.
+	_muted_before = Sound.muted
+	Sound.set_muted(false)
 	# A headless window is 64x64 — smaller than either button, small enough that
 	# a tap at a button's own coordinates lands outside the layout entirely.
 	# `content_scale_size` is the design resolution from project.godot, so this
@@ -56,6 +63,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	get_tree().root.size = _window_size_before
+	Sound.set_muted(_muted_before)
 
 
 func _record(state: GameState) -> void:
@@ -76,6 +84,10 @@ func _play_button() -> Button:
 
 func _how_to_play_button() -> Button:
 	return _screen.get_node("%HowToPlay") as Button
+
+
+func _sound_toggle() -> SoundToggle:
+	return _screen.get_node("%Sound") as SoundToggle
 
 
 func test_the_screen_is_a_game_screen() -> void:
@@ -320,6 +332,37 @@ func test_the_rules_are_reached_without_disturbing_the_theme() -> void:
 	_how_to_play_button().pressed.emit()
 	assert_eq(_faded.size(), 0, "reading the rules must not stop the music")
 	assert_eq(_rung.size(), 0, "and must not ring the bell that means the job started")
+
+
+# ---- the sound toggle: carried over from the title card ----------------------
+#
+# The toggle's own size, dressing and effect on [Sound] are
+# tests/integration/test_sound_toggle.gd's job. What is worth pinning here is
+# that the choice a player made on the title card is still on offer one screen
+# later, and that pressing it here is not mistaken for either of the two real
+# doors this screen has.
+
+
+func test_the_menu_offers_the_sound_toggle_too() -> void:
+	assert_not_null(_sound_toggle(), "the menu must carry the same toggle the title card does")
+
+
+func test_pressing_it_opens_neither_door() -> void:
+	_sound_toggle().pressed.emit()
+	assert_eq(_requested.size(), 0, "muting is not Play and it is not How to Play")
+	assert_eq(_rung.size(), 0, "and it must not ring the bell that means the job started")
+	assert_eq(_faded.size(), 0, "and it must not touch the theme it is about to silence")
+
+
+func test_a_tap_on_it_actually_reaches_it() -> void:
+	# Through a real touch and not `pressed.emit()` — see
+	# tests/integration/test_title_screen.gd's twin of this test for why
+	# `pressed.emit()` alone cannot catch a `CenterContainer` left at the
+	# engine's default `mouse_filter` swallowing the tap before it arrives.
+	Sound.set_muted(false)
+	_tap(_sound_toggle().get_global_rect().get_center())
+	await wait_process_frames(1)
+	assert_true(Sound.muted, "a tap on the corner must reach the sound toggle")
 
 
 # ---- touch: the phone-shaped half of "do these buttons work" -----------------
