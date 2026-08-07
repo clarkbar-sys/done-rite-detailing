@@ -55,15 +55,15 @@
 ## than choosing one of its own: the first car a player is offered is the first
 ## car they were shown.
 ##
-## [b]And the credit for the cars is on this screen[/b], along the bottom. The ten
-## models in [code]assets/models/cars/[/code] are CC-BY 4.0, which makes
+## [b]And the credit for the models is on this screen[/b], along the bottom. The
+## ten cars in [code]assets/models/cars/[/code] and the driveway they are parked
+## on in [code]assets/models/driveway/[/code] are both CC-BY 4.0, which makes
 ## attribution a condition of using them rather than a courtesy, and a licence is
 ## not satisfied by a file in a repository the player never sees. This is the
 ## screen everybody passes through on the way to the bay, so this is where the
-## line goes; [code]README.md[/code] and
-## [code]assets/models/cars/ATTRIBUTION.txt[/code] carry the same words for
-## whoever clones the repo. The wording lives in
-## [code]src/screens/main_menu.tscn[/code] with the rest of what is on screen —
+## lines go; [code]README.md[/code] and the [code]ATTRIBUTION.txt[/code] beside
+## each model carry the same words for whoever clones the repo. The wording lives
+## in [code]src/screens/main_menu.tscn[/code] with the rest of what is on screen —
 ## what is done here is the colour, because grey type over a lit driveway needs
 ## the shadow [constant Brand.INK] gives it.
 ##

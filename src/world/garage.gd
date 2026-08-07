@@ -1,11 +1,15 @@
-## The driveway: a grey plane for the car to sit on, green planes either side
-## for the grass, a [Car] parked on it, and a camera that either circles the car
-## or stands beside it looking at it.
+## The driveway: a concrete pad for the car to sit on, a lawn either side of it
+## that rises away into banks, a [Car] parked on it, and a camera that either
+## circles the car or stands beside it looking at it.
 ##
-## The ground is boxes on purpose. Every plane of it is one unit [BoxMesh]
-## scaled into place, so the whole level is readable in the scene file and none
-## of it is waiting on an artist; the shapes and their sizes are the design
-## decision, and a real mesh drops in later without moving anything else.
+## The ground used to be boxes on purpose. Every plane of it was one unit
+## [BoxMesh] scaled into place — so the whole level was readable in the scene
+## file and none of it was waiting on an artist; the shapes and their sizes were
+## the design decision, and a real mesh could drop in later without moving
+## anything else. That is what happened (#114): it is now [Ground], one imported
+## driveway standing on the origin, and the sentence about dropping in without
+## moving anything else turned out to be true — what this file knows about the
+## floor is where its top is, and it asks.
 ##
 ## The car used to be one of those boxes, and then it was a CSG blockout in a
 ## 4.3 × 1.9 × 1.4 m envelope standing in for one. It is now a [MeshCar]: one of
@@ -103,15 +107,16 @@
 ## [code]src/world/garage.tscn[/code].
 ##
 ## [b]Which is why the car has to be something a ray can hit.[/b] It is the only
-## thing out here that is — the ground has no collider and nothing else is
-## modelled. It needs no hand-built collider to be it: every panel of the [Car] is
-## its own collider — on the [MeshCar] parked here by the [StaticBody3D] the panel
-## is rooted in, carrying a trimesh of the panel's own triangles, and on the
-## blockout that preceded it by [member CSGShape3D.use_collision]. Either way the
-## body comes with the panel. That deleted a [BoxShape3D] that used to sit beside
-## the mesh carrying the car's size a second time, along with the test whose whole
-## job was catching the two disagreeing — and it means the ray now measures to the
-## panel it actually hit rather than to a box drawn around everything.
+## thing out here that is — the ground is drawn and nothing else, deliberately,
+## and there is nothing else out there at all. It needs no hand-built collider to
+## be it: every panel of the [Car] is its own collider — on the [MeshCar] parked
+## here by the [StaticBody3D] the panel is rooted in, carrying a trimesh of the
+## panel's own triangles, and on the blockout that preceded it by
+## [member CSGShape3D.use_collision]. Either way the body comes with the panel.
+## That deleted a [BoxShape3D] that used to sit beside the mesh carrying the
+## car's size a second time, along with the test whose whole job was catching the
+## two disagreeing — and it means the ray now measures to the panel it actually
+## hit rather than to a box drawn around everything.
 ##
 ## [b]The viewmodel hangs off this camera, and is kept inside the near plane
 ## rather than given a camera of its own.[/b] A mesh parented to a camera punches
@@ -288,8 +293,14 @@ const NO_SIDE_TO_IT: float = 0.35
 @export var start_angle_degrees: float = 0.0
 
 ## How far the camera stands from the car, on the ground plane. Kept under the
-## modeled ground's 6.2 m half-width so the camera never orbits off the edge of
-## the driveway and grass.
+## modeled ground's 6.30 m half-width so the camera never orbits off the edge of
+## the drive and the lawn.
+##
+## It is now the ground that is sized to this rather than the other way round:
+## the driveway model is scaled by the quarter it takes to stand its outer edge
+## outside this circle, which [code]src/world/ground.gd[/code] argues and
+## [code]tests/integration/test_ground.gd[/code] checks. The 5.6 is a shot,
+## chosen against a car; the 6.30 is whatever keeping it honest costs.
 @export var orbit_radius: float = 5.6
 
 ## How far above the middle of the car the camera sits. Well above rather than
@@ -327,8 +338,10 @@ const NO_SIDE_TO_IT: float = 0.35
 ## about 0.95 m away — one step back from arm's reach, the distance you would
 ## actually stand at to wash a panel, and close enough that the car fills the
 ## frame instead of sitting in the middle of it. Well inside the modeled
-## ground's 6.2 m half-width, and outside the car's own box so the eye is not
-## standing in the bodywork; the tests hold both.
+## ground's 6.30 m half-width — and on the concrete rather than out on the grass,
+## which is the other thing the driveway model's scale was picked to buy — and
+## outside the car's own box so the eye is not standing in the bodywork; the
+## tests hold both.
 ##
 ## The angle is not an export because there is nothing to choose: the camera
 ## looks at the car, the same way the orbit does.
@@ -609,6 +622,13 @@ var _marked: String = ""
 @onready var _camera: Camera3D = %Camera
 @onready var _car: Car = %Car
 
+## The floor, and the only thing this file asks it for is its own top — see
+## [method _park_the_car]. Held rather than looked up each time because it is
+## read on the way in and again on every restyle, and because a room that cannot
+## find its ground should say so at [code]_ready[/code] rather than at the
+## moment somebody changes car.
+@onready var _ground: Ground = %Ground
+
 ## Where held things render: a [ViewModel] parented to the camera, so it travels
 ## with the eye and never has to be re-aimed. What hangs in it is that class's
 ## business; where it hangs is this one's.
@@ -887,7 +907,13 @@ func _park_the_car() -> void:
 	var box: AABB = _car.bounds()
 	if box.size.y <= 0.0:
 		return
-	_car.global_position.y -= box.position.y
+	# And the tarmac is asked for rather than assumed to be zero. It is zero —
+	# `src/world/ground.tscn` lays the model's concrete on the room's own origin
+	# plane deliberately — but the floor being at the origin is a fact about the
+	# ground, and reading it here is what makes re-placing the ground a change to
+	# one scene file instead of a hunt for the places that knew where it used to
+	# be. The same reason the box above is the car's own and not 1.4 m.
+	_car.global_position.y += _ground.drive().end.y - box.position.y
 
 
 ## Puts the camera where the orbit says it should be, looking at the car.

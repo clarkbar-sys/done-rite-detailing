@@ -17,6 +17,11 @@ extends GutTest
 
 const MAIN_MENU: String = "res://src/screens/main_menu.tscn"
 
+## The character the credit's two lines are separated by, which is the one thing
+## in it the font is not asked to draw. See
+## [method test_the_font_can_draw_the_credit].
+const LINE_BREAK: int = 0x0A
+
 var _screen: GameScreen = null
 var _requested: Array[GameState] = []
 var _rung: Array[Bell.Voice] = []
@@ -166,6 +171,19 @@ func test_the_car_pack_is_credited_where_a_player_can_read_it() -> void:
 		assert_string_contains(credits.text, required, "the credit must name %s" % required)
 
 
+func test_the_driveway_is_credited_where_a_player_can_read_it() -> void:
+	# The second model in the game, and the same licence — see
+	# assets/models/driveway/ATTRIBUTION.txt. Its own test rather than three more
+	# strings in the one above, because the two credits can be broken separately
+	# and a failure should say which model lost its line.
+	var credits: Label = _screen.get_node("%Credits") as Label
+	assert_not_null(credits, "the menu must carry the credit for the ground")
+	if credits == null:
+		return
+	for required: String in ["Sunken Driveway Parking Spot", "jimbogies", "CC BY 4.0"]:
+		assert_string_contains(credits.text, required, "the credit must name %s" % required)
+
+
 func test_the_credit_is_actually_on_the_screen() -> void:
 	# A label with the right words in it, laid out off the bottom of the picture,
 	# is not attribution. The design height rather than the window's, for the
@@ -191,6 +209,13 @@ func test_the_font_can_draw_the_credit() -> void:
 	var font: Font = credits.get_theme_font("font")
 	for i: int in credits.text.length():
 		var glyph: int = credits.text.unicode_at(i)
+		# The one character in there that is not meant to be drawn. There are two
+		# credits now — the cars and the ground they stand on — and they are a line
+		# each rather than one long line broken wherever the label ran out of room.
+		# A line break is a layout instruction; no font has a glyph for it, and one
+		# that did would be the bug.
+		if glyph == LINE_BREAK:
+			continue
 		assert_true(
 			font.has_char(glyph),
 			(

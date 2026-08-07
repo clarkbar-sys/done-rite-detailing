@@ -77,7 +77,8 @@ func before_each() -> void:
 	# taken up, and both of those happen in `Garage._lay_on_the_grime` one *process*
 	# frame after `_ready`. Physics frames do not measure that: when a frame runs
 	# long — and the frame this room is built in is the longest one it will ever
-	# have, a car's worth of CSG and a grove — the engine catches up by running
+	# have, a car's worth of CSG and a driveway's worth of mesh — the engine
+	# catches up by running
 	# several physics ticks inside a single iteration of the main loop, so all four
 	# of RESOLVE_FRAMES can pass before `process_frame` has been emitted once.
 	#

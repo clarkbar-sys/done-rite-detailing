@@ -326,12 +326,21 @@ out of
 licensed under
 [Creative Commons Attribution 4.0](http://creativecommons.org/licenses/by/4.0/).
 
+The driveway it is parked on is
+**"Sunken Driveway Parking Spot"**
+(https://sketchfab.com/3d-models/sunken-driveway-parking-spot-2cffc511a53641a6a0f46133f85989c6)
+by **jimbogies**, under the same licence.
+
 Attribution is a condition of that licence rather than a courtesy, so the same
-credit is in three places: in the game, along the bottom of the main menu;
+credits are in three places: in the game, along the bottom of the main menu;
 beside the assets, in
-[`assets/models/cars/ATTRIBUTION.txt`](./assets/models/cars/ATTRIBUTION.txt);
+[`assets/models/cars/ATTRIBUTION.txt`](./assets/models/cars/ATTRIBUTION.txt)
+and
+[`assets/models/driveway/ATTRIBUTION.txt`](./assets/models/driveway/ATTRIBUTION.txt);
 and here. The models in `assets/models/cars/` are processed derivatives — see
-`scripts/build-car-pack.py` — and remain under CC-BY 4.0.
+`scripts/build-car-pack.py` — and remain under CC-BY 4.0; the driveway is the
+artist's own file, unmodified, placed and scaled by
+[`src/world/ground.tscn`](./src/world/ground.tscn).
 
 Everything else in this repository is the project's own and is covered by the
 licence below.

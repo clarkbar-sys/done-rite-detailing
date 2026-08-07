@@ -169,18 +169,23 @@ func _view_model_of(screen: GameScreen) -> Node3D:
 	return _garage_of(screen).get_node("%ViewModel") as Node3D
 
 
+## The ground the room is standing on, which is a mesh and knows its own size.
+func _ground_of(screen: GameScreen) -> Ground:
+	return _garage_of(screen).get_node("%Ground") as Ground
+
+
 ## How far the car is from the outer edge of the modeled ground, read off the
-## grass itself rather than written down again here.
+## ground itself rather than written down again here. The narrower of its two
+## sides, since what hangs off this is an absolute value.
 func _ground_half_width(screen: GameScreen) -> float:
-	var grass: Node3D = _garage_of(screen).get_node("View/World/Ground/GrassRight") as Node3D
-	return grass.position.x + grass.scale.x * 0.5
+	var box: AABB = _ground_of(screen).extent()
+	return minf(absf(box.position.x), box.end.x)
 
 
 ## Where the top of the driveway is, read off the driveway. The room is allowed to
 ## move and this suite is a statement about the car and the floor together.
 func _tarmac(screen: GameScreen) -> float:
-	var drive: Node3D = _garage_of(screen).get_node("View/World/Ground/Driveway") as Node3D
-	return drive.position.y + drive.scale.y * 0.5
+	return _ground_of(screen).drive().end.y
 
 
 ## The gap between [param point] and the nearest face of [param box], and zero if

@@ -432,11 +432,12 @@ func test_no_proxy_reaches_into_the_car() -> void:
 
 
 func test_no_proxy_leaves_the_ground() -> void:
-	# The other geometry that could swallow a held tool. Read off the grass rather
+	# The other geometry that could swallow a held tool. Read off the ground rather
 	# than written down again, so it keeps meaning "the ground" if the ground
-	# changes.
-	var grass: Node3D = _garage.get_node("View/World/Ground/GrassRight") as Node3D
-	var half_width: float = grass.position.x + grass.scale.x * 0.5
+	# changes — which it has: three scaled boxes became one modeled driveway, and
+	# this line is the whole of what that cost here.
+	var box: AABB = (_garage.get_node("%Ground") as Ground).extent()
+	var half_width: float = minf(absf(box.position.x), box.end.x)
 	for tool: DetailingTool in DetailingTool.catalogue():
 		for corner: Vector3 in _world_corners(_view_model().proxy_for(tool.id)):
 			assert_lt(
