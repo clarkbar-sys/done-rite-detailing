@@ -217,7 +217,9 @@
 ## thumb's width up the glass on purpose, and over a low car that regularly puts
 ## the ray in the sky — and what it buys is not a hit where there was none, but a
 ## hit with a [i]measured normal[/i] where the bottom tier could only invent one.
-## [AimSweep] has the whole argument, including why it is not the first tier.
+## [AimSweep] has the whole argument, including why it is not the first tier;
+## [AimHold] has why that tier alone is taken once per aim rather than once per
+## tick, which is four milliseconds a press against the car pack's trimeshes.
 ##
 ## [b]And the tools that work the paint draw their own sight.[/b] The water the
 ## power wash throws, the product the two bottles spray, the suds the sponge
@@ -598,6 +600,7 @@ var _drive: OrbitDrive = null
 var _standoff: Standoff = null
 var _sight: ToolSight = null
 var _sweep: AimSweep = null
+var _held: AimHold = AimHold.new()
 var _racket: ToolRacket = null
 var _grime: Grime = null
 var _routine: AttractRoutine = null
@@ -750,8 +753,13 @@ func aim_at(where: Vector2) -> void:
 ##
 ## Holding the glass is firing and letting go is not — so this is the release
 ## half of the trigger, and the thing that will one day also stop the water.
+##
+## The swept answer goes with it, so the next press starts by asking rather than by
+## inheriting — see [method AimHold.drop], which has why that is a release-time job
+## and not a press-time one.
 func release_aim() -> void:
 	_aiming = false
+	_held.drop()
 
 
 ## What the aim is drawn with, or [code]null[/code] on a screen that never took up
@@ -972,11 +980,19 @@ func _take_up_aiming() -> void:
 ## Started and not awaited by the caller: [method _ready] has nothing further to
 ## do about grime, and making it wait would push every screen's first frame
 ## behind this.
+##
+## [b]A physics frame and not an idle one, since [code]#144[/code].[/b] Laying the
+## mud on now casts a few tens of thousands of rays at the car to find out where a
+## player can reach ([method Grime.lay_on]), and a space state may only be queried
+## while physics is stepping — the same constraint that put the walk and the aim on
+## that clock. Awaiting [signal SceneTree.physics_frame] resumes inside exactly the
+## window [method _physics_process] runs in, which is the window the query is legal
+## in.
 func _lay_on_the_grime() -> void:
-	await get_tree().process_frame
+	await get_tree().physics_frame
 	if not is_instance_valid(_grime) or not is_instance_valid(_car):
 		return
-	_grime.lay_on(_car)
+	_lay_the_mud_on()
 	# Here rather than in `_ready()` for the reason the grime itself is: the running
 	# order is sorted by how big each panel is, and a panel asked before its CSG has
 	# been built reports a zero box — so a demo set up a frame earlier would work the
@@ -1201,6 +1217,16 @@ func _reach_of(held: DetailingTool.Id) -> float:
 ## came back empty, it has no exact answer left to steal. [param reach] is how wide
 ## the tool in hand works ([method _reach_of]), which is the window it forgives by.
 ##
+## [b]And the middle tier is the one that is not cast every tick.[/b] It goes
+## through [AimHold], which hands back what the last sweep down this aim found for
+## as long as the aim has not moved — the whole of [code]#145[/code]'s fix, and a
+## statement about how often rather than about what. That class carries the
+## numbers; the short of it is four milliseconds a sweep against the car pack's
+## trimeshes, bought sixty times a second by a thumb hovering over a roofline to be
+## told the same thing every time. The other two tiers are cast every tick exactly
+## as they were, and the hold is dropped by the smallest movement of eye or aim
+## that could change the answer — so a moving press is as exact as it ever was.
+##
 ## The nearest-panel fallback stays underneath both, unchanged, because it is the
 ## only one of the three that always answers: a sphere the width of a sponge is
 ## bounded by definition, and a press at the horizon should still put the mark on
@@ -1214,7 +1240,9 @@ func _under_the_finger(from: Vector3, facing: Vector3, reach: float) -> Dictiona
 	if not hit.is_empty():
 		hit["surface"] = true
 		return hit
-	var swept: Dictionary = _sweep.onto(space, from, facing, reach)
+	if not _held.holds(from, facing, reach):
+		_held.keep(_sweep.onto(space, from, facing, reach), from, facing, reach)
+	var swept: Dictionary = _held.answer()
 	if not swept.is_empty():
 		return swept
 	return _nearest_on_the_car(space, from, facing)
@@ -1470,7 +1498,37 @@ func _press_the_glass(work: Vector3) -> void:
 ## exactly this, and it is the only line of the attract mode that reaches past the
 ## controls a player has.
 func _on_lapped() -> void:
-	_grime.lay_on(_car)
+	_lay_the_mud_on()
+
+
+## Mud on the car, and only where somebody standing in this room could get a tool
+## onto it.
+##
+## [b]The room is the only thing that knows the band[/b], which is why the poses
+## are worked out here and handed over rather than reached for from inside
+## [Grime]: the walk's fence ([member standoff_radius_min] to
+## [member orbit_radius]) and its lift ([member eye_height_min] to
+## [member eye_height_max]) are this class's exports, and a grime that read them
+## would be a second class with an opinion about where the player may stand.
+##
+## [b]The narrowest tool decides the margin, not the widest.[/b] A texel is only
+## finished when all three passes have been over it, so the radius that matters is
+## the one that reaches least far — the sponge's [member scrub_radius_metres],
+## today. Handing over the jet's would seed mud in a ring that can be washed and
+## never foamed, which is a panel nobody can finish and the exact failure this
+## whole change is about. [PanelReach]'s class docs have the argument at length.
+##
+## Called again by [method _on_lapped], where it costs almost nothing: the poses
+## are the same array and the panels are the same panels, so [Grime] hands back the
+## mask it already measured.
+func _lay_the_mud_on() -> void:
+	_grime.lay_on(
+		_car,
+		PanelReach.eyes(
+			_car.bounds(), standoff_radius_min, orbit_radius, eye_height_min, eye_height_max
+		),
+		minf(wash_radius_metres, minf(scrub_radius_metres, buff_radius_metres))
+	)
 
 
 ## Measures how far the car actually is and lets [Standoff] close the gap.

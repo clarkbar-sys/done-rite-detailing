@@ -89,6 +89,28 @@
 ## equality: a transfer rounded on the way in and again on the way out would leak
 ## a unit a touch, and a texel that had quietly lost three units of itself could
 ## never be finished.
+##
+## [b]And the panel is only as big as the player can reach.[/b] A box has six
+## faces and a car does not: the underside of a pack car's shell is a face of its
+## own box, the middle of that face is air nothing projects to at all, and a strip
+## of real paint behind a wheel arch is somewhere no legal aim lands. Seeded with
+## mud, every one of those was work nobody could ever do — so this map takes an
+## optional [PanelReach], and where that says the player cannot get a tool, no mud
+## is laid and no capacity is counted. [method is_clean] and [method is_finished]
+## became answerable questions the day it did.
+##
+## [b]The unreachable texels are held out of the arithmetic entirely, and that is
+## the subtle half.[/b] The obvious version — seed them bare and let the tools find
+## nothing there — is wrong in exactly one place, and it is the place the
+## conservation law makes it wrong: bare paint is the bucket that is [i]not[/i]
+## stored, so a texel holding no mud, no product and no shine holds a full
+## [constant UNITS] of bare paint by definition, and [method foam] would happily
+## draw on all of it. The underside of the car would refuse the water and then take
+## a coat of product, and every unit of it would count towards a total that was
+## sized without it. So [method _touch] refuses an unreachable texel before it
+## reads a pixel: nothing moves there under any tool, the three running totals only
+## ever describe texels the mask counted, and the conservation the class docs open
+## on holds over exactly the set of texels the game is played on.
 class_name GrimeMap
 extends RefCounted
 
@@ -110,6 +132,11 @@ enum Stage {
 ## Mud on a fresh panel: all of it.
 const FILTHY: float = 1.0
 
+## A texel with nothing on it in any of the three channels — what a texel the
+## player cannot reach is seeded with, and what the shader draws nothing for. The
+## alpha is opaque only because the format has one; nothing reads it.
+const BARE: Color = Color(0.0, 0.0, 0.0, 1.0)
+
 ## The steps of one bucket a pixel holds, which is what eight bits of channel
 ## buys. The totals below count these rather than fractions — see the class docs.
 const UNITS: int = 255
@@ -124,6 +151,19 @@ var _box: AABB
 var _tile_pixels: int
 var _patches_across: int
 var _patches_down: int
+## The whole atlas in pixels, kept rather than asked of the image every time: it
+## is read once per texel of every brush stroke, to work out which patch and which
+## reach cell that texel belongs to, and [method Image.get_width] is a call where
+## this is a field.
+var _atlas: Vector2i = Vector2i.ZERO
+## Where the player can get a tool, or [code]null[/code] for a panel nobody has
+## measured — which means everywhere, and is what every caller that has no physics
+## world to cast in gets. See the class docs.
+var _reach: PanelReach = null
+## The reach mask's grid, which is [method PanelReach.cells_for] of the patch grid
+## when there is a mask and the patch grid itself when there is not. Kept either
+## way so the seeding walk below has one shape rather than two.
+var _cells: Vector2i = Vector2i.ZERO
 var _image: Image = null
 var _texture: ImageTexture = null
 ## Patches' worth of work done in each [enum Stage], indexed by it. See
@@ -152,25 +192,48 @@ var _dirty: bool = false
 ## each face is diced for the purpose of saying "this bit is done" — it is the
 ## granularity of the ding, and it is a knob rather than a constant because how
 ## often that fires is a matter of taste rather than of correctness.
-func _init(panel_box: AABB, tile_pixels: int, patches_per_tile: int) -> void:
+##
+## [param reach] is where a tool can actually be got onto this panel, and
+## [code]null[/code] — the default — means everywhere, which is what this class did
+## before there was anything that could measure it. That default is not politeness:
+## a [GrimeMap] is built in unit tests and against fixtures with no physics world
+## to cast rays in, and those want a full panel rather than an empty one. The room
+## supplies a real mask; see [method Grime.lay_on].
+func _init(
+	panel_box: AABB, tile_pixels: int, patches_per_tile: int, reach: PanelReach = null
+) -> void:
 	_box = panel_box
 	_tile_pixels = maxi(tile_pixels, 1)
-	var per_tile: int = maxi(patches_per_tile, 1)
-	_patches_across = BoxProjection.COLUMNS * per_tile
-	_patches_down = BoxProjection.ROWS * per_tile
-	_image = Image.create_empty(
-		BoxProjection.COLUMNS * _tile_pixels,
-		BoxProjection.ROWS * _tile_pixels,
-		false,
-		Image.FORMAT_RGBA8
-	)
+	var grid: Vector2i = patch_grid_for(patches_per_tile)
+	_patches_across = grid.x
+	_patches_down = grid.y
+	_reach = reach
+	_cells = grid if _reach == null else _reach.grid()
+	_atlas = Vector2i(BoxProjection.COLUMNS * _tile_pixels, BoxProjection.ROWS * _tile_pixels)
+	_image = Image.create_empty(_atlas.x, _atlas.y, false, Image.FORMAT_RGBA8)
 	# Every unit in the mud bucket and none in the other two, which is the one
 	# seeding the conservation law allows: a fresh panel is entirely mud, so there
 	# is no bare paint to foam and no product to buff until the water has run. The
 	# alpha is only there because the format has one.
+	#
+	# Filled here and cut back below rather than painted texel by texel: an
+	# unreachable texel has to end up bare, and `fill` plus a few dozen `fill_rect`s
+	# is two native calls a row against a hundred thousand `set_pixel`s.
 	_image.fill(Color(FILTHY, 0.0, 0.0, 1.0))
-	_texture = ImageTexture.create_from_image(_image)
 	_seed_the_totals()
+	_texture = ImageTexture.create_from_image(_image)
+
+
+## How a panel diced [param patches_per_tile] to a face lays its patches out —
+## the same [code]across, down[/code] pair [method patch_grid] reports.
+##
+## Static and public because the mask has to be built before the map that will
+## carry it, and [PanelReach] sizes itself off this grid: two derivations of the
+## same dicing is two things that can disagree, which is the argument
+## [method patch_grid] already makes for [PatchFlash].
+static func patch_grid_for(patches_per_tile: int) -> Vector2i:
+	var per_tile: int = maxi(patches_per_tile, 1)
+	return Vector2i(BoxProjection.COLUMNS * per_tile, BoxProjection.ROWS * per_tile)
 
 
 ## The mask, for a shader to sample or a debug view to draw. The same texture for
@@ -274,25 +337,41 @@ func worked(stage: Stage) -> float:
 	return _worked[int(stage)]
 
 
-## Whether every patch on the panel has had its mud taken off.
+## Whether every reachable texel on the panel has had its mud taken off.
 ##
-## [b]It will not become true in play, and that is known.[/b] A box has six faces
-## and the car does not: the underside of the bonnet is a face of the bonnet's
-## box, it is seeded with mud like every other, and no jet of water will ever
-## reach it. So this is the honest question with an answer nobody can reach yet,
-## and the thing that will make it reachable is seeding mud only where the player
-## can get at it — one function, when there is a reason to write it. Until then
-## the ding rides on patches, which are reachable, and the fractions above are
-## reported as the fractions they actually are.
+## [b]It is a question with an answer now.[/b] It used not to be: a box has six
+## faces and a car does not, so the underside of the bonnet was a face of the
+## bonnet's box, seeded with mud like every other, and no jet of water was ever
+## going to reach it. The mask this map is built with is the "one function, when
+## there is a reason to write it" that note asked for — [PanelReach] — and with it
+## the mud that is laid is exactly the mud a player can take off. So a panel washed
+## end to end really does read clean.
 func is_clean() -> bool:
 	return _mud_total == 0
 
 
-## Whether every patch on the panel is buffed. Unreachable today for the same
-## reason [method is_clean] is, and for one more besides: a face nobody can wash
-## is a face nobody can foam either.
+## Whether every reachable texel on the panel is buffed — the end of the job for
+## this panel, and reachable for the same reason [method is_clean] is.
+##
+## [code]true[/code] for a panel with nothing reachable on it at all, which is the
+## honest reading of "everything that can be done here has been": there is no work,
+## so there is none outstanding. [method has_reach] is how a caller averaging over
+## panels tells that case apart from a panel somebody finished.
 func is_finished() -> bool:
 	return _shine_total == _full
+
+
+## Whether there is any work on this panel at all — whether the mask left it a
+## single texel a tool can be got onto.
+##
+## Public because a caller averaging a fraction over a car's panels has to leave
+## the empty ones out: [method remaining] and [method shine] both divide by a
+## capacity of zero and answer [code]0.0[/code], which would read as a panel that
+## is simultaneously spotless and unpolished and would drag both averages down. No
+## panel of either car in this project is empty; a wing mirror seen from one side
+## only could be.
+func has_reach() -> bool:
+	return _full > 0
 
 
 ## Whether one patch has had its mud taken off, by its index in [method patches].
@@ -460,7 +539,21 @@ func _brush(
 ## A tool too weak to move a whole unit moves none. The alternative — rounding
 ## every touch up to at least one — would let a vanishingly light brush finish the
 ## car given enough ticks.
+##
+## [b]A texel the player cannot reach is refused here, before anything is
+## read.[/b] It is the first line for a reason and the class docs have the long
+## version: an unreachable texel was seeded with nothing in any bucket, so it holds
+## a full [constant UNITS] of the one bucket that is not stored, and a cleaner let
+## through would draw on all of it. Refusing at the top is also what keeps the
+## refusal free of arithmetic — nothing is moved, so nothing has to be unmoved from
+## a total, and the conservation law simply does not range over these texels.
+##
+## One masked lookup per texel of every brush stroke is the cost, and it is an
+## integer divide and an array read against the [method Image.get_pixel] and
+## [method Image.set_pixel] already on this line.
 func _touch(at: Vector2i, amount: float, stage: Stage, finished: PackedInt32Array) -> void:
+	if _reach != null and not _reach.reaches(_cell_at(at)):
+		return
 	var pixel: Color = _image.get_pixel(at.x, at.y)
 	var mud: int = roundi(pixel.r * float(UNITS))
 	var foamed: int = roundi(pixel.g * float(UNITS))
@@ -555,8 +648,8 @@ func _stage_finished(patch: int, stage: Stage) -> bool:
 ## What one pixel of the mask holds, at a point on the panel.
 func _pixel_at(point: Vector3, normal: Vector3) -> Color:
 	var uv: Vector2 = BoxProjection.uv_for(_box, point, normal)
-	var x: int = clampi(int(uv.x * float(_image.get_width())), 0, _image.get_width() - 1)
-	var y: int = clampi(int(uv.y * float(_image.get_height())), 0, _image.get_height() - 1)
+	var x: int = clampi(int(uv.x * float(_atlas.x)), 0, _atlas.x - 1)
+	var y: int = clampi(int(uv.y * float(_atlas.y)), 0, _atlas.y - 1)
 	return _image.get_pixel(x, y)
 
 
@@ -592,24 +685,47 @@ func _corner(at: Vector2) -> Vector2i:
 
 ## Which patch an image pixel belongs to.
 func _patch_at(at: Vector2i) -> int:
-	var column: int = at.x * _patches_across / _image.get_width()
-	var row: int = at.y * _patches_down / _image.get_height()
+	var column: int = at.x * _patches_across / _atlas.x
+	var row: int = at.y * _patches_down / _atlas.y
 	return row * _patches_across + column
 
 
-## Fills in how many units each patch holds, which is [constant UNITS] per pixel
-## it covers, without walking the image to count them.
+## Which cell of the reach mask an image pixel belongs to — the same proportional
+## rounding [method _patch_at] does, against a finer grid.
+func _cell_at(at: Vector2i) -> Vector2i:
+	return Vector2i(at.x * _cells.x / _atlas.x, at.y * _cells.y / _atlas.y)
+
+
+## Fills in how many units each patch holds — [constant UNITS] per pixel of it the
+## player can reach — and bares the pixels they cannot, in one walk of the mask's
+## own grid.
 ##
-## The spans are worked out the same way [method _patch_at] assigns pixels, so a
-## patch grid that does not divide the atlas evenly still adds up to exactly the
-## number of pixels there are — a patch that was short by a pixel would be a
-## patch that never rang.
+## The spans are worked out the same way [method _patch_at] and [method _cell_at]
+## assign pixels, so a grid that does not divide the atlas evenly still adds up to
+## exactly the number of pixels there are — a patch that was short by a pixel would
+## be a patch that never rang.
+##
+## [b]Walked in reach cells rather than in patches, and that is what makes it
+## affordable.[/b] A cell is [constant PanelReach.CELLS_PER_PATCH] to a side of a
+## patch and — by that class's construction — never straddles two of them, so a
+## patch's capacity is the sum of its own cells' pixels and no pixel is ever
+## counted twice or missed. The alternative is a walk over every texel of the
+## atlas, which on a [MeshCar] is a hundred thousand of them a panel and seven
+## panels, at load.
+##
+## [b]The image is cut back in runs, in the same walk.[/b] Unreachable cells are
+## gathered along a row and bared with one [method Image.fill_rect] per run: on a
+## real panel the unreachable part is whole faces and the edges of others, so a row
+## is one or two rects rather than sixty. Bare and not "clean" — every bucket at
+## zero is a texel no tool moves anything on, because [method _touch] refuses it
+## before it looks, and the shader draws nothing where the mask holds nothing.
 ##
 ## [b]Capacity is kept as well as the three totals[/b], and it is what the two
 ## later stages are measured against. Mud could get away without it because it
 ## starts full and only falls, so zero is the answer; product and shine start
 ## empty and rise, and "how high is full here" is a different number for every
-## patch on a grid that does not divide evenly.
+## patch — now for two reasons, the grid that does not divide evenly and the mask
+## that leaves a patch part of a panel.
 func _seed_the_totals() -> void:
 	var count: int = patches()
 	# One running tally per stage of the job, all three starting at nothing done —
@@ -618,24 +734,50 @@ func _seed_the_totals() -> void:
 	_worked.resize(Stage.size())
 	_worked.fill(0.0)
 	_mud.resize(count)
+	_mud.fill(0)
 	_product.resize(count)
+	_product.fill(0)
 	_shine.resize(count)
+	_shine.fill(0)
 	_capacity.resize(count)
-	var widths: PackedInt32Array = _spans(_image.get_width(), _patches_across)
-	var heights: PackedInt32Array = _spans(_image.get_height(), _patches_down)
+	_capacity.fill(0)
+	var widths: PackedInt32Array = _spans(_atlas.x, _cells.x)
+	var heights: PackedInt32Array = _spans(_atlas.y, _cells.y)
 	_full = 0
-	for row: int in _patches_down:
-		for column: int in _patches_across:
-			var patch: int = row * _patches_across + column
-			var units: int = widths[column] * heights[row] * UNITS
-			_capacity[patch] = units
-			_mud[patch] = units
-			_product[patch] = 0
-			_shine[patch] = 0
-			_full += units
+	var top: int = 0
+	for row: int in _cells.y:
+		_seed_a_row(row, top, widths, heights[row])
+		top += heights[row]
 	_mud_total = _full
 	_product_total = 0
 	_shine_total = 0
+
+
+## One row of the mask's grid: banks the reachable cells' pixels against their
+## patches and bares the runs of pixels behind the unreachable ones.
+##
+## [param top] is where the row starts in the atlas and [param tall] is how many
+## pixels deep it is; [param widths] is every cell column's width, which is the
+## same for every row and so is worked out once by the caller.
+func _seed_a_row(row: int, top: int, widths: PackedInt32Array, tall: int) -> void:
+	var patch_row: int = row * _patches_down / _cells.y
+	var left: int = 0
+	var bared: int = -1
+	for column: int in _cells.x:
+		if _reach == null or _reach.reaches(Vector2i(column, row)):
+			var patch: int = patch_row * _patches_across + column * _patches_across / _cells.x
+			var units: int = widths[column] * tall * UNITS
+			_capacity[patch] += units
+			_mud[patch] += units
+			_full += units
+			if bared >= 0:
+				_image.fill_rect(Rect2i(bared, top, left - bared, tall), BARE)
+				bared = -1
+		elif bared < 0:
+			bared = left
+		left += widths[column]
+	if bared >= 0:
+		_image.fill_rect(Rect2i(bared, top, left - bared, tall), BARE)
 
 
 ## How many pixels fall into each of [param count] patches across
