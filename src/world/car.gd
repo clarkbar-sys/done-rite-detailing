@@ -43,6 +43,12 @@
 ## today, with the imported mesh and a [CollisionShape3D] under it, carrying the
 ## same groups under the same names — and no other file has to know.
 ##
+## [MeshCar] is that car, and it is a subclass of this one rather than a rival to
+## it: it builds those bodies out of one of the ten models in
+## [code]assets/models/cars/[/code] and inherits every method below unchanged. The
+## blockout is still what the driveway parks ([code]#139[/code] is the swap), and
+## it is still the shape everything in the game was measured against.
+##
 ## [b]An accessor pair and not an adapter object.[/b] The tidy-looking
 ## alternative is a small [RefCounted] holding the two nodes, handed out by
 ## [method panels] instead of the root. It does not survive contact with what a
