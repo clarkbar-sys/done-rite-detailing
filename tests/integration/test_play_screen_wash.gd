@@ -171,8 +171,9 @@ func _at_the_car() -> Vector2:
 ## what [constant CLEARS_THE_SWEEP] is and what this used to get wrong. It was
 ## 0.3 m, which is inside the window a 0.4 m sweep reaches — measured in
 ## [code]tests/integration/test_play_screen_sweep.gd[/code], whose own constants
-## record that the car is found up to 0.3 m over the roofline at the power wash's
-## radius and lost from 0.4 m. On the blockout the press missed anyway, on the
+## record that at the power wash's radius the car is found up to 0.4 m over the
+## roofline on the three tallest styles and lost from 0.45 m on all ten. On the
+## blockout the press missed anyway, on the
 ## shape of that particular roof; against the ten cars the bay parks now it lands
 ## on one, and a test whose subject is "a mark that came off a box spends no
 ## water" was quietly asserting something else. [constant CLEARS_THE_SWEEP] has
