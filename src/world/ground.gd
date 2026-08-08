@@ -47,13 +47,15 @@
 ## one — and a test says so rather than leaving it to the next person to
 ## re-import with a box ticked.
 ##
-## [b]What it is for, beyond being drawn.[/b] Two questions the rest of the room
-## used to answer by reading a box's scale off the scene file: how high the drive
-## is ([method drive]), which is where a car of any height gets sat, and how far
-## the modeled ground reaches ([method extent]), which is the fence the camera
-## and everything held in front of it stay inside. Both are measured off the
-## meshes themselves, so ground that is re-placed or re-scaled moves them
-## together and nothing has to remember to follow.
+## [b]What it is for, beyond being drawn.[/b] Three questions the rest of the
+## room used to answer by reading a box's scale off the scene file: how high the
+## drive is ([method drive]), which is where a car of any height gets sat; how
+## far the modeled ground reaches ([method extent]), which is the fence the
+## camera and everything held in front of it stay inside; and how high the grass
+## is at a given spot ([method settle]), which is what [Grove] plants its trees
+## on now that the lawn is a slope instead of a box with a flat top. All three
+## are measured off the meshes themselves, so ground that is re-placed or
+## re-scaled moves them together and nothing has to remember to follow.
 class_name Ground
 extends Node3D
 
@@ -103,6 +105,121 @@ func extent() -> AABB:
 	for piece: AABB in pieces:
 		whole = whole.merge(piece)
 	return whole
+
+
+## How high the ground is under each of [param spots], in world metres —
+## the answer to "I want to stand something here, what is it standing on".
+##
+## [b]The third thing measured off the model rather than declared, and the one
+## that only exists because the ground stopped being flat.[/b] [method drive]
+## and [method extent] were both once a number read off a scaled box. So was
+## this: the trees the blockout carried stood at [code]y = 0[/code] because the
+## lawn they stood on was a box 0.2 m thick with its top there, and every tree
+## in the wood could be planted from the same constant. The modeled lawn rises
+## out of the drive to 1.17 m and does it unevenly, so a constant now buries a
+## trunk on the bank or floats one over the hollow. [Grove] asks this instead.
+##
+## [b]NAN where there is no ground, and that is the useful part.[/b] The lawn
+## wraps three sides of the pad and the fourth is open — the end the car drives
+## in from — and the outer edge is a hard edge with sky past it, so "is there
+## ground at this spot" is a real question with a real no. A caller that plants
+## on NAN gets a tree at no height at all rather than one hanging in the air at
+## zero, which is the difference between a test noticing and a player noticing.
+##
+## [b]It takes every spot at once because the walk is the cost.[/b] Nothing out
+## here has a collider — see the class docs, and the two rays that is protecting
+## — so there is no physics query to make and the height has to come off the
+## triangles themselves. That is one pass over all 31,420 of them, and it is the
+## same pass whether it is asked about one spot or fifty. Asked one at a time by
+## a grove of nine, it would be nine passes for no more answer. Measured on the
+## headless Linux box the numbers in [code]scripts/perf-probe.gd[/code] were
+## taken on: 35 ms for the whole call, once, at [method Grove.plant].
+##
+## The spots' own Y is ignored — what is asked is where the column of air above
+## and below each [code]x, z[/code] meets the ground, and the highest surface it
+## meets is the one that answers, so a spot over the drive gets the concrete
+## rather than the underside of the slab it is cut into.
+func settle(spots: PackedVector3Array) -> PackedFloat32Array:
+	var found: PackedFloat32Array = PackedFloat32Array()
+	found.resize(spots.size())
+	found.fill(NAN)
+	if spots.is_empty():
+		return found
+	# The spots bucketed by a coarse cell of the ground plane, so the loop below
+	# can ask "is any spot near this triangle" with one dictionary lookup instead
+	# of by trying all of them. Without it the inner test runs spots x triangles
+	# times, which is the whole cost of the pass for a grove of any size.
+	var buckets: Dictionary[Vector2i, PackedInt32Array] = {}
+	for spot: int in spots.size():
+		var cell: Vector2i = _cell(spots[spot].x, spots[spot].z)
+		if not buckets.has(cell):
+			buckets[cell] = PackedInt32Array()
+		var sharing: PackedInt32Array = buckets[cell]
+		sharing.append(spot)
+		buckets[cell] = sharing
+	for node: Node in find_children("*", "MeshInstance3D", true, false):
+		var drawn: MeshInstance3D = node as MeshInstance3D
+		if drawn == null or drawn.mesh == null:
+			continue
+		_drop_onto(drawn, spots, buckets, found)
+	return found
+
+
+## Which bucket of [method settle]'s grid the point [param x], [param z] falls
+## in. Two metres, which is wider than any triangle in the model — so a triangle
+## touches four cells at worst and the lookups stay a handful.
+func _cell(x: float, z: float) -> Vector2i:
+	return Vector2i(int(floorf(x * 0.5)), int(floorf(z * 0.5)))
+
+
+## Raises [param found] to whatever of [param drawn]'s triangles stands over any
+## of [param spots], using [param buckets] to skip the ones standing over none.
+func _drop_onto(
+	drawn: MeshInstance3D,
+	spots: PackedVector3Array,
+	buckets: Dictionary[Vector2i, PackedInt32Array],
+	found: PackedFloat32Array
+) -> void:
+	var faces: PackedVector3Array = drawn.mesh.get_faces()
+	var placed: Transform3D = drawn.global_transform
+	var corner: int = 0
+	while corner + 2 < faces.size():
+		var a: Vector3 = placed * faces[corner]
+		var b: Vector3 = placed * faces[corner + 1]
+		var c: Vector3 = placed * faces[corner + 2]
+		corner += 3
+		var low: Vector2i = _cell(minf(a.x, minf(b.x, c.x)), minf(a.z, minf(b.z, c.z)))
+		var high: Vector2i = _cell(maxf(a.x, maxf(b.x, c.x)), maxf(a.z, maxf(b.z, c.z)))
+		for across: int in range(low.x, high.x + 1):
+			for along: int in range(low.y, high.y + 1):
+				var cell: Vector2i = Vector2i(across, along)
+				if not buckets.has(cell):
+					continue
+				for spot: int in buckets[cell]:
+					var here: float = _over(a, b, c, spots[spot])
+					if not is_nan(here) and (is_nan(found[spot]) or here > found[spot]):
+						found[spot] = here
+	return
+
+
+## How high the triangle [param a], [param b], [param c] is directly above or
+## below [param spot], or NAN when the spot is not under it at all.
+##
+## Barycentric on the ground plane rather than a ray cast against the triangle
+## in space: the question is always asked straight down, so dropping Y turns it
+## into a point-in-triangle test and an interpolation, and a triangle standing
+## exactly on its edge — a wall of the sunken pad, seen from above — has no area
+## to be inside of and is skipped by the same divisor that would be zero.
+func _over(a: Vector3, b: Vector3, c: Vector3, spot: Vector3) -> float:
+	var area: float = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z)
+	if is_zero_approx(area):
+		return NAN
+	var at_a: float = ((b.z - c.z) * (spot.x - c.x) + (c.x - b.x) * (spot.z - c.z)) / area
+	var at_b: float = ((c.z - a.z) * (spot.x - c.x) + (a.x - c.x) * (spot.z - c.z)) / area
+	var at_c: float = 1.0 - at_a - at_b
+	if at_a < 0.0 or at_b < 0.0 or at_c < 0.0:
+		return NAN
+	return at_a * a.y + at_b * b.y + at_c * c.y
 
 
 ## Adds the world-space box of every [VisualInstance3D] under [param branch] to
