@@ -104,6 +104,12 @@
 ## [code]resource_local_to_scene[/code] buys the blockout. Two cars in one room
 ## repaint separately; the textures are shared references and are not copied.
 ##
+## [b]And the colour is driven past itself on the way on[/b], because that greyscale
+## map averages 0.653 over the bodywork rather than 1.0 — so a tint left at face
+## value arrives at about two thirds of the colour it names.
+## [constant MAP_COMPENSATION] is what makes up for it, and carries the argument for
+## why it makes up for most of that rather than all of it.
+##
 ## [b]The glass is repainted outright[/b], because the pack's is near-black at 68%
 ## alpha and this game decided otherwise in [code]#58[/code]: a light bluish-green,
 ## the same numbers [code]tests/fixtures/blockout_car.tscn[/code] gives the blockout's windows.
@@ -151,6 +157,49 @@ const GLASS_PARTS: Array[String] = [GLASS_PART, "Optics"]
 ## [code]Wheel1[/code]..[code]Wheel4[/code], front-left, front-right, rear-left,
 ## rear-right.
 const WHEEL_PART: String = "Wheel"
+
+## How far past its own value a colour from [constant Car.PAINT_COLORS] is
+## driven, to make up for the greyscale map it is multiplied into.
+##
+## [b]The map is not neutral, which is the whole reason this exists.[/b] The
+## pack bakes the body albedo to greyscale so the game can tint it — see the
+## class docs — but greyscale is not white: measured over the bodywork of the
+## sedan at the showcase angle, it multiplies the paint by 0.653. So a colour
+## lands at about two thirds of the value it names, and the palette
+## [constant Car.PAINT_COLORS] carefully picks is not the palette that reaches
+## the screen. Rendered, the thirteen average [code]L* 35.0[/code] against the
+## [code]L* 54.2[/code] they are authored at, and the loss is proportional —
+## it takes 13 lightness steps off Alpine White and 3.5 off Burgundy, so it
+## squashes the top of the range rather than the bottom.
+##
+## [b]And it is 1.25 rather than the 1.53 that would cancel the map outright.[/b]
+## 1.53 does land the thirteen back on their authored lightness, and it does it
+## by blowing 49% of Alpine White's bodywork to flat 255. The bay's
+## [Environment] sets no tonemap — linear, exposure 1.0 — so anything over 1.0
+## hard-clips, and what the greyscale map has quietly been doing all along is
+## keeping the brightest panels underneath that ceiling. Take the darkening away
+## without putting a highlight rolloff in its place and the light half of the
+## palette stops being too dark and starts being blown out, which is the worse
+## of the two: a dark car is still a car, and a bonnet at flat white has no shape
+## on it at all.
+##
+## So this is the most lift there is before that starts. Measured over the
+## thirteen colours, at the same angle, counting body pixels at 254/255 or
+## above: 1.15, 1.20 and 1.25 clip nothing whatsoever, and 1.30 puts 28.7% of
+## Alpine White's body at the ceiling. It buys [code]L* 35.0 → 43.9[/code],
+## which is a little over half the deficit, and it costs the room nothing — the
+## tarmac, the grass and the sky move by 0.2/255, which is bounce.
+##
+## [b]The other half needs a tonemap and is deliberately not here.[/b] A filmic
+## or ACES curve has the rolloff this wants and would let the paint come all the
+## way back; it also lifts every other surface in the room by about 44/255, which
+## is a relight — and [code]src/world/garage.tscn[/code] argues at length that a
+## relight is its own change, with every value in it to be found again.
+##
+## [b]On [MeshCar] and not on [Car][/b], because it is a fact about the pack's
+## map. The blockout has no texture under its paint, so a colour put on it
+## arrives at full value and compensating it would simply overexpose it.
+const MAP_COMPENSATION: float = 1.25
 
 ## Which body style this car is, or [code]""[/code] to have one picked at random —
 ## after [method Node._ready] it always names the style that was picked.
@@ -201,6 +250,31 @@ func _ready() -> void:
 	if paint == null:
 		return
 	super()
+	# After `super()` and not instead of it: which colour a car is remains [Car]'s
+	# to pick, and what this adds is only that the pack's map is on the way between
+	# that colour and the screen. Repainting a car by hand — which is what the menu
+	# does through [method restyle] — goes through [method compensated] for the same
+	# reason.
+	paint.albedo_color = compensated(paint.albedo_color)
+
+
+## [param colour] driven up by [constant MAP_COMPENSATION], which is what it takes
+## to arrive on the paint looking like itself.
+##
+## Static, and public, so the sum can be asserted without standing a car up in a
+## tree — and so the one other place that puts a colour on this material
+## ([method restyle]) can say out loud that it is not applying it twice.
+##
+## The alpha is left alone: this is an exposure on the tint, and a paint job that
+## quietly became more opaque than it was asked to be would be a bug in a
+## different subject.
+static func compensated(colour: Color) -> Color:
+	return Color(
+		colour.r * MAP_COMPENSATION,
+		colour.g * MAP_COMPENSATION,
+		colour.b * MAP_COMPENSATION,
+		colour.a,
+	)
 
 
 ## Throws this car away and parks [param style_name] in its place, on a car that
@@ -230,6 +304,11 @@ func _ready() -> void:
 ## would mean the colour changed every time somebody pressed an arrow, which turns
 ## "look at the other nine" into a slot machine. What a player is comparing is the
 ## shape, so the shape is the only thing that moves.
+##
+## The colour it carries across has already been through [method compensated] —
+## it is read back off the material this is about to replace — so it is emphatically
+## not put through it again. A second pass would brighten the car by a quarter per
+## press of the arrow, which is a slot machine of a different kind.
 func restyle(style_name: String) -> void:
 	if style_name == style:
 		return
