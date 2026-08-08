@@ -20,20 +20,19 @@
 ## near plane, the car, the ground — then means the same thing it meant about the
 ## primitive, because it is measured against the same box.
 ##
-## [b]The [code].glb[/code]'s own scale is deliberately thrown away.[/b] The
-## window bottle is authored in Blender as a unit cylinder with a
-## [code](0.1, 0.26, 0.1)[/code] scale on the node — its catalogue extent read as
-## half-extents, so the exported bottle is twice the size the catalogue asks for.
-## The tyre bottle has the opposite problem and it is not a mistake either: it is
-## a real 27 cm trigger sprayer modelled in real metres, which is a perfectly good
-## number and is not the 30 cm the catalogue gives that tool. The sponge is a
-## third answer again — a 16 cm one, which is a real sponge and is not the 24 cm
-## the catalogue hands the player. The pressure washer is a fourth: a download
-## whose vertices are in no unit at all — 21 of them from end to end, with the
-## root node carrying the scale that would make it metres, and this class never
-## looks at a node. Honouring any of those files would put a tool in the hand at a
-## size nothing else in the game agrees with. Reading the mesh's box instead makes
-## the export's scale irrelevant: re-export the same shape at any scale at all and
+## [b]The [code].glb[/code]'s own scale is deliberately thrown away.[/b] The two
+## bottles are one piece of geometry in two liveries — a real 27 cm trigger
+## sprayer modelled in real metres, which is a perfectly good number and is
+## neither the 26 cm nor the 30 cm the catalogue gives the two tools drawn from
+## it. That is the case at its plainest: the same mesh has to arrive in the hand
+## at two sizes, and a file can only claim one. The sponge is a second answer —
+## a 16 cm one, which is a real sponge and is not the 24 cm the catalogue hands
+## the player. The pressure washer is a third: a download whose vertices are in
+## no unit at all — 21 of them from end to end, with the root node carrying the
+## scale that would make it metres, and this class never looks at a node.
+## Honouring any of those files would put a tool in the hand at a size nothing
+## else in the game agrees with. Reading the mesh's box instead makes the
+## export's scale irrelevant: re-export the same shape at any scale at all and
 ## the thing in the player's hand does not move.
 ##
 ## [b]Its orientation is not thrown away, and the turn that fixes one is data.[/b]
@@ -63,17 +62,21 @@
 ## this class exists.
 ##
 ## [b]Normals are divided by the fit, not multiplied by it.[/b] The fit is
-## non-uniform — a bottle is taller than it is wide and the source cylinder is
-## not — and a normal carried through a non-uniform scale unchanged is a normal
+## non-uniform — the catalogue's box is never quite the mesh's own proportions,
+## and both bottles come out about a quarter deeper than they are modelled, which
+## is what the extent buys — and a normal carried through that unchanged is one
 ## that no longer stands off the surface it belongs to, which reads as a bottle
 ## lit from the wrong angle rather than as a bug. The inverse transpose of a
 ## diagonal matrix is the reciprocal of its diagonal, so that is a component-wise
 ## divide; tangents are directions [i]along[/i] the surface and take the fit
 ## itself. Neither is expensive per vertex and both are paid once, while the
-## screen is loading: measured in [method ViewModel._build], the window bottle's
-## 2,352 vertices take 5 ms and the tyre bottle's 37,286 take 37 ms. The second
-## of those is a real number rather than a rounding error, and it is the price of
-## a model this class deliberately does not decimate — see
+## screen is loading: measured in [method ViewModel._build], each bottle's 37,286
+## vertices take about 40 ms, so the pair costs a little under 80 ms of the bay's
+## load. That is a real number rather than a rounding error, and it is roughly
+## double what it was — the window bottle used to be a 2,352-vertex cylinder at
+## 5 ms, and is now the tyre bottle in a blue livery (see
+## [code]scripts/build-window-cleaner.py[/code]). It is the price of a model this
+## class deliberately does not decimate — see
 ## [code]scripts/build-tire-cleaner.py[/code], which says the same thing about
 ## the triangle count. The sponge is at the other end of that range: 224
 ## vertices, two orders of magnitude under the bottles, because everything that

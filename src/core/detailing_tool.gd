@@ -251,9 +251,14 @@ static func catalogue() -> Array[DetailingTool]:
 		)
 	)
 	# A spray bottle, and the first tool on the belt that was given a modelled mesh
-	# rather than a primitive. The colour is what the roll-up draws it in and is
-	# unchanged — the other blue on the belt, deliberately a long way from the
-	# rag's.
+	# rather than a primitive. It is now the tyre cleaner's trigger sprayer with
+	# its grey plastic recoloured — see
+	# [code]scripts/build-window-cleaner.py[/code] — which makes this colour do a
+	# second job: it is still the blue the roll-up draws the icon in, deliberately
+	# a long way from the rag's, and it is now also the blue the bake paints the
+	# bottle itself. One number, so the badge in the corner and the thing in the
+	# hand cannot end up two shades apart, which is exactly what the class docs
+	# above say the colour is here for.
 	tools.append(
 		DetailingTool.new(
 			Id.WINDOW_CLEANER,
@@ -266,8 +271,9 @@ static func catalogue() -> Array[DetailingTool]:
 			"res://assets/models/cleaning_spray/window_cleaner.glb"
 		)
 	)
-	# A trigger sprayer, and one of the three tools on the belt whose art came from
-	# outside the project — see
+	# A trigger sprayer, and one of the four tools on the belt whose art came from
+	# outside the project — the window bottle above is this same mesh in a blue
+	# livery, so the two of them are one download between them. See
 	# [code]assets/models/cleaning_spray/ATTRIBUTION.txt[/code], and the sponge's and
 	# the pressure washer's above it.
 	# The colour is the roll-up's business and not the model's, and the same note

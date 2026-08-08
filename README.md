@@ -270,7 +270,7 @@ project.godot          engine + project settings (typed-GDScript gates live here
 export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make build-web`
 assets/brand/          the logo the game shares with the business it is named after
 assets/models/cars/    the ten cars the bay parks, baked out of the pack credited below
-assets/models/cleaning_spray/  the two spray bottles the belt carries
+assets/models/cleaning_spray/  the two spray bottles the belt carries — one sprayer, two liveries
 assets/models/sponge/  the sponge the belt carries, baked out of the model credited below
 assets/models/pressure_washer/  the wand the belt carries, credited below
 assets/models/driveway/  the ground the whole game happens on, credited below
@@ -330,7 +330,8 @@ out of
 licensed under
 [Creative Commons Attribution 4.0](http://creativecommons.org/licenses/by/4.0/).
 
-The bottle in your hand for the tyre & engine cleaner is baked out of
+Both bottles in your hand — the tyre & engine cleaner and the window cleaner,
+which is the same sprayer recoloured — are baked out of
 **"Kitchen Spray"**
 (https://sketchfab.com/3d-models/kitchen-spray-2a5debf2fd58487e91fce90487c22e26)
 by **Jesus Osco** (https://sketchfab.com/gsus.vfx), licensed under the same
@@ -362,9 +363,10 @@ beside the assets, in
 and
 [`assets/models/driveway/ATTRIBUTION.txt`](./assets/models/driveway/ATTRIBUTION.txt);
 and here. The first three are processed derivatives — see
-`scripts/build-car-pack.py`, `scripts/build-tire-cleaner.py` and
-`scripts/build-sponge.py` — and remain under CC-BY 4.0; the pressure washer and
-the driveway are the artists' own files, unmodified, with the sizing, righting
+`scripts/build-car-pack.py`, `scripts/build-tire-cleaner.py` (plus
+`scripts/build-window-cleaner.py`, which recolours its output into the second
+bottle) and `scripts/build-sponge.py` — and remain under CC-BY 4.0; the pressure
+washer and the driveway are the artists' own files, unmodified, with the sizing, righting
 and placing all done by the game around them —
 [`DetailingTool.catalogue`](./src/core/detailing_tool.gd) and
 [`ToolModel`](./src/world/tool_model.gd) for the one,
