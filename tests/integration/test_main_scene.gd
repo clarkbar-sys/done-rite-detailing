@@ -26,8 +26,14 @@ const PLAY_SCREEN: String = "res://src/screens/play_screen.tscn"
 
 var _main: Control = null
 
+## The state [Sound] was in before this suite touched it, so a run that boots
+## the scene muted (see below) still hands the next suite an unmuted game
+## rather than whatever this one last left the settings file at.
+var _muted_before: bool = false
+
 
 func before_each() -> void:
+	_muted_before = Sound.muted
 	var packed: PackedScene = load(MAIN_SCENE) as PackedScene
 	assert_not_null(packed, "could not load %s" % MAIN_SCENE)
 	if packed == null:
@@ -46,6 +52,10 @@ func before_each() -> void:
 	# latter but logs it as deprecated, and a suite that prints deprecation
 	# noise on every green run trains people to stop reading the output.
 	await wait_process_frames(1)
+
+
+func after_each() -> void:
+	Sound.set_muted(_muted_before)
 
 
 ## The scene file behind whatever the host is showing, or "" if it is not
@@ -234,6 +244,24 @@ func test_the_theme_survives_the_long_way_round_as_well() -> void:
 	await _press_play()
 	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
 	assert_true(_music().fading(), "the rules screen's Play left the theme running into the game")
+
+
+func test_a_saved_mute_is_applied_before_the_title_screen_shows() -> void:
+	# `before_each` already booted `_main` off whatever `_muted_before` was, so
+	# proving main.gd reads a *saved* mute back means saving one and booting a
+	# second instance — the only way to tell "read the setting on the way in"
+	# apart from "happened to start unmuted".
+	Settings.save_muted(true)
+	var packed: PackedScene = load(MAIN_SCENE) as PackedScene
+	var instance: Node = packed.instantiate()
+	var second_main: Control = instance as Control
+	add_child_autofree(second_main)
+	await wait_process_frames(1)
+	assert_true(Sound.muted, "a fresh boot did not read the saved setting")
+	assert_true(
+		AudioServer.is_bus_mute(AudioServer.get_bus_index(Sound.BUS_NAME)),
+		"the bus was not silenced to match"
+	)
 
 
 func test_only_one_screen_is_mounted_at_a_time() -> void:

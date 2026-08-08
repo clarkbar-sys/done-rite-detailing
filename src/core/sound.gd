@@ -29,11 +29,15 @@ const BUS_NAME: String = "Master"
 static var muted: bool = false
 
 
-## Silences or restores [constant BUS_NAME], and remembers which for the next
-## screen that asks.
+## Silences or restores [constant BUS_NAME], remembers which for the next
+## screen that asks, and writes it to [Settings] so it's still true after a
+## reload. Write-through rather than some settings screen's Save button —
+## there isn't one, and a toggle a player has to remember to save is a worse
+## toggle.
 static func set_muted(value: bool) -> void:
 	muted = value
 	AudioServer.set_bus_mute(AudioServer.get_bus_index(BUS_NAME), muted)
+	Settings.save_muted(muted)
 
 
 ## Flips [member muted] and applies it. What every on/off button in the game
