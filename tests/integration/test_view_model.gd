@@ -248,8 +248,8 @@ func test_every_proxy_is_the_shape_and_size_the_catalogue_gives_it() -> void:
 		var proxy: MeshInstance3D = _view_model().proxy_for(tool.id)
 		match tool.shape:
 			DetailingTool.Shape.CYLINDER:
-				# Measured off the mesh's own box, because two of the three cylinders on
-				# the belt are modelled bottles rather than a [CylinderMesh] — see
+				# Measured off the mesh's own box, because all three cylinders on the
+				# belt are modelled now rather than a [CylinderMesh] — see
 				# [ToolModel], which fits one into exactly this box. The box is the
 				# question worth asking of both: it is what the clearances further down
 				# are measured against, and a [CylinderMesh] of this extent fills it

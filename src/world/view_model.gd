@@ -18,10 +18,10 @@
 ## here is only the part the catalogue has no opinion about: how a hand holds the
 ## thing.
 ##
-## [b]Three of the five are modelled meshes now, and the sentence above is why
-## that changed nothing.[/b] The two spray bottles and the sponge name a
-## [member DetailingTool.model] and are built by [ToolModel], which fits the
-## baked mesh into exactly the [member DetailingTool.extent] box the
+## [b]Four of the five are modelled meshes now, and the sentence above is why
+## that changed nothing.[/b] The two spray bottles, the sponge and the power wash
+## name a [member DetailingTool.model] and are built by [ToolModel], which fits the
+## exported mesh into exactly the [member DetailingTool.extent] box the
 ## [CylinderMesh] or [BoxMesh] filled — same size, same origin, same box every
 ## clearance below is measured against. The one thing a modelled tool does not
 ## take from the catalogue is its surface, because it arrives wearing a texture
@@ -31,7 +31,7 @@
 ## of the frame belongs to the anchor and is set in [code]garage.tscn[/code] — it
 ## is where your hand is, and your hand does not move when you swap tools. What
 ## changes per tool is the angle, in [method _held_pose] below, and a grip
-## distance along the tool's own long axis so a 0.72 m wand is held near its butt
+## distance along the tool's own long axis so a 0.60 m wand is held near its butt
 ## like a wand instead of balanced at its middle like a baton.
 ##
 ## [b]The hand can now be pointed, and it still does not move.[/b] Press the
@@ -71,7 +71,10 @@
 ## the proxy, with their [code]-Z[/code] pointed out of the nozzle — which is the
 ## axis a [GPUParticles3D] emits along, so [WashJet] and [SprayMist] are stood on
 ## the first one every tick and throw their contents down it with no arithmetic of
-## their own. They are also what a test measures the alignment with: the line
+## their own. Which end is which is the proxy's [code]+Y[/code] and nothing else,
+## so a modelled tool has to arrive the right way up in it — see
+## [member DetailingTool.model_turn], which is the pressure washer's row for
+## exactly that reason. They are also what a test measures the alignment with: the line
 ## between them is the tool, and asserting on two nodes is honest in a way that
 ## re-deriving the axis from the same [Basis] the code posed it with is not.
 ##
@@ -100,14 +103,18 @@
 ## icon and the thing in your hands still agree about what a rag is.
 ##
 ## [b]Silver is a material, not a colour.[/b] The power wash is the only metal on
-## the belt, and the only metal in the scene at all, and it comes out of the
-## catalogue at [code]metallic = 0.9[/code], [code]roughness = 0.25[/code].
-## Worth knowing what that buys here: the scene's [WorldEnvironment] hands it no
-## radiance map at all, so its specular comes entirely from the two strip lights
-## and the directional fill. That reads as dark metal with hard highlights
-## rather than as chrome, which is right for a pressure washer and is
-## emphatically not the light-grey plastic a [code]metallic = 0[/code] cylinder
-## would have been.
+## the belt, and the only metal in the scene at all. It used to say so through the
+## catalogue, at [code]metallic = 0.9[/code], [code]roughness = 0.25[/code] over a
+## grey cylinder; it now says so through the map its model arrives wearing, which
+## averages a little over half metal across a pipe, a valve and the bottle strapped
+## to it. Both are the same claim and
+## [code]tests/integration/test_view_model.gd[/code] asks it the same way — of what
+## is actually painting the mesh rather than of the catalogue. Worth knowing what
+## that buys here: the scene's [WorldEnvironment] hands it no radiance map at all,
+## so its specular comes entirely from the two strip lights and the directional
+## fill. That reads as dark metal with hard highlights rather than as chrome, which
+## is right for a pressure washer and is emphatically not the light-grey plastic a
+## [code]metallic = 0[/code] cylinder would have been.
 ##
 ## That used to be true by accident — the background was a flat colour, so there
 ## was nothing to mirror. It is now true [i]on purpose[/i]: the room has a real
@@ -468,16 +475,16 @@ func _build(tool: DetailingTool, carry: ToolCarry) -> MeshInstance3D:
 ## opinion on — the size, the plane it starts as, the material it wears — is
 ## unchanged, which is why the swap can be this small.
 ##
-## The two spray bottles and the sponge: a [ToolModel] is a [MeshInstance3D]
-## carrying an imported mesh, fitted into the same [member DetailingTool.extent]
-## box the primitive filled. Asked by whether the tool names a model rather than
-## by its id, which is the whole reason the sponge could be modelled without a
+## The other four: a [ToolModel] is a [MeshInstance3D] carrying an imported mesh,
+## fitted into the same [member DetailingTool.extent] box the primitive filled.
+## Asked by whether the tool names a model rather than by its id, which is the
+## whole reason the sponge and then the power wash could be modelled without a
 ## line changing here — and why the next one is a row in the catalogue too.
 func _instance_for(tool: DetailingTool) -> MeshInstance3D:
 	if tool.id == DetailingTool.Id.DRYING_RAG:
 		return ClothRag.new(Vector2(tool.extent.x, tool.extent.z))
 	if not tool.model.is_empty():
-		return ToolModel.new(tool.model, tool.extent)
+		return ToolModel.new(tool.model, tool.extent, tool.model_turn)
 	var proxy: MeshInstance3D = MeshInstance3D.new()
 	proxy.mesh = _mesh_for(tool)
 	return proxy
@@ -597,8 +604,15 @@ func _facing() -> Vector3:
 ##
 ## The per-shape reading of [member DetailingTool.extent] is the contract that
 ## class documents: a [CylinderMesh] takes `x` as a diameter and `y` as a height,
-## a [PlaneMesh] takes `x` and `z`. Getting that wrong makes a 6 cm wand 12 cm
+## a [PlaneMesh] takes `x` and `z`. Getting that wrong makes a 10 cm bottle 20 cm
 ## thick, which looks like a scaling bug rather than like the mistake it is.
+##
+## [b]No tool on the belt comes through here today[/b], and all three branches are
+## kept anyway. Four of the five name a model and the fifth is a [ClothRag], so
+## [method _instance_for] answers before this is ever reached — but which
+## primitive a tool falls back to is the catalogue's promise rather than a fact
+## about the art that happens to exist this month, and deleting the fallback is
+## how the next tool added without a mesh becomes invisible instead of a cylinder.
 func _mesh_for(tool: DetailingTool) -> Mesh:
 	match tool.shape:
 		DetailingTool.Shape.CYLINDER:
@@ -651,7 +665,7 @@ func _material_for(tool: DetailingTool) -> StandardMaterial3D:
 func _held_pose(id: DetailingTool.Id) -> Transform3D:
 	match id:
 		DetailingTool.Id.POWER_WASH:
-			# A wand: gripped 6 cm below its middle so two thirds of it reaches up
+			# A wand: gripped 6 cm below its middle so three fifths of it reaches up
 			# and away, tip finishing near the centre of the frame like something
 			# aimed at the car rather than at the viewer.
 			return _pose(Vector3(-55.0, 0.0, 25.0), -0.06)

@@ -176,18 +176,19 @@ func test_the_logo_is_framed_rather_than_pasted_on() -> void:
 
 
 func test_every_borrowed_model_is_credited_where_a_player_can_read_it() -> void:
-	# CC-BY 4.0 is the licence the cars, the tyre cleaner's bottle, the sponge and
-	# the driveway all arrive under, and attribution is a condition of it, not a
-	# courtesy. A file in the repository does not discharge that — the person
-	# playing the game never sees one — so the credit has to be on a screen, and
-	# this is the screen every player passes through.
+	# CC-BY 4.0 is the licence the cars, the tyre cleaner's bottle, the sponge, the
+	# pressure washer and the driveway all arrive under, and attribution is a
+	# condition of it, not a courtesy. A file in the repository does not discharge
+	# that — the person playing the game never sees one — so the credit has to be on
+	# a screen, and this is the screen every player passes through.
 	#
 	# Every work, and all three parts of each by name, because the licence asks
 	# for all three and a line that lost one of them would still look like a
 	# credit: the title of the work, who made it, and what licence it is under.
 	# Substrings rather than the whole string, so the wording around them stays
-	# the .tscn's business — including how many of them share a line, which is two
-	# apiece since the sponge (#155).
+	# the .tscn's business — including how many of them share a line, which has
+	# been two apiece since the sponge (#155) and is 2 + 2 + 1 since the pressure
+	# washer (#154) made five.
 	var credits: Label = _screen.get_node("%Credits") as Label
 	assert_not_null(credits, "the menu must carry the credits for the borrowed models")
 	if credits == null:
@@ -196,6 +197,7 @@ func test_every_borrowed_model_is_credited_where_a_player_can_read_it() -> void:
 		["Generic passenger car pack", "Comrade1280"],
 		["Kitchen Spray", "Jesus Osco"],
 		["Sponge", "Aullwen"],
+		["homemade flamethrower", "excellenthe"],
 		["Sunken Driveway Parking Spot", "jimbogies"],
 	]
 	for work: Array in borrowed:
@@ -227,6 +229,12 @@ func test_the_credit_does_not_cross_the_how_to_play_label() -> void:
 	# as a button, and nothing else on this screen can see it happen — the two
 	# nodes are siblings that never touch, and both are laid out exactly as their
 	# offsets ask.
+	#
+	# The pressure washer's fifth work (#154) is the one that finally spent the
+	# 16 px two lines had in hand, and the menu bought the room back rather than
+	# shrinking the type: 44 px off the lockup and 44 off the column's container —
+	# src/screens/main_menu.tscn has that arithmetic — and this is the measurement
+	# that says it was enough.
 	#
 	# Both boxes are measured off the text rather than off the control: a Label
 	# is as tall as its offsets whatever it has in it, and a pill is mostly

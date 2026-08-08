@@ -45,6 +45,11 @@ extends ToolCarry
 ## because that is the axis a [CylinderMesh] is built along — see
 ## [method ViewModel._mesh_for] — so the nozzle is the top of the cylinder and
 ## the butt is the bottom of it.
+##
+## A modelled wand has to agree with that rather than the other way round: the
+## mesh is fitted into the same box the cylinder filled and this is still where
+## the water leaves, which is why the pressure washer's own frame is righted by
+## [member DetailingTool.model_turn] before it ever gets here.
 const AXIS: Vector3 = Vector3.UP
 
 ## How nearly the aim has to be pointed back down the wand before there is no
@@ -91,8 +96,12 @@ func pose(toward: Vector3, _outward: Vector3, raise: float) -> Transform3D:
 ## The origin is the hand itself: the wand turns about the anchor and is not slid
 ## along its own axis first, unlike the resting grip. That is what keeps the
 ## nozzle on the line — see the class docs — and it is also what keeps the wand
-## inside the reach the shot promises, since half of a 0.72 m wand either side of
-## the anchor is less than the 0.45 m every other tool is already allowed.
+## inside the reach the shot promises: half the box the tool is fitted into, plus
+## the grip the resting pose slides it down by, comes to 0.422 m against the
+## 0.45 m every other tool is already allowed. Half a length rather than half a
+## box while the wand was a 6 cm barrel; it is a modelled pressure washer with a
+## bottle across it now, and the corner of that box is what spends the budget —
+## see [method DetailingTool.catalogue], where the size is picked to fit it.
 ##
 ## Falls back to the resting pose for a direction there is no rotation to build
 ## from: a zero-length one, or one pointed back down the wand (see

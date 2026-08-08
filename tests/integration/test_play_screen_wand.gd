@@ -328,9 +328,13 @@ func test_an_aimed_wand_stays_out_of_the_paint_and_inside_the_shot() -> void:
 	# The three budgets the room's docs record, held at the poses that spend the
 	# most of all of them: fully aimed, at presses spread across the glass rather
 	# than at the one in the middle. The wand turns about the anchor instead of
-	# being slid along its own axis first, which is what keeps half a wand — 0.36 m
-	# — inside the 0.45 m every other tool is already allowed, and what keeps its
-	# butt in front of a 0.05 m near plane with the rest of it pointed away.
+	# being slid along its own axis first, which is what keeps the far corner of its
+	# box — 0.391 m out — inside the 0.45 m every other tool is already allowed, and
+	# what keeps its butt in front of a 0.05 m near plane with the rest of it
+	# pointed away. Both numbers are why the modelled pressure washer is the size it
+	# is rather than the size its barrel used to be: see
+	# [method DetailingTool.catalogue], where this suite is named as the thing that
+	# measured it.
 	#
 	# Worth being thorough about, because this is the one thing on screen that is no
 	# longer inside [member Garage.aim_yaw_degrees]: the wand follows the mark, and
