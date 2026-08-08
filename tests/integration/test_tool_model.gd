@@ -64,6 +64,20 @@ const LOPSIDED_ENOUGH: float = 1.01
 ## that it is the same kind of path a typo in the catalogue would produce.
 const NOWHERE: String = "res://assets/models/nothing_here.glb"
 
+## How much thicker one end of the wand has to be than the other before the two
+## can be told apart by measurement rather than by eye. Twice over, against a real
+## 4.4 — a margin, and deliberately not a threshold anybody has to tune: the ends
+## of this model are a 4 cm pipe and a 22 cm flat, and nothing between them is
+## close.
+const BLUNTER: float = 2.0
+
+## What counts as "the end" of a fitted tool when its two ends are being compared:
+## the tenth of its length nearest each. Small enough that the bottle strapped
+## across the middle of the wand is in neither, and large enough that the count of
+## vertices in each is in the hundreds rather than the handful a face or two would
+## give.
+const AN_END: float = 0.1
+
 
 ## Every tool in the catalogue that names a model. Read off the catalogue rather
 ## than listed here, so the third bottle is covered by these tests on the day it
@@ -77,9 +91,17 @@ func _modelled() -> Array[DetailingTool]:
 
 
 func _built(tool: DetailingTool, extent: Vector3) -> ToolModel:
-	var built: ToolModel = ToolModel.new(tool.model, extent)
+	var built: ToolModel = ToolModel.new(tool.model, extent, tool.model_turn)
 	autofree(built)
 	return built
+
+
+## The turn [param tool] asks for, as the [Basis] [ToolModel] will build from it.
+## Zero for every tool but the power wash, which is the identity — so every
+## measurement below reads the same as it did before turns existed, for every
+## model that does not name one.
+func _turn_of(tool: DetailingTool) -> Basis:
+	return Basis.from_euler(tool.model_turn * (PI / 180.0))
 
 
 ## The mesh inside [param model_path]'s imported scene.
@@ -113,19 +135,29 @@ func _mesh_under(node: Node) -> Mesh:
 
 
 ## The fit [ToolModel] will use for [param tool] at [param extent] — its
-## documented contract, which is the catalogue's box over the source mesh's own.
+## documented contract, which is the catalogue's box over the source mesh's own,
+## measured after whatever turn the tool asks for.
 func _fit_of(tool: DetailingTool, extent: Vector3) -> Vector3:
-	return extent / _source_mesh(tool.model).get_aabb().size
+	var turned: AABB = (
+		Transform3D(_turn_of(tool), Vector3.ZERO) * _source_mesh(tool.model).get_aabb()
+	)
+	return extent / turned.size
 
 
 ## The worst agreement, over every vertex of every surface, between the normal
-## [param fitted] ended up with and the source normal turned by [param by].
+## [param fitted] ended up with and the source normal righted by [param turn] and
+## then turned by [param by].
 ##
 ## Pass the reciprocal of the fit and this measures whether the fit turned its
 ## normals correctly; pass [constant Vector3.ONE] and it measures how wrong
 ## leaving them alone would have been. A signed dot product, because a turn is
 ## what is being checked and a normal that came out backwards is not a pass.
-func _worst_turned(fitted: Mesh, source: Mesh, by: Vector3) -> float:
+##
+## [param turn] is the model's own righting and is applied either way, because it
+## is not the arithmetic under test: a rigid turn of both sides of a dot product
+## changes nothing about what the fit did, and leaving it off the right-hand side
+## would report every normal on a turned model as 180° wrong.
+func _worst_turned(fitted: Mesh, source: Mesh, turn: Basis, by: Vector3) -> float:
 	var worst: float = 1.0
 	for surface: int in source.get_surface_count():
 		var was: Array = source.surface_get_arrays(surface)
@@ -133,8 +165,33 @@ func _worst_turned(fitted: Mesh, source: Mesh, by: Vector3) -> float:
 		var before: PackedVector3Array = was[Mesh.ARRAY_NORMAL]
 		var after: PackedVector3Array = now[Mesh.ARRAY_NORMAL]
 		for at: int in before.size():
-			worst = minf(worst, after[at].dot((before[at] * by).normalized()))
+			worst = minf(worst, after[at].dot((turn * before[at] * by).normalized()))
 	return worst
+
+
+## The area of the cross-section [param mesh] has at one end of its long axis, in
+## square metres: the [code]+Y[/code] end for [param at_top] and the
+## [code]-Y[/code] end otherwise.
+##
+## The [code]x[/code] by [code]z[/code] box around every vertex in the outer
+## [constant AN_END] of the mesh's own height, which is how a pipe is told from a
+## flat: it is the measurement that says which end of a tool is its nozzle without
+## anybody writing down which way the artist happened to work.
+func _cross_section(mesh: Mesh, at_top: bool) -> float:
+	var box: AABB = mesh.get_aabb()
+	var deep: float = box.size.y * AN_END
+	var from: float = box.end.y - deep if at_top else box.position.y
+	var to: float = box.end.y if at_top else box.position.y + deep
+	var across: AABB = AABB()
+	var found: bool = false
+	for surface: int in mesh.get_surface_count():
+		var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		for vertex: Vector3 in vertices:
+			if vertex.y < from or vertex.y > to:
+				continue
+			across = across.expand(vertex) if found else AABB(vertex, Vector3.ZERO)
+			found = true
+	return across.size.x * across.size.z
 
 
 # ---- the drop-in ------------------------------------------------------------
@@ -213,6 +270,67 @@ func test_a_model_made_of_several_parts_arrives_with_all_of_them() -> void:
 		)
 
 
+# ---- which way up the model arrives -----------------------------------------
+
+
+func test_the_wand_is_thinnest_at_the_end_the_water_leaves() -> void:
+	# The bug this pins was reported as "the washer is shooting out the opposite
+	# end", and it was: the download is authored Z-up with its barrel at the
+	# mesh's own [code]-Y[/code], [ToolModel] never looks at the node that would
+	# say so, and the nozzle marker [ViewModel] hangs off the wand is at
+	# [code]+Y[/code] whatever arrives there. So the jet left the hose end.
+	#
+	# Measured as a shape rather than as a rotation, because "the barrel is at the
+	# top" is the thing that has to be true and the half-turn in the catalogue is
+	# only how it is currently spelled. A barrel is a pipe: the tenth of the wand
+	# nearest the muzzle is a thin round section, and the tenth nearest the butt is
+	# the wide flat end the bottle is strapped to. Measured, at the catalogue
+	# extent: 0.00157 m² at the muzzle against 0.00694 m² at the butt, four times
+	# over, so [constant BLUNTER] is nowhere near either.
+	var wand: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.POWER_WASH]
+	var mesh: Mesh = _built(wand, wand.extent).mesh
+	assert_lt(
+		_cross_section(mesh, true) * BLUNTER,
+		_cross_section(mesh, false),
+		"the wand's muzzle end is not the thin one — it is fitted upside down"
+	)
+
+
+func test_the_same_wand_without_its_turn_is_upside_down() -> void:
+	# What keeps the test above from passing on a model that happens to be roughly
+	# symmetrical end to end, and what says the catalogue's turn is load-bearing
+	# rather than decoration: build the same asset with no turn at all and the
+	# thin end is the butt. Delete [member DetailingTool.model_turn]'s row and this
+	# is the test that says which way the wand went.
+	var wand: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.POWER_WASH]
+	var untold: ToolModel = ToolModel.new(wand.model, wand.extent)
+	autofree(untold)
+	assert_lt(
+		_cross_section(untold.mesh, false) * BLUNTER,
+		_cross_section(untold.mesh, true),
+		"the wand needs no turn, so the turn in the catalogue is doing nothing"
+	)
+
+
+func test_a_turn_leaves_the_box_and_the_centre_exactly_where_they_were() -> void:
+	# The turn is applied before the box is measured — see [method
+	# ToolModel._fitted] — precisely so that it cannot move the tool: the catalogue
+	# extent has the hand's whole clearance budget in it (see [method
+	# DetailingTool.catalogue]) and a model that grew or wandered when somebody
+	# righted it would spend that budget silently. Asserted against a turn no tool
+	# asks for as well as the one the wand does, because a half-turn about Z leaves
+	# a box the same size by symmetry and would prove very little on its own.
+	var wand: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.POWER_WASH]
+	for turn: Vector3 in [wand.model_turn, Vector3.ZERO, Vector3(90.0, 0.0, 0.0)]:
+		var built: ToolModel = ToolModel.new(wand.model, wand.extent, turn)
+		autofree(built)
+		var box: AABB = built.get_aabb()
+		assert_almost_eq(box.size.x, wand.extent.x, TOLERANCE, "turned %v: width" % turn)
+		assert_almost_eq(box.size.y, wand.extent.y, TOLERANCE, "turned %v: height" % turn)
+		assert_almost_eq(box.size.z, wand.extent.z, TOLERANCE, "turned %v: depth" % turn)
+		assert_almost_eq(box.get_center().length(), 0.0, TOLERANCE, "turned %v: centre" % turn)
+
+
 # ---- what the model brings that a cylinder could not -------------------------
 
 
@@ -270,7 +388,7 @@ func test_normals_are_turned_by_the_inverse_of_the_fit() -> void:
 		var source: Mesh = _source_mesh(tool.model)
 		var fitted: Mesh = _built(tool, tool.extent).mesh
 		var by: Vector3 = Vector3.ONE / _fit_of(tool, tool.extent)
-		var worst: float = _worst_turned(fitted, source, by)
+		var worst: float = _worst_turned(fitted, source, _turn_of(tool), by)
 		assert_gt(worst, TURNED, "%s: a normal is not where the fit puts it" % tool.display_name)
 
 
@@ -283,7 +401,7 @@ func test_normals_survive_a_fit_far_more_lopsided_than_any_tool_asks_for() -> vo
 		var source: Mesh = _source_mesh(tool.model)
 		var fitted: Mesh = _built(tool, LOPSIDED).mesh
 		var by: Vector3 = Vector3.ONE / _fit_of(tool, LOPSIDED)
-		var worst: float = _worst_turned(fitted, source, by)
+		var worst: float = _worst_turned(fitted, source, _turn_of(tool), by)
 		assert_gt(worst, TURNED, "%s: a normal is not where the fit puts it" % tool.display_name)
 
 
@@ -310,7 +428,9 @@ func test_a_fit_that_left_the_normals_alone_would_fail_the_two_tests_above() -> 
 			if maxf(fit.x, maxf(fit.y, fit.z)) / minf(fit.x, minf(fit.y, fit.z)) < LOPSIDED_ENOUGH:
 				continue
 			var fitted: Mesh = _built(tool, extent).mesh
-			var worst: float = _worst_turned(fitted, _source_mesh(tool.model), Vector3.ONE)
+			var worst: float = _worst_turned(
+				fitted, _source_mesh(tool.model), _turn_of(tool), Vector3.ONE
+			)
 			assert_lt(
 				worst,
 				UNTURNED_MAX,

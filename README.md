@@ -364,8 +364,9 @@ and
 and here. The first three are processed derivatives — see
 `scripts/build-car-pack.py`, `scripts/build-tire-cleaner.py` and
 `scripts/build-sponge.py` — and remain under CC-BY 4.0; the pressure washer and
-the driveway are the artists' own files, unmodified, sized and placed by the game
-around them — [`DetailingTool.catalogue`](./src/core/detailing_tool.gd) and
+the driveway are the artists' own files, unmodified, with the sizing, righting
+and placing all done by the game around them —
+[`DetailingTool.catalogue`](./src/core/detailing_tool.gd) and
 [`ToolModel`](./src/world/tool_model.gd) for the one,
 [`src/world/ground.tscn`](./src/world/ground.tscn) for the other.
 

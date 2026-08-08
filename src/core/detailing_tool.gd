@@ -107,6 +107,34 @@ var roughness: float
 ## here would drag two meshes and their textures into every one of those runs.
 var model: String
 
+## How far [member model] has to be turned, in degrees, before it is the way up
+## the game holds it. [code]Vector3.ZERO[/code] for a mesh that already is, which
+## is every one of these but the power wash.
+##
+## [b]An artist's frame is not the game's, and only one of them can be wrong
+## here.[/b] [ToolModel] fits a mesh axis by axis into [member extent], so a model
+## has to arrive with its long axis on [code]+Y[/code] and the end it emits from
+## at the top — which is where the [CylinderMesh] it replaces put them, and where
+## [ViewModel] hangs the [code]Muzzle[/code] marker. Three of the four models on
+## the belt were authored that way. The pressure washer was authored Z-up, with
+## its barrel at the [code]-Y[/code] end of the mesh, so fitted as it arrives it
+## sprays out of its own hose end.
+##
+## [b]A row here rather than an edit to the file or a branch in [ToolModel].[/b]
+## The asset is a CC-BY download this project keeps byte for byte — see
+## [code]assets/models/pressure_washer/ATTRIBUTION.txt[/code] — and "which way up
+## did this artist model it" is a fact about one asset, which is what this table
+## is for. [ToolModel] applies it before it measures the box, so [member extent]
+## goes on describing the tool the player actually ends up holding.
+##
+## [b]Right angles only.[/b] This is for righting a frame, not for posing a tool —
+## posing is [method ViewModel._held_pose]'s, and a tool turned a few degrees here
+## would be turned in the roll-up's box as well as in the hand. [ToolModel]
+## measures the turned box off the unturned one, which is exact at multiples of
+## 90° and slack at anything else, so an odd angle here would quietly fit the mesh
+## into something smaller than [member extent] says.
+var model_turn: Vector3
+
 
 func _init(
 	tool_id: Id,
@@ -116,7 +144,8 @@ func _init(
 	proxy_albedo: Color,
 	proxy_metallic: float,
 	proxy_roughness: float,
-	proxy_model: String = ""
+	proxy_model: String = "",
+	proxy_model_turn: Vector3 = Vector3.ZERO
 ) -> void:
 	id = tool_id
 	display_name = name_shown
@@ -126,6 +155,7 @@ func _init(
 	metallic = proxy_metallic
 	roughness = proxy_roughness
 	model = proxy_model
+	model_turn = proxy_model_turn
 
 
 ## The five tools, in belt order.
@@ -163,6 +193,19 @@ static func catalogue() -> Array[DetailingTool]:
 	# So the tool is a fifth shorter than the barrel it replaces and several times
 	# bulkier, which is the trade this model is: a thin 6 cm tube could be long
 	# because it was thin, and a pipe with a bottle across it cannot.
+	#
+	# [b]And it is turned end over end, because the artist's frame is not this
+	# one.[/b] The download is authored Z-up — the wrapper node the exporter writes
+	# carries the quarter turn that would say so, and [ToolModel] never looks at a
+	# node — so in the mesh's own space the barrel is at [code]-Y[/code] and the
+	# hose end is at [code]+Y[/code]. Fitted as it arrives, the wand sprays out of
+	# the end nearest the hand: reported as "the washer is shooting out the opposite
+	# end", which is exactly what it was doing. Half a turn about [code]Z[/code]
+	# rather than about [code]X[/code], and that is the axis with the argument: both
+	# put the barrel at the top, and only this one leaves the mesh's own up —
+	# [code]+Z[/code], the side the barrel sits on above the bottle — pointing out
+	# of the screen at the player once [method ViewModel._held_pose] has tipped the
+	# wand away. About [code]X[/code] the player would be shown its underside.
 	tools.append(
 		DetailingTool.new(
 			Id.POWER_WASH,
@@ -172,7 +215,8 @@ static func catalogue() -> Array[DetailingTool]:
 			Color(0.78, 0.80, 0.84),
 			0.9,
 			0.25,
-			"res://assets/models/pressure_washer/homemade_flamethrower.glb"
+			"res://assets/models/pressure_washer/homemade_flamethrower.glb",
+			Vector3(0.0, 0.0, 180.0)
 		)
 	)
 	# Stretched, as specified — a cube reads as a dice, and the thing that says

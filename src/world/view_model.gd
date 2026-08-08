@@ -71,7 +71,10 @@
 ## the proxy, with their [code]-Z[/code] pointed out of the nozzle — which is the
 ## axis a [GPUParticles3D] emits along, so [WashJet] and [SprayMist] are stood on
 ## the first one every tick and throw their contents down it with no arithmetic of
-## their own. They are also what a test measures the alignment with: the line
+## their own. Which end is which is the proxy's [code]+Y[/code] and nothing else,
+## so a modelled tool has to arrive the right way up in it — see
+## [member DetailingTool.model_turn], which is the pressure washer's row for
+## exactly that reason. They are also what a test measures the alignment with: the line
 ## between them is the tool, and asserting on two nodes is honest in a way that
 ## re-deriving the axis from the same [Basis] the code posed it with is not.
 ##
@@ -481,7 +484,7 @@ func _instance_for(tool: DetailingTool) -> MeshInstance3D:
 	if tool.id == DetailingTool.Id.DRYING_RAG:
 		return ClothRag.new(Vector2(tool.extent.x, tool.extent.z))
 	if not tool.model.is_empty():
-		return ToolModel.new(tool.model, tool.extent)
+		return ToolModel.new(tool.model, tool.extent, tool.model_turn)
 	var proxy: MeshInstance3D = MeshInstance3D.new()
 	proxy.mesh = _mesh_for(tool)
 	return proxy

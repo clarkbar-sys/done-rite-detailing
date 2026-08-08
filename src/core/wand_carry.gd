@@ -45,6 +45,11 @@ extends ToolCarry
 ## because that is the axis a [CylinderMesh] is built along — see
 ## [method ViewModel._mesh_for] — so the nozzle is the top of the cylinder and
 ## the butt is the bottom of it.
+##
+## A modelled wand has to agree with that rather than the other way round: the
+## mesh is fitted into the same box the cylinder filled and this is still where
+## the water leaves, which is why the pressure washer's own frame is righted by
+## [member DetailingTool.model_turn] before it ever gets here.
 const AXIS: Vector3 = Vector3.UP
 
 ## How nearly the aim has to be pointed back down the wand before there is no
