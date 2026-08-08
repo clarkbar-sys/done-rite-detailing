@@ -99,6 +99,12 @@
 ## DetailingTool.Shape.PLANE] of exactly the catalogue's extent, so the roll-up
 ## icon and the thing in your hands still agree about what a rag is.
 ##
+## [b]And the surface on it is cloth rather than a colour.[/b] The rag's material
+## is a [Microfiber] — still a [StandardMaterial3D] painted the catalogue's blue
+## by [method _material_for], with a generated pile, nap and matte under it. The
+## two changes are one change: a sheet that folds like cloth and is lit like
+## card reads as a folding card, and the fold is the thing worth drawing.
+##
 ## [b]Silver is a material, not a colour.[/b] The power wash is the only metal on
 ## the belt, and the only metal in the scene at all, and it comes out of the
 ## catalogue at [code]metallic = 0.9[/code], [code]roughness = 0.25[/code].
@@ -621,16 +627,23 @@ func _mesh_for(tool: DetailingTool) -> Mesh:
 ## A [code]material_override[/code] rather than a surface material, matching the
 ## room's boxes: one material per proxy, visible in one place, and no chance of a
 ## mesh resource carrying a colour of its own that disagrees.
+##
+## [b]The one tool that gets more than a colour is the rag[/b], which is a
+## [Microfiber] — still a [StandardMaterial3D], still painted the catalogue's
+## colour by the three lines below, and with a generated weave under it. The pair
+## of it and [ClothRag] is the whole of that tool being cloth: the mesh moves like
+## a sheet and the surface is made of something. Asked by shape rather than by id
+## for the same reason [method _instance_for] is — a second flat tool would want
+## the same treatment, and neither of these files should have to be edited to say
+## so. Two-sidedness moved into that class with it, because it is a fact about
+## cloth rather than about planes.
 func _material_for(tool: DetailingTool) -> StandardMaterial3D:
 	var material: StandardMaterial3D = StandardMaterial3D.new()
+	if tool.shape == DetailingTool.Shape.PLANE:
+		material = Microfiber.new()
 	material.albedo_color = tool.albedo
 	material.metallic = tool.metallic
 	material.roughness = tool.roughness
-	if tool.shape == DetailingTool.Shape.PLANE:
-		# Half of what keeps the rag on screen; the other half is its angle. See
-		# the class docs — a cloth has no back, so refusing to draw one is the
-		# renderer being right about a mesh that is wrong.
-		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return material
 
 

@@ -114,6 +114,19 @@ func _indices() -> PackedInt32Array:
 	return indices
 
 
+func _tangents() -> PackedFloat32Array:
+	var tangents: PackedFloat32Array = _surface()[Mesh.ARRAY_TANGENT]
+	return tangents
+
+
+## The tangent at [param index], as a direction — the fourth float is the
+## binormal sign and is asserted on its own where it matters.
+func _tangent_at(index: int) -> Vector3:
+	var tangents: PackedFloat32Array = _tangents()
+	var first: int = index * ClothRag.TANGENT_STRIDE
+	return Vector3(tangents[first], tangents[first + 1], tangents[first + 2])
+
+
 # ---- the rectangle it stands in for ------------------------------------------
 
 
@@ -151,6 +164,40 @@ func test_a_settled_sheet_faces_the_way_a_plane_of_the_same_size_would() -> void
 	_rag.settle()
 	for normal: Vector3 in _normals():
 		assert_almost_eq(normal, Vector3.UP, Vector3.ONE * TOLERANCE)
+
+
+func test_a_settled_sheet_carries_the_tangent_frame_a_plane_would() -> void:
+	# The other half of "it is a PlaneMesh", and the half a [Microfiber] reads: a
+	# normal map is sampled in the surface's own tangent frame, so a sheet that
+	# shipped none would have its weave lit from whatever direction the renderer
+	# invented. Measured off a real [PlaneMesh] of this size rather than assumed —
+	# it writes +X with a positive binormal sign, and so does this.
+	_rag.settle()
+	assert_eq(
+		_tangents().size(),
+		_rag.cloth().count() * ClothRag.TANGENT_STRIDE,
+		"a tangent and a sign per point"
+	)
+	for index: int in _rag.cloth().count():
+		assert_almost_eq(_tangent_at(index), Vector3.RIGHT, Vector3.ONE * TOLERANCE)
+		assert_almost_eq(
+			_tangents()[index * ClothRag.TANGENT_STRIDE + 3], ClothRag.HANDED, TOLERANCE
+		)
+
+
+func test_the_tangent_frame_stays_square_to_the_cloth_that_bends_it() -> void:
+	# What the orthogonalisation in [method ClothRag._frame_at] is for. A tangent
+	# taken straight off the span across a fold leans out of the surface, and a
+	# tangent frame that is not square to its own normal shears the weave exactly
+	# where the cloth is most obviously cloth — which is the one place anybody would
+	# be looking. Asserted on a hanging sheet, because a flat one cannot fail it.
+	_rag.settle()
+	await wait_process_frames(SETTLE_FRAMES)
+	var normals: PackedVector3Array = _normals()
+	for index: int in _rag.cloth().count():
+		var tangent: Vector3 = _tangent_at(index)
+		assert_almost_eq(tangent.length(), 1.0, TOLERANCE, "a unit tangent")
+		assert_almost_eq(tangent.dot(normals[index]), 0.0, TOLERANCE, "square to the surface")
 
 
 # ---- and the part that makes it cloth ----------------------------------------
