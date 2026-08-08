@@ -149,11 +149,11 @@ func test_the_logo_is_framed_rather_than_pasted_on() -> void:
 
 
 func test_every_borrowed_model_is_credited_where_a_player_can_read_it() -> void:
-	# CC-BY 4.0 is the licence the cars, the tyre cleaner's bottle and the driveway
-	# all arrive under, and attribution is a condition of it, not a courtesy. A
-	# file in the repository does not discharge that — the person playing the game
-	# never sees one — so the credit has to be on a screen, and this is the screen
-	# every player passes through.
+	# CC-BY 4.0 is the licence the cars, the tyre cleaner's bottle, the pressure
+	# washer and the driveway all arrive under, and attribution is a condition of
+	# it, not a courtesy. A file in the repository does not discharge that — the
+	# person playing the game never sees one — so the credit has to be on a screen,
+	# and this is the screen every player passes through.
 	#
 	# Every work, and all three parts of each by name, because the licence asks
 	# for all three and a line that lost one of them would still look like a
@@ -170,6 +170,7 @@ func test_every_borrowed_model_is_credited_where_a_player_can_read_it() -> void:
 	var borrowed: Array[Array] = [
 		["Generic passenger car pack", "Comrade1280"],
 		["Kitchen Spray", "Jesus Osco"],
+		["homemade flamethrower", "excellenthe"],
 		["Sunken Driveway Parking Spot", "jimbogies"],
 	]
 	for work: Array in borrowed:
@@ -191,6 +192,37 @@ func test_the_credit_is_actually_on_the_screen() -> void:
 	var design: Vector2i = get_tree().root.content_scale_size
 	assert_lte(box.end.y, float(design.y), "the credit is off the bottom of the picture")
 	assert_true(credits.is_visible_in_tree(), "the credit must be drawn")
+
+
+func test_the_credit_clears_the_words_on_the_pill_above_it() -> void:
+	# The other half of "actually on the screen": a credit drawn through the How to
+	# Play label is on the screen and unreadable, which is the failure the third
+	# line (#114) came within a couple of pixels of and the fourth (#154) would have
+	# walked straight into. The menu gave 44 px off the lockup and 44 off the
+	# column's container to buy the room — src/screens/main_menu.tscn has that
+	# arithmetic — and this is the measurement that says it was enough.
+	#
+	# The pill's [i]text[/i] and not the pill: the button is 168 px of rounded plate
+	# with 61 px of type centred in it, so its bottom edge sits some 53 px below
+	# anything a player reads, and asserting on the plate would fail a layout that
+	# looks perfect. Where the ink ends is the middle of the button plus half the
+	# font's own ascent-plus-descent, read off the theme at the size the button is
+	# actually drawing rather than written down here — the same reason
+	# [method GameScreen.dress_quiet] is asked for the shape of a pill instead of
+	# this file knowing it.
+	var credits: Label = _screen.get_node("%Credits") as Label
+	var pill: Button = _screen.get_node("%HowToPlay") as Button
+	var font: Font = pill.get_theme_font("font")
+	var size: int = pill.get_theme_font_size("font_size")
+	var ink: float = (
+		pill.get_global_rect().get_center().y
+		+ (font.get_ascent(size) + font.get_descent(size)) * 0.5
+	)
+	assert_gte(
+		credits.get_global_rect().position.y,
+		ink,
+		"the credit is drawn through the words on the How to Play pill"
+	)
 
 
 func test_the_font_can_draw_the_credit() -> void:

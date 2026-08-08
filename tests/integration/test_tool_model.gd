@@ -48,6 +48,17 @@ const UNTURNED_MAX: float = 0.999
 ## a special case, which is the point of testing at it.
 const LOPSIDED: Vector3 = Vector3(0.1, 1.0, 0.1)
 
+## How far apart a fit's three factors have to be before "what would leaving the
+## normals alone cost" is a question with an answer.
+##
+## A ratio of the largest to the smallest, and 1.01 is a long way from every fit
+## on the belt: the window bottle's is 2.23, the tyre bottle's 1.27, and the
+## pressure washer's — whose extent is its own mesh's box at one scale, on
+## purpose — is 1.0013. So this separates a fit that is uniform by design from
+## every fit that is merely gentle, and it does not sit near enough to either to
+## be tuning.
+const LOPSIDED_ENOUGH: float = 1.01
+
 ## A path with nothing behind it, for the one test that asks what a missing model
 ## does. Under [code]assets/models/[/code] rather than somewhere obviously fake so
 ## that it is the same kind of path a typo in the catalogue would produce.
@@ -77,13 +88,27 @@ func _built(tool: DetailingTool, extent: Vector3) -> ToolModel:
 ## normal tests below measure is the arithmetic that class does to this array, so
 ## a test that read the array back through it would be grading the fit against
 ## itself.
+##
+## Depth first, and that is not tidiness. The two bottles are baked by this
+## project and their mesh hangs straight off the root; the pressure washer is a
+## Sketchfab download and its mesh is two nodes down, under the wrapper and the
+## scene root the exporter writes. A search of the root's own children finds
+## nothing there and would hand every test below a null to measure.
 func _source_mesh(model_path: String) -> Mesh:
 	var scene: Node = (load(model_path) as PackedScene).instantiate()
 	autofree(scene)
-	for child: Node in scene.get_children():
-		var found: MeshInstance3D = child as MeshInstance3D
+	return _mesh_under(scene)
+
+
+## The first mesh at or under [param node], depth first.
+func _mesh_under(node: Node) -> Mesh:
+	var here: MeshInstance3D = node as MeshInstance3D
+	if here != null and here.mesh != null:
+		return here.mesh
+	for child: Node in node.get_children():
+		var found: Mesh = _mesh_under(child)
 		if found != null:
-			return found.mesh
+			return found
 	return null
 
 
@@ -211,14 +236,14 @@ func test_the_models_own_textures_survive_the_fit() -> void:
 			assert_not_null(surface.albedo_texture, "%s: and texture %d" % [tool.display_name, at])
 
 
-func test_the_two_bottles_do_not_share_one_texture() -> void:
-	# Two bottles that came out of the same tin of paint are one bottle as far as
-	# a glance at the corner of the screen is concerned. Kept as a test after the
-	# tyre bottle stopped being a re-skin of the window one, because what it
-	# guards is not that history: both are extracted into
-	# [code]assets/models/cleaning_spray/[/code] as PNGs named after the
-	# [code].glb[/code] they came out of, and a re-export that renames one onto
-	# the other's file is silent everywhere else.
+func test_no_two_modelled_tools_share_one_texture() -> void:
+	# Two tools that came out of the same tin of paint are one tool as far as a
+	# glance at the corner of the screen is concerned. Kept as a test after the
+	# tyre bottle stopped being a re-skin of the window one, because what it guards
+	# is not that history: every one of these textures is extracted out of its
+	# [code].glb[/code] on import and named after it, into a folder that now holds
+	# three models' worth of them, and a re-export that renames one onto another's
+	# file is silent everywhere else.
 	var textures: Array[Texture2D] = []
 	for tool: DetailingTool in _modelled():
 		var surface: StandardMaterial3D = (
@@ -269,8 +294,22 @@ func test_a_fit_that_left_the_normals_alone_would_fail_the_two_tests_above() -> 
 	# they would both pass over a class that copied the array across untouched —
 	# which is the exact bug they exist for. So: measure the same worst vertex
 	# against the untouched normal, and require it to miss.
+	#
+	# [b]Except where the fit really is uniform, which is not a loophole.[/b] The
+	# power wash's catalogue extent is its mesh's own box at one scale — see
+	# [method DetailingTool.catalogue], which picks it that way so the pipe stays
+	# round — so its three fit factors agree to a tenth of a per cent, and a normal
+	# turned by the reciprocal of that [i]is[/i] the normal left alone. There is
+	# nothing to prove at that extent and no bug that could hide there.
+	# [constant LOPSIDED] still asks the question of every tool including that one,
+	# and the count at the end is what stops "skip it" from quietly becoming
+	# "skip them all".
+	var proved: int = 0
 	for tool: DetailingTool in _modelled():
 		for extent: Vector3 in [tool.extent, LOPSIDED]:
+			var fit: Vector3 = _fit_of(tool, extent)
+			if maxf(fit.x, maxf(fit.y, fit.z)) / minf(fit.x, minf(fit.y, fit.z)) < LOPSIDED_ENOUGH:
+				continue
 			var fitted: Mesh = _built(tool, extent).mesh
 			var worst: float = _worst_turned(fitted, _source_mesh(tool.model), Vector3.ONE)
 			assert_lt(
@@ -281,6 +320,8 @@ func test_a_fit_that_left_the_normals_alone_would_fail_the_two_tests_above() -> 
 					% [tool.display_name, extent]
 				)
 			)
+			proved += 1
+	assert_gt(proved, 0, "every fit was skipped, so this test proved nothing at all")
 
 
 func test_a_model_that_is_not_there_is_an_empty_proxy_rather_than_a_broken_belt() -> void:

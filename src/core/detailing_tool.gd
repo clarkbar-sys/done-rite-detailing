@@ -16,11 +16,11 @@
 ## buried in a mesh nobody can diff, and a real model drops in later without
 ## moving anything else.
 ##
-## [b]Two of them have now dropped in, and nothing else moved.[/b] The spray
-## bottles carry a [member model] — a glTF exported out of
-## [code]src-models/[/code] — and [ToolModel] fits it into exactly the
+## [b]Three of them have now dropped in, and nothing else moved.[/b] The two spray
+## bottles and the power wash carry a [member model] — a glTF under
+## [code]assets/models/[/code] — and [ToolModel] fits it into exactly the
 ## [member extent] box the cylinder occupied. So this table still decides how big
-## a bottle is, the roll-up still draws its icon from the same row, and the three
+## a bottle is, the roll-up still draws its icon from the same row, and the two
 ## tools with no model in their row are still primitives. What a model brings that
 ## a primitive could not is a texture, which is the whole reason to have one.
 class_name DetailingTool
@@ -83,7 +83,7 @@ var roughness: float
 ## The modelled mesh this tool is drawn by in the player's hands, as a
 ## [code]res://[/code] path, or [code]""[/code] for a tool still drawn as the
 ## primitive above. This is the "a real model drops in later" the class docs
-## promise, arriving for the two spray bottles.
+## promise, arriving for the two spray bottles and now for the power wash.
 ##
 ## [b]Everything above still applies to a tool that has one.[/b] [ToolModel]
 ## fits the mesh into exactly the [member extent] box the primitive occupied, so
@@ -128,16 +128,43 @@ func _init(
 ## startup is not a cost worth designing around.
 static func catalogue() -> Array[DetailingTool]:
 	var tools: Array[DetailingTool] = []
-	# A wand: thin, long, and the only metal on the belt.
+	# A wand: long, aimed, and the only metal on the belt. Modelled now — see
+	# [code]assets/models/pressure_washer/ATTRIBUTION.txt[/code] — and the model is
+	# what all three numbers below come from.
+	#
+	# [b]All three, because the fit is per axis.[/b] [ToolModel] maps the mesh's own
+	# box onto this one axis by axis, and the mesh is not a bare barrel: it is
+	# 5.632 x 21.391 x 14.655 in its own units, a pipe with a gas bottle strapped
+	# across it. The old 0.06 x 0.72 x 0.06 would have squashed that to a third of
+	# its width and a twelfth of its depth. These three are the mesh's own box at
+	# one scale, so the fit is uniform to a tenth of a per cent and the pipe stays
+	# round.
+	#
+	# [b]And the scale is the hand's clearance budget rather than taste.[/b] This is
+	# the one tool that stays in the hand and turns about it, so what it spends is
+	# the corner of this box: it has to stay inside the 0.45 m a held thing may
+	# reach and in front of the camera's 0.05 m near plane, at rest and at every
+	# press the glass allows. Both are measured — in
+	# [code]tests/integration/test_view_model.gd[/code] and
+	# [code]tests/integration/test_play_screen_wand.gd[/code] — and both failed on
+	# the way here rather than in theory. At the 0.72 m the barrel used to be, the
+	# corner reaches 0.495 m and comes to 0.03 m of the lens; at 0.60 m the reach is
+	# fine and the lens is still only 0.037 m away. At 0.55 m the corner is 0.391 m
+	# out and clears the near plane by 0.068 m at rest and 0.072 m aimed.
+	#
+	# So the tool is a fifth shorter than the barrel it replaces and several times
+	# bulkier, which is the trade this model is: a thin 6 cm tube could be long
+	# because it was thin, and a pipe with a bottle across it cannot.
 	tools.append(
 		DetailingTool.new(
 			Id.POWER_WASH,
 			"Power Wash",
 			Shape.CYLINDER,
-			Vector3(0.06, 0.72, 0.06),
+			Vector3(0.145, 0.550, 0.377),
 			Color(0.78, 0.80, 0.84),
 			0.9,
-			0.25
+			0.25,
+			"res://assets/models/pressure_washer/homemade_flamethrower.glb"
 		)
 	)
 	# Stretched, as specified — a cube reads as a dice, and the thing that says

@@ -87,11 +87,22 @@ script = ExtResource("5_arrow")
 ; children are actually drawn — before a sibling earlier in the tree ever saw
 ; the press. Play and How to Play are unaffected either way: a child control's
 ; own filter, not its container's, decides whether it reacts to a point over it.
+;
+; `offset_bottom` is half the ground the menu gave when the fourth borrowed model
+; arrived (#154); the other half came off the lockup below. The column centres in
+; what is left rather than in the whole screen, and centring is why 44 buys 22: a
+; column given 44 px less room moves its bottom edge up by half of it. The two
+; halves together take the pills up 44 px, and 26 of that is what the fourth line
+; of credit costs — a 23 px line plus the 3 px `line_spacing` above it. The
+; remaining 18 is spent on something the three-line credit never had: its top line
+; now starts below the last row of ink in "How to Play" rather than a few pixels
+; into it, which tests/integration/test_main_menu.gd measures off the font.
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = -44.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -105,18 +116,20 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 
-; 273x229 against the title card's 380x319: the lockup gives up height twice
-; over, once so the second pill fits under it and again so the car's name does,
-; and both times so the column does not run off a 720-tall screen into the credit
-; line along the bottom. 229 is 16 less than the 245 it was, which is exactly
-; what the name costs after the 20 px spacer it replaces is given back — so the
-; column is the same height it has been since the menu existed. Same picture,
-; same card, same mipmapped filter — see src/screens/title_screen.gd for why the
-; filter is not this project's default.
+; 220x185 against the title card's 380x319: the lockup gives up height three
+; times over — once so the second pill fits under it, again so the car's name
+; does, and now so a fourth line of credit fits along the bottom — and every time
+; so the column does not run off a 720-tall screen into the credit line. 185 is 44
+; less than the 229 it was, and it is the second of the two halves the fourth
+; credit cost: 44 here and 44 off the Center container above, which between them
+; take the How to Play pill up 44 px. The width follows the height rather than
+; being tuned on its own — 220 is 185 at the artwork's own 1.19, so the lockup is
+; smaller and not squashed. Same picture, same card, same mipmapped filter — see
+; src/screens/title_screen.gd for why the filter is not this project's default.
 [node name="Logo" type="TextureRect" parent="Center/Column/LogoCard"]
 unique_name_in_owner = true
 texture_filter = 4
-custom_minimum_size = Vector2(273, 229)
+custom_minimum_size = Vector2(220, 185)
 layout_mode = 2
 texture = ExtResource("3_logo")
 expand_mode = 1
@@ -169,16 +182,16 @@ text = "How to Play"
 ; The credits for the borrowed models, along the bottom of the menu.
 ;
 ; CC-BY 4.0 is the licence the ten models in assets/models/cars/ arrive under —
-; and the licence the tyre cleaner's bottle and the driveway all three of them
-; are used on arrive under too — and attribution is a condition of it, not a
-; courtesy. So it has to be somewhere a player can actually read, and this is the
-; screen every player passes through on the way to the bay. The same lines are in
-; README.md and in the three ATTRIBUTION.txt files beside the assets; this is the
-; copy the licence is actually satisfied by, because the others ship to whoever
-; clones the repo rather than to whoever plays the game.
+; and the licence the tyre cleaner's bottle, the pressure washer and the driveway
+; all four of them are used on arrive under too — and attribution is a condition
+; of it, not a courtesy. So it has to be somewhere a player can actually read, and
+; this is the screen every player passes through on the way to the bay. The same
+; lines are in README.md and in the four ATTRIBUTION.txt files beside the assets;
+; this is the copy the licence is actually satisfied by, because the others ship
+; to whoever clones the repo rather than to whoever plays the game.
 ;
 ; One line per work, and all but the first link the author's page rather than the
-; model's: the car pack has a skfb.ly short link and the other two do not, and
+; model's: the car pack has a skfb.ly short link and the other three do not, and
 ; their full URLs are 60-odd characters of hex that would wrap the line on a
 ; phone. The direct link to each model is in the ATTRIBUTION.txt beside it and in
 ; README.md.
@@ -191,6 +204,18 @@ text = "How to Play"
 ; foot of the menu by design and this is a little smaller again, which is the
 ; cost of a third borrowed model; a fourth would need the menu to give ground
 ; rather than the type.
+;
+; The fourth line arrived with the pressure washer (#154), and the menu gave the
+; ground rather than the type, exactly as that sentence says it would. Four lines
+; at 16 is 101 px where three were 75, and the menu found the 26 by moving the
+; pills 44 px up — 44 off the lockup and 44 off the Center container, each worth
+; half of itself to a centred column. The type is still 16, and the 18 px of
+; change bought the credit something it did not have at three lines: its top line
+; now starts below the last row of ink in "How to Play" instead of a few pixels
+; into it. There is no fifth line's worth of slack up there: a fifth borrowed
+; model wants the same two edits again, and it is worth asking at that point
+; whether the works should be laid out in two columns instead of five lines down
+; the foot of a phone.
 ;
 ; A credit laid out off the bottom of the picture is not a credit —
 ; tests/integration/test_main_menu.gd measures that rather than trusting the
@@ -221,7 +246,7 @@ offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_font_sizes/font_size = 16
-text = "Car models: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) — CC BY 4.0\nSpray bottle: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nDriveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0"
+text = "Car models: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) — CC BY 4.0\nSpray bottle: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nPressure washer: “homemade flamethrower” by excellenthe (sketchfab.com/excellenthe) — CC BY 4.0\nDriveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0"
 autowrap_mode = 3
 
 [node name="Build" type="Label" parent="."]

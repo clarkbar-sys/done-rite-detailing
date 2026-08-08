@@ -129,13 +129,20 @@ func test_every_proxy_is_big_enough_to_see() -> void:
 			assert_gt(tool_carried.extent.y, 0.0, "%s has no height" % tool_carried.display_name)
 
 
-func test_the_spray_bottles_are_drawn_by_a_model_and_the_rest_are_not() -> void:
+func test_the_sprayers_are_drawn_by_a_model_and_the_rest_are_not() -> void:
 	# Which tools have art and which are still primitives, said once here so that
-	# nothing downstream has to keep its own list. The three without a model are
-	# not an oversight — [ViewModel] draws them from [member DetailingTool.shape]
-	# and will go on doing so until somebody exports them.
+	# nothing downstream has to keep its own list. The two without a model are not
+	# an oversight — [ViewModel] draws them from [member DetailingTool.shape] and
+	# will go on doing so until somebody exports them.
+	#
+	# The three with one are the three that spray: two bottles and, since #154, the
+	# power wash. That is a coincidence of which art turned up rather than a rule,
+	# and the assertion below is a list precisely so nobody starts reading it as
+	# one.
 	var modelled: Array[DetailingTool.Id] = [
-		DetailingTool.Id.WINDOW_CLEANER, DetailingTool.Id.TIRE_ENGINE_CLEANER
+		DetailingTool.Id.POWER_WASH,
+		DetailingTool.Id.WINDOW_CLEANER,
+		DetailingTool.Id.TIRE_ENGINE_CLEANER,
 	]
 	for tool_carried: DetailingTool in _tools:
 		assert_eq(

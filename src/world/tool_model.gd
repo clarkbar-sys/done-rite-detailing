@@ -1,5 +1,5 @@
 ## A tool drawn as a modelled mesh instead of as a primitive — which, so far, is
-## the two spray bottles.
+## the two spray bottles and the power wash.
 ##
 ## [b]What this is for.[/b] [DetailingTool] says a tool is a shape, a size and a
 ## colour, and [method ViewModel._mesh_for] has always turned that into a
@@ -26,11 +26,24 @@
 ## half-extents, so the exported bottle is twice the size the catalogue asks for.
 ## The tyre bottle has the opposite problem and it is not a mistake either: it is
 ## a real 27 cm trigger sprayer modelled in real metres, which is a perfectly good
-## number and is not the 30 cm the catalogue gives that tool. Honouring either
-## file would hand the player a bottle at a size nothing else in the game agrees
-## with. Reading the mesh's box instead makes the export's scale irrelevant:
-## re-export the same shape at any scale at all and the thing in the player's
-## hand does not move.
+## number and is not the 30 cm the catalogue gives that tool. The pressure washer
+## is a third kind of the same thing: a download whose vertices are in no unit at
+## all — 21 of them from end to end, with the root node carrying the scale that
+## would make it metres, and this class never looks at a node. Honouring any of
+## the three would hand the player a tool at a size nothing else in the game
+## agrees with. Reading the mesh's box instead makes the export's scale
+## irrelevant: re-export the same shape at any scale at all and the thing in the
+## player's hand does not move.
+##
+## [b]Its orientation is not thrown away, and cannot be.[/b] The fit is axis by
+## axis, so the mesh has to arrive with its long axis on [code]+Y[/code] and its
+## business end at the top — which is where a [CylinderMesh] put them, which is
+## what [method ViewModel._build] hangs the [code]Muzzle[/code] marker off, and
+## which all three of these models happen to honour. A mesh lying down in its own
+## space would be fitted lying down, at the length the catalogue meant for its
+## width. That is a property of an asset rather than something to correct here:
+## correcting it would mean this class carrying a per-model turn, which is the
+## table [DetailingTool] already is.
 ##
 ## [b]Fitted by rebuilding the mesh, not by scaling the node.[/b] The proxy's
 ## transform is rewritten every frame by its [ToolCarry] out of an orthonormal
