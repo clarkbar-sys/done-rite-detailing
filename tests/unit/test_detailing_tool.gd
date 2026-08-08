@@ -129,12 +129,14 @@ func test_every_proxy_is_big_enough_to_see() -> void:
 			assert_gt(tool_carried.extent.y, 0.0, "%s has no height" % tool_carried.display_name)
 
 
-func test_the_bottles_and_the_sponge_are_drawn_by_a_model_and_the_rest_are_not() -> void:
+func test_everything_but_the_rag_is_drawn_by_a_model() -> void:
 	# Which tools have art and which are still primitives, said once here so that
-	# nothing downstream has to keep its own list. The two without a model are
-	# not an oversight — [ViewModel] draws them from [member DetailingTool.shape]
-	# and will go on doing so until somebody exports them.
+	# nothing downstream has to keep its own list. The rag is the last one without
+	# a model, and it is not an oversight — [ViewModel] draws it from
+	# [member DetailingTool.shape], through [ClothRag], and will go on doing so
+	# until somebody exports one.
 	var modelled: Array[DetailingTool.Id] = [
+		DetailingTool.Id.POWER_WASH,
 		DetailingTool.Id.SPONGE,
 		DetailingTool.Id.WINDOW_CLEANER,
 		DetailingTool.Id.TIRE_ENGINE_CLEANER,
@@ -187,6 +189,25 @@ func test_a_tool_is_a_primitive_unless_it_says_otherwise() -> void:
 		0.5
 	)
 	assert_eq(built.model, "", "a tool with no model named is drawn by its primitive")
+	assert_eq(built.model_turn, Vector3.ZERO, "and a tool that names no turn is not turned")
+
+
+func test_only_a_model_authored_the_wrong_way_up_asks_to_be_turned() -> void:
+	# A turn is a correction to one asset and not a knob — see
+	# [member DetailingTool.model_turn]. Two ways it could quietly stop meaning
+	# that, and both are worth a line: a turn on a row with no model to turn is a
+	# number nothing reads, and a second tool growing one would mean the belt has
+	# started collecting artists' frames rather than fixing one.
+	var turned: Array[String] = []
+	for tool_carried: DetailingTool in _tools:
+		if tool_carried.model_turn == Vector3.ZERO:
+			continue
+		assert_false(
+			tool_carried.model.is_empty(),
+			"%s asks to be turned and has nothing to turn" % tool_carried.display_name
+		)
+		turned.append(tool_carried.display_name)
+	assert_eq(turned, ["Power Wash"], "the power wash is the one model authored Z-up")
 
 
 func test_a_tool_keeps_what_it_was_built_with() -> void:
@@ -198,9 +219,11 @@ func test_a_tool_keeps_what_it_was_built_with() -> void:
 		Color(0.1, 0.2, 0.3),
 		0.4,
 		0.5,
-		"res://nowhere.glb"
+		"res://nowhere.glb",
+		Vector3(0.0, 0.0, 180.0)
 	)
 	assert_eq(built.model, "res://nowhere.glb")
+	assert_eq(built.model_turn, Vector3(0.0, 0.0, 180.0))
 	assert_eq(built.id, DetailingTool.Id.SPONGE)
 	assert_eq(built.display_name, "Test Tool")
 	assert_eq(built.shape, DetailingTool.Shape.BOX)

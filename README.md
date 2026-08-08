@@ -272,6 +272,7 @@ assets/brand/          the logo the game shares with the business it is named af
 assets/models/cars/    the ten cars the bay parks, baked out of the pack credited below
 assets/models/cleaning_spray/  the two spray bottles the belt carries
 assets/models/sponge/  the sponge the belt carries, baked out of the model credited below
+assets/models/pressure_washer/  the wand the belt carries, credited below
 assets/models/driveway/  the ground the whole game happens on, credited below
 src/core/              cross-cutting code (shared helpers, game states, process-global facts)
 src/main/              the entry scene — owns the state machine and swaps screens
@@ -339,6 +340,13 @@ The sponge you wash the paint with is baked out of **"Sponge"**
 (https://sketchfab.com/3d-models/sponge-97aee64edf0c4521b82416f3b30c61ce)
 by **Aullwen** (https://sketchfab.com/Aullwen), under the same licence again.
 
+The pressure washer you hold for the power wash is
+**"homemade flamethrower"**
+(https://sketchfab.com/3d-models/homemade-flamethrower-1d41ddbb089a4f2ab0d8a0fe780936d6)
+by **excellenthe** (https://sketchfab.com/excellenthe), under the same licence
+again. It is a flamethrower where the game wants a wand, and that is the joke:
+the belt's first tool is the one thing on it that already read as dangerous.
+
 The driveway the car is parked on is
 **"Sunken Driveway Parking Spot"**
 (https://sketchfab.com/3d-models/sunken-driveway-parking-spot-2cffc511a53641a6a0f46133f85989c6)
@@ -349,14 +357,18 @@ credits are in three places: in the game, along the bottom of the main menu;
 beside the assets, in
 [`assets/models/cars/ATTRIBUTION.txt`](./assets/models/cars/ATTRIBUTION.txt),
 [`assets/models/cleaning_spray/ATTRIBUTION.txt`](./assets/models/cleaning_spray/ATTRIBUTION.txt),
-[`assets/models/sponge/ATTRIBUTION.txt`](./assets/models/sponge/ATTRIBUTION.txt)
+[`assets/models/sponge/ATTRIBUTION.txt`](./assets/models/sponge/ATTRIBUTION.txt),
+[`assets/models/pressure_washer/ATTRIBUTION.txt`](./assets/models/pressure_washer/ATTRIBUTION.txt)
 and
 [`assets/models/driveway/ATTRIBUTION.txt`](./assets/models/driveway/ATTRIBUTION.txt);
 and here. The first three are processed derivatives — see
 `scripts/build-car-pack.py`, `scripts/build-tire-cleaner.py` and
-`scripts/build-sponge.py` — and remain under CC-BY 4.0; the driveway is the
-artist's own file, unmodified, placed and scaled by
-[`src/world/ground.tscn`](./src/world/ground.tscn).
+`scripts/build-sponge.py` — and remain under CC-BY 4.0; the pressure washer and
+the driveway are the artists' own files, unmodified, with the sizing, righting
+and placing all done by the game around them —
+[`DetailingTool.catalogue`](./src/core/detailing_tool.gd) and
+[`ToolModel`](./src/world/tool_model.gd) for the one,
+[`src/world/ground.tscn`](./src/world/ground.tscn) for the other.
 
 Everything else in this repository is the project's own and is covered by the
 licence below.

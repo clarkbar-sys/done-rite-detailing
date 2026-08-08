@@ -37,10 +37,11 @@ const EYE_MAX_HEIGHT: float = 2.0
 ## one from across the room.
 const REACHED_THE_CAR: float = 3.0
 
-## How far a held thing may stick out from the anchor in any direction. Half the
-## longest tool on the belt (the power wash wand, 0.72 m) plus room to spare, so
-## the clearance below is a promise about the proxies #42 hangs here and not just
-## about the empty node they hang from.
+## How far a held thing may stick out from the anchor in any direction. The
+## corner of the biggest box on the belt — the power wash, a modelled pressure
+## washer 0.55 m long and 0.38 m across — reaches 0.391 m of it, so the clearance
+## below is a promise about the proxies #42 hangs here and not just about the
+## empty node they hang from.
 const HELD_REACH: float = 0.45
 
 ## Long enough for the standoff to have eased from where the standing shot puts
