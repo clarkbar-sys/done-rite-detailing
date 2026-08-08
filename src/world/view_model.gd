@@ -18,14 +18,14 @@
 ## here is only the part the catalogue has no opinion about: how a hand holds the
 ## thing.
 ##
-## [b]Three of the five are modelled meshes now, and the sentence above is why
-## that changed nothing.[/b] The two spray bottles and the power wash name a
-## [member DetailingTool.model] and are built by [ToolModel], which fits the
+## [b]Four of the five are modelled meshes now, and the sentence above is why
+## that changed nothing.[/b] The two spray bottles, the sponge and the power wash
+## name a [member DetailingTool.model] and are built by [ToolModel], which fits the
 ## exported mesh into exactly the [member DetailingTool.extent] box the
-## [CylinderMesh] filled — same size, same origin, same box every clearance below
-## is measured against. The one thing a modelled tool does not take from the
-## catalogue is its surface, because it arrives wearing a texture and
-## [method _build] would otherwise paint over it.
+## [CylinderMesh] or [BoxMesh] filled — same size, same origin, same box every
+## clearance below is measured against. The one thing a modelled tool does not
+## take from the catalogue is its surface, because it arrives wearing a texture
+## and [method _build] would otherwise paint over it.
 ##
 ## [b]The hand is one place; the tool turns in it.[/b] The offset into the corner
 ## of the frame belongs to the anchor and is set in [code]garage.tscn[/code] — it
@@ -472,10 +472,11 @@ func _build(tool: DetailingTool, carry: ToolCarry) -> MeshInstance3D:
 ## opinion on — the size, the plane it starts as, the material it wears — is
 ## unchanged, which is why the swap can be this small.
 ##
-## The two spray bottles: a [ToolModel] is a [MeshInstance3D] carrying an
-## imported mesh, fitted into the same [member DetailingTool.extent] box
-## the [CylinderMesh] filled. Asked by whether the tool names a model rather than
-## by its id, so the third bottle is a row in the catalogue and not an edit here.
+## The other four: a [ToolModel] is a [MeshInstance3D] carrying an imported mesh,
+## fitted into the same [member DetailingTool.extent] box the primitive filled.
+## Asked by whether the tool names a model rather than by its id, which is the
+## whole reason the sponge and then the power wash could be modelled without a
+## line changing here — and why the next one is a row in the catalogue too.
 func _instance_for(tool: DetailingTool) -> MeshInstance3D:
 	if tool.id == DetailingTool.Id.DRYING_RAG:
 		return ClothRag.new(Vector2(tool.extent.x, tool.extent.z))
@@ -603,13 +604,12 @@ func _facing() -> Vector3:
 ## a [PlaneMesh] takes `x` and `z`. Getting that wrong makes a 10 cm bottle 20 cm
 ## thick, which looks like a scaling bug rather than like the mistake it is.
 ##
-## [b]Only the sponge comes through here today[/b], and the other two branches are
-## kept anyway. Every cylinder on the belt is a model now and the rag is a
-## [ClothRag], so [method _instance_for] answers before this is reached for four
-## of the five — but which primitive a tool falls back to is the catalogue's
-## promise rather than a fact about the art that happens to exist this month, and
-## deleting the fallback is how the next tool added without a mesh becomes
-## invisible instead of a cylinder.
+## [b]No tool on the belt comes through here today[/b], and all three branches are
+## kept anyway. Four of the five name a model and the fifth is a [ClothRag], so
+## [method _instance_for] answers before this is ever reached — but which
+## primitive a tool falls back to is the catalogue's promise rather than a fact
+## about the art that happens to exist this month, and deleting the fallback is
+## how the next tool added without a mesh becomes invisible instead of a cylinder.
 func _mesh_for(tool: DetailingTool) -> Mesh:
 	match tool.shape:
 		DetailingTool.Shape.CYLINDER:
