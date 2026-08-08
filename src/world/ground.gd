@@ -15,8 +15,9 @@
 ## argued.
 ##
 ## [b]This scene exists because the model's origin is not the room's.[/b] The
-## glTF is authored Z-up, about a point 0.403 m below its own concrete, with the
-## pad's footprint 0.125 m to one side of that point and 0.247 m along it.
+## glTF is authored Z-up, about a point 0.127 m below the face of its concrete a
+## car parks on, with the pad's footprint 0.125 m to one side of that point and
+## 0.247 m along it.
 ## Godot's importer fixes the first of those and none of the rest, so something
 ## has to hold the one transform that turns the model's metres into a floor —
 ## and putting it here rather than in [code]src/world/garage.tscn[/code] is what
@@ -48,14 +49,25 @@
 ## re-import with a box ticked.
 ##
 ## [b]What it is for, beyond being drawn.[/b] Three questions the rest of the
-## room used to answer by reading a box's scale off the scene file: how high the
-## drive is ([method drive]), which is where a car of any height gets sat; how
-## far the modeled ground reaches ([method extent]), which is the fence the
-## camera and everything held in front of it stay inside; and how high the grass
-## is at a given spot ([method settle]), which is what [Grove] plants its trees
-## on now that the lawn is a slope instead of a box with a flat top. All three
-## are measured off the meshes themselves, so ground that is re-placed or
-## re-scaled moves them together and nothing has to remember to follow.
+## room used to answer by reading a box's scale off the scene file: how big the
+## concrete is and how high its box reaches ([method drive]), which is what says
+## the longest car in the pack fits on it; how far the modeled ground reaches
+## ([method extent]), which is the fence the camera and everything held in front
+## of it stay inside; and how high the ground is at a given spot
+## ([method settle]), which is what [Grove] plants its trees on now that the lawn
+## is a slope instead of a box with a flat top — and what [Garage] parks the car
+## on, for the same reason. All three are measured off the meshes themselves, so
+## ground that is re-placed or re-scaled moves them together and nothing has to
+## remember to follow.
+##
+## [b][method settle] and not [method drive] is the one to stand something
+## on.[/b] They are two measurements of the same concrete and they disagree by a
+## third of a metre, because the pad is sunk into kerb walls: the box's lid is
+## the kerb, the surface underfoot is the pad. Parking read the lid for four
+## releases and floated all ten cars 34.5 cm over their own driveway (#167). The
+## rule that falls out of it is worth stating once here rather than rediscovering
+## per caller — a box tells you how much room there is, a surface tells you what
+## is under your feet, and only one of those answers "where does this go".
 class_name Ground
 extends Node3D
 
@@ -68,16 +80,26 @@ extends Node3D
 @export var concrete: NodePath
 
 
-## Where the top of the drive is and how much of it there is, as a box in world
-## space — the concrete itself, not the field it is let into.
+## How much concrete there is and how far it reaches, as a box in world space —
+## the concrete itself, not the field it is let into.
 ##
-## [b]This is the room's floor, measured rather than declared.[/b] Every car in
-## the pack is authored about its own mid-height and the ten are 1.04 m to 1.77 m
-## tall, so [method Garage._park_the_car] has to lift each one by half of itself
-## onto something; that something is [code]drive().end.y[/code], which this scene
-## puts at zero and would go on reporting truthfully if it did not. The width and
-## depth are here for the same reason — a car parked on ground it overhangs is a
-## thing a test can notice before a player does.
+## [b]The width and depth are what this is for.[/b] The pack runs from 3.26 m of
+## compact to 5.19 m of pickup and the room parks whichever one the player
+## picked, so "does the longest car fit on the drive, with room to walk round it"
+## is a question with an answer, and a car parked on ground it overhangs is a
+## thing a test can notice before a player does. The x and z are also the fence
+## the walk is held inside.
+##
+## [b]The height is honest and is not the floor.[/b] It is the box round the
+## concrete [i]mesh[/i], and that mesh is a sunken pad with kerb walls standing
+## up either side of it — so [code]end.y[/code] is the top of the kerb, about
+## 0.345 m above the surface a car actually rests on, and
+## [code]position.y[/code] is the underside of the slab. Nothing should be sat on
+## either. [method Garage._park_the_car] sat every car in the pack on
+## [code]end.y[/code] until #167 and floated all ten of them by that 0.345; it
+## asks [method settle] now, which is the measurement that means "what is under
+## this spot". Filtering the drivable face back out of this box would mean
+## walking triangles inside one mesh for an answer [method settle] already gives.
 ##
 ## An empty box if [member concrete] names nothing, which is the honest answer to
 ## having no measurement and the one that makes a caller's arithmetic obviously
@@ -118,6 +140,15 @@ func extent() -> AABB:
 ## in the wood could be planted from the same constant. The modeled lawn rises
 ## out of the drive to 1.17 m and does it unevenly, so a constant now buries a
 ## trunk on the bank or floats one over the hollow. [Grove] asks this instead.
+##
+## [b]So does the car, and it should have from the start.[/b] The concrete has
+## the same problem the lawn does in miniature: it is not flat either, it is a
+## pad sunk between kerbs, so the one number [method drive] can offer about
+## height is the top of the whole shape rather than the bit underfoot.
+## [method Garage._park_the_car] took that number and stood ten cars 34.5 cm over
+## their own driveway for four releases (#167). The spot it asks about is the
+## car's own position, so the answer follows the car if the room ever parks it
+## somewhere other than the middle.
 ##
 ## [b]NAN where there is no ground, and that is the useful part.[/b] The lawn
 ## wraps three sides of the pad and the fourth is open — the end the car drives
