@@ -1,11 +1,11 @@
-## Integration test for [ToolModel] — the modelled mesh the two spray bottles are
-## drawn as.
+## Integration test for [ToolModel] — the modelled mesh the two spray bottles and
+## the sponge are drawn as.
 ##
 ## Under tests/integration/ because a [ToolModel] is a node and because it loads
 ## a real asset: the whole class is about what comes out of
 ## [code]assets/models/[/code] and what shape it is once it has, neither of which
-## a unit test with no resource server behind it could answer. That the bottles
-## are then held, swapped and posed like every other tool is
+## a unit test with no resource server behind it could answer. That they are then
+## held, swapped and posed like every other tool is
 ## [code]tests/integration/test_view_model.gd[/code]'s job, and is not repeated
 ## here.
 ##
@@ -211,14 +211,13 @@ func test_the_models_own_textures_survive_the_fit() -> void:
 			assert_not_null(surface.albedo_texture, "%s: and texture %d" % [tool.display_name, at])
 
 
-func test_the_two_bottles_do_not_share_one_texture() -> void:
-	# Two bottles that came out of the same tin of paint are one bottle as far as
-	# a glance at the corner of the screen is concerned. Kept as a test after the
+func test_no_two_modelled_tools_share_one_texture() -> void:
+	# Two tools that came out of the same tin of paint are one tool as far as a
+	# glance at the corner of the screen is concerned. Kept as a test after the
 	# tyre bottle stopped being a re-skin of the window one, because what it
-	# guards is not that history: both are extracted into
-	# [code]assets/models/cleaning_spray/[/code] as PNGs named after the
-	# [code].glb[/code] they came out of, and a re-export that renames one onto
-	# the other's file is silent everywhere else.
+	# guards is not that history: every one of these is extracted beside its
+	# [code].glb[/code] as a PNG named after it, and a re-export that renames one
+	# onto another's file is silent everywhere else.
 	var textures: Array[Texture2D] = []
 	for tool: DetailingTool in _modelled():
 		var surface: StandardMaterial3D = (
