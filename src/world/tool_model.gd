@@ -1,5 +1,5 @@
 ## A tool drawn as a modelled mesh instead of as a primitive — which, so far, is
-## the two spray bottles.
+## the two spray bottles and the sponge.
 ##
 ## [b]What this is for.[/b] [DetailingTool] says a tool is a shape, a size and a
 ## colour, and [method ViewModel._mesh_for] has always turned that into a
@@ -26,11 +26,12 @@
 ## half-extents, so the exported bottle is twice the size the catalogue asks for.
 ## The tyre bottle has the opposite problem and it is not a mistake either: it is
 ## a real 27 cm trigger sprayer modelled in real metres, which is a perfectly good
-## number and is not the 30 cm the catalogue gives that tool. Honouring either
-## file would hand the player a bottle at a size nothing else in the game agrees
-## with. Reading the mesh's box instead makes the export's scale irrelevant:
-## re-export the same shape at any scale at all and the thing in the player's
-## hand does not move.
+## number and is not the 30 cm the catalogue gives that tool. The sponge is a
+## third answer again — a 16 cm one, which is a real sponge and is not the 24 cm
+## the catalogue hands the player. Honouring any of those files would put a tool
+## in the hand at a size nothing else in the game agrees with. Reading the mesh's
+## box instead makes the export's scale irrelevant: re-export the same shape at
+## any scale at all and the thing in the player's hand does not move.
 ##
 ## [b]Fitted by rebuilding the mesh, not by scaling the node.[/b] The proxy's
 ## transform is rewritten every frame by its [ToolCarry] out of an orthonormal
@@ -57,7 +58,16 @@
 ## of those is a real number rather than a rounding error, and it is the price of
 ## a model this class deliberately does not decimate — see
 ## [code]scripts/build-tire-cleaner.py[/code], which says the same thing about
-## the triangle count.
+## the triangle count. The sponge is at the other end of that range: 224
+## vertices, two orders of magnitude under the bottles, because everything that
+## makes it look like a sponge is in its normal map rather than in its geometry.
+##
+## [b]Which is what makes the sponge the one to look at if this arithmetic is
+## ever wrong.[/b] Its fit is a genuinely lopsided (1.47, 2.46, 1.56): a 16 cm
+## sponge into a box proportionally 67% thicker, see
+## [code]scripts/build-sponge.py[/code] — and it is six broad faces and a bevel,
+## where a bottle spreads the same error over thousands of small ones and it
+## reads as lighting.
 class_name ToolModel
 extends MeshInstance3D
 
@@ -103,15 +113,17 @@ static func _mesh_in(model_path: String) -> Mesh:
 ##
 ## "The first" rather than "the one" because a [code].glb[/code] may carry
 ## anything an artist left in the scene — an empty, a camera, a light — and the
-## bottles are one mesh each. A model that grows a second one wants a class that
-## keeps the hierarchy, not a silent second answer from here.
+## belt's models are one mesh each. A model that grows a second one wants a class
+## that keeps the hierarchy, not a silent second answer from here.
 ##
 ## [b]One mesh each is a property of the assets, and it is maintained.[/b] The
 ## tyre bottle is six modelled parts — body, neck, nozzle, two caps and a trigger
 ## — and [code]scripts/build-tire-cleaner.py[/code] flattens them into one mesh of
-## six surfaces on the way in, for exactly this contract. Read that way round,
-## the bake is what keeps the belt simple rather than this class being naive
-## about art.
+## six surfaces on the way in, for exactly this contract; the sponge arrives four
+## nodes deep under a Sketchfab exporter chain and
+## [code]scripts/build-sponge.py[/code] flattens that the same way. Read that way
+## round, the bakes are what keep the belt simple rather than this class being
+## naive about art.
 static func _first_mesh(node: Node) -> MeshInstance3D:
 	var here: MeshInstance3D = node as MeshInstance3D
 	if here != null and here.mesh != null:

@@ -18,13 +18,14 @@
 ## here is only the part the catalogue has no opinion about: how a hand holds the
 ## thing.
 ##
-## [b]Two of the five are modelled meshes now, and the sentence above is why that
-## changed nothing.[/b] The spray bottles name a [member DetailingTool.model] and
-## are built by [ToolModel], which fits the exported mesh into exactly the
-## [member DetailingTool.extent] box the [CylinderMesh] filled — same size, same
-## origin, same box every clearance below is measured against. The one thing a
-## modelled tool does not take from the catalogue is its surface, because it
-## arrives wearing a texture and [method _build] would otherwise paint over it.
+## [b]Three of the five are modelled meshes now, and the sentence above is why
+## that changed nothing.[/b] The two spray bottles and the sponge name a
+## [member DetailingTool.model] and are built by [ToolModel], which fits the
+## baked mesh into exactly the [member DetailingTool.extent] box the
+## [CylinderMesh] or [BoxMesh] filled — same size, same origin, same box every
+## clearance below is measured against. The one thing a modelled tool does not
+## take from the catalogue is its surface, because it arrives wearing a texture
+## and [method _build] would otherwise paint over it.
 ##
 ## [b]The hand is one place; the tool turns in it.[/b] The offset into the corner
 ## of the frame belongs to the anchor and is set in [code]garage.tscn[/code] — it
@@ -467,10 +468,11 @@ func _build(tool: DetailingTool, carry: ToolCarry) -> MeshInstance3D:
 ## opinion on — the size, the plane it starts as, the material it wears — is
 ## unchanged, which is why the swap can be this small.
 ##
-## The two spray bottles: a [ToolModel] is a [MeshInstance3D] carrying an
-## imported mesh, fitted into the same [member DetailingTool.extent] box
-## the [CylinderMesh] filled. Asked by whether the tool names a model rather than
-## by its id, so the third bottle is a row in the catalogue and not an edit here.
+## The two spray bottles and the sponge: a [ToolModel] is a [MeshInstance3D]
+## carrying an imported mesh, fitted into the same [member DetailingTool.extent]
+## box the primitive filled. Asked by whether the tool names a model rather than
+## by its id, which is the whole reason the sponge could be modelled without a
+## line changing here — and why the next one is a row in the catalogue too.
 func _instance_for(tool: DetailingTool) -> MeshInstance3D:
 	if tool.id == DetailingTool.Id.DRYING_RAG:
 		return ClothRag.new(Vector2(tool.extent.x, tool.extent.z))
