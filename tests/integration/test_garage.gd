@@ -37,11 +37,19 @@ func _car() -> Car:
 	return _garage.get_node("%Car") as Car
 
 
+## The ground the room is standing on, which is now a mesh and knows its own
+## size.
+func _ground() -> Ground:
+	return _garage.get_node("%Ground") as Ground
+
+
 ## How far the car is from the outer edge of the modeled ground, read off the
-## grass itself rather than written down again here.
+## ground itself rather than written down again here. The narrower of the two
+## sides, because the model is not perfectly square about its own drive and what
+## hangs off this is an absolute value.
 func _ground_half_width() -> float:
-	var grass: Node3D = _garage.get_node("View/World/Ground/GrassRight") as Node3D
-	return grass.position.x + grass.scale.x * 0.5
+	var box: AABB = _ground().extent()
+	return minf(absf(box.position.x), box.end.x)
 
 
 func test_the_room_instantiates() -> void:
@@ -229,10 +237,11 @@ func test_the_car_is_sat_on_the_tarmac_and_not_in_it() -> void:
 	# way, which is a wheel through the drive.
 	#
 	# The floor is read off the driveway rather than assumed to be zero, for the
-	# same reason `_ground_half_width` reads the grass: the room is allowed to move
-	# and this is a statement about the two of them together.
-	var drive: Node3D = _garage.get_node("View/World/Ground/Driveway") as Node3D
-	var tarmac: float = drive.position.y + drive.scale.y * 0.5
+	# same reason `_ground_half_width` reads the ground: the room is allowed to
+	# move and this is a statement about the two of them together. It is the same
+	# call `Garage._park_the_car` makes, which is the point — the room and this
+	# test agree about where the concrete is because they ask the concrete.
+	var tarmac: float = _ground().drive().end.y
 	var box: AABB = _car().bounds()
 	assert_gt(box.size.y, 0.0, "a car with no box is not parked anywhere")
 	assert_almost_eq(box.position.y, tarmac, TOLERANCE, "the tyres must be on the drive")
@@ -266,8 +275,7 @@ func test_a_car_parked_by_the_arrows_is_sat_on_the_tarmac_too() -> void:
 	# car dropped in at the last one's height is up to 18 cm through the drive or
 	# hovering over it. Garage.show_style re-parks for exactly this, and all ten are
 	# walked because the pair that breaks it is whichever two are furthest apart.
-	var drive: Node3D = _garage.get_node("View/World/Ground/Driveway") as Node3D
-	var tarmac: float = drive.position.y + drive.scale.y * 0.5
+	var tarmac: float = _ground().drive().end.y
 	for style: String in MeshCar.STYLES:
 		_garage.show_style(style)
 		var box: AABB = _garage.car().bounds()

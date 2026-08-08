@@ -203,10 +203,11 @@ func _clearance(box: AABB, point: Vector3) -> float:
 
 
 ## How far the car is from the outer edge of the modeled ground, read off the
-## grass itself.
+## ground itself. The narrower of its two sides, since what hangs off this is an
+## absolute value.
 func _ground_half_width() -> float:
-	var grass: Node3D = _garage().get_node("View/World/Ground/GrassRight") as Node3D
-	return grass.position.x + grass.scale.x * 0.5
+	var box: AABB = (_garage().get_node("%Ground") as Ground).extent()
+	return minf(absf(box.position.x), box.end.x)
 
 
 ## How far the eye stands from the middle of the car, measured flat on the floor
