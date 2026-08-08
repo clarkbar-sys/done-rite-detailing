@@ -32,6 +32,12 @@ var _states: GameStateMachine = GameStateMachine.new()
 func _ready() -> void:
 	var project_name: String = str(ProjectSettings.get_setting("application/config/name"))
 	print("%s %s" % [project_name, BuildInfo.describe()])
+	# Loaded here, before the title screen — the first of the three screens
+	# that read [member Sound.muted] to draw their own toggle — is ever
+	# instanced. Routed through [method Sound.set_muted] rather than assigned
+	# to [member Sound.muted] directly so the bus is silenced (or not) to match
+	# from the very first frame, not just the flag.
+	Sound.set_muted(Settings.read_settings(Settings.SETTINGS_PATH)[Settings.KEY_MUTED])
 	_states.changed.connect(_on_state_changed)
 	_states.enter(TitleScreenGameState.new())
 

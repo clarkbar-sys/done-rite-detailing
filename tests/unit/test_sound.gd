@@ -55,3 +55,14 @@ func test_the_bus_it_drives_is_the_whole_mix() -> void:
 	# named, and project.godot defines no other bus — so muting this one bus is
 	# muting the theme, the bell and every tool at once, not one voice of them.
 	assert_eq(Sound.BUS_NAME, "Master")
+
+
+func test_set_muted_writes_through_to_settings() -> void:
+	# The real path and not a throwaway one — this is the wiring test, the same
+	# way BuildInfo's own suite reads the real STAMP_PATH to check
+	# `_static_init` rather than hardcoding an answer. `after_each` above
+	# restores whatever this suite started with by the same route.
+	Sound.set_muted(true)
+	assert_true(Settings.read_settings(Settings.SETTINGS_PATH)[Settings.KEY_MUTED])
+	Sound.set_muted(false)
+	assert_false(Settings.read_settings(Settings.SETTINGS_PATH)[Settings.KEY_MUTED])
