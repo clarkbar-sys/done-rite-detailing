@@ -34,15 +34,20 @@
 ## intersect_ray, hit     the common press: the exact ray, landing on the car
 ## intersect_ray, miss    the same ray when it goes over the roof — the tick
 ##                        that then reaches for the tiers below
-## cast_motion, near      AimSweep down a near miss: sweep, then get_rest_info
-## cast_motion, sky       AimSweep at the open sky: the whole aim_reach of
-##                        conservative advancement, answering nothing
+## AimSweep, near         the ray fan down a near miss: twelve offset rays,
+##                        several of them landing on the bodywork
+## AimSweep, sky          the ray fan at the open sky: twelve rays the whole
+##                        aim_reach, answering nothing
 ## GrimeMap.wash          one tick of held trigger on the biggest panel
 ## [/codeblock]
 ## The sky sweep is on the list because it is the one the room pays most often and
 ## the one nobody thinks about: a press that misses the car entirely still runs the
-## middle tier, and a sweep that finds nothing has advanced the shape the full
-## [constant AIM_REACH] before it can say so.
+## middle tier, and a fan that finds nothing has cast every ray the full
+## [constant AIM_REACH] before it can say so. The two rows measured a swept sphere
+## when this tier was one — 355 µs on the blockout and 3,700–3,800 µs against the
+## pack, the numbers [code]src/core/aim_hold.gd[/code] keeps as its record — and
+## the fan that replaced it is priced here by the same two rows under their new
+## names, so the before and the after sit in the same table.
 ##
 ## [b]The brush walks along the panel rather than staying put[/b], which is the one
 ## measurement here that had to be arranged rather than simply taken. A jet held on
@@ -203,8 +208,8 @@ func _measure(subject: String, car: Car) -> void:
 	_check_the_aims(subject, space, eye, onto, past)
 	_row(subject, "intersect_ray, hit", _ray_usec(space, eye, onto))
 	_row(subject, "intersect_ray, miss", _ray_usec(space, eye, past))
-	_row(subject, "cast_motion, near", _sweep_usec(space, eye, past))
-	_row(subject, "cast_motion, sky", _sweep_usec(space, eye, Vector3.UP))
+	_row(subject, "AimSweep, near", _sweep_usec(space, eye, past))
+	_row(subject, "AimSweep, sky", _sweep_usec(space, eye, Vector3.UP))
 	_row(subject, "GrimeMap.wash", _brush_usec(car))
 
 
@@ -259,11 +264,11 @@ func _ray_usec(space: PhysicsDirectSpaceState3D, origin: Vector3, facing: Vector
 	return float(Time.get_ticks_usec() - began) / float(RAY_CALLS)
 
 
-## Microseconds per [method AimSweep.onto] — which is a
-## [method PhysicsDirectSpaceState3D.cast_motion] plus, when that lands, a
-## [method PhysicsDirectSpaceState3D.get_rest_info]. Measured through [AimSweep]
-## rather than around it because that pair is what the room actually calls, and
-## splitting them would report a cost nothing pays.
+## Microseconds per [method AimSweep.onto] — which is the fan of twelve
+## [method PhysicsDirectSpaceState3D.intersect_ray] calls that class rings the
+## aim with. Measured through [AimSweep] rather than as one ray times twelve
+## because the fan is what the room actually calls, and how many of its rays
+## land — the dear case — depends on the aim in a way a single ray cannot say.
 func _sweep_usec(space: PhysicsDirectSpaceState3D, origin: Vector3, facing: Vector3) -> float:
 	var sweep: AimSweep = AimSweep.new(AIM_REACH)
 	for _warm: int in range(WARMUP_CALLS):

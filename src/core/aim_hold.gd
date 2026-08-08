@@ -39,9 +39,13 @@
 ## often".[/b] Nothing here makes a sweep faster; it makes a held press take one
 ## instead of sixty. A dragged aim still pays per tick and that is correct — the aim
 ## really has moved and the old answer really is stale. Making the query itself
-## cheap is a different job with a different shape (decimated colliders, a signed
-## distance field) and is deliberately not this one: those change what the tool
-## hits, this changes only when the room asks.
+## cheap was a different job with a different shape, and it has since been done:
+## the table above is the record of the swept-sphere tier this class was built
+## against, and the [code]cast_motion[/code] rows in it are why [AimSweep] is now
+## a fan of [method PhysicsDirectSpaceState3D.intersect_ray] calls priced off the
+## ray rows instead — its class docs carry that change. The hold stays because
+## the two fixes compose rather than compete: a dragged press pays the fan's tens
+## of microseconds, and a held press still pays nothing at all.
 ##
 ## [b]It holds the answer as well as the key[/b], rather than leaving the caller a
 ## [Dictionary] to keep beside it. The two are one fact — "this is what was found,
@@ -76,9 +80,9 @@ const HELD_METRES: float = 0.002
 ## [b]0.99999 is a quarter of a degree[/b], which at the 2.2 m the walk stands off
 ## a car ([member Garage.standoff_metres]) is about a centimetre across the paint.
 ## Sized against what the query it is holding can itself resolve rather than
-## against the screen: a swept sphere comes to rest a whole tool-radius off the
-## line it was cast down — 0.4 m for the power wash — so a centimetre is two orders
-## of magnitude inside the approximation the answer already is. Nothing exact is
+## against the screen: a swept answer lands up to a whole tool-radius off the
+## line it was asked about — 0.4 m for the power wash — so a centimetre is two
+## orders of magnitude inside the approximation the answer already is. Nothing exact is
 ## held this way; [method Garage._under_the_finger] casts its exact ray every tick
 ## regardless, so every press that lands on the car is as sharp as it ever was.
 ##
@@ -97,12 +101,12 @@ var _taken: bool = false
 ## Whether what is being held is still an answer to the aim from [param from] along
 ## [param facing] with a tool that works [param reach] metres wide.
 ##
-## [b]An empty answer is held too[/b], and that is not an oversight. "A sphere this
-## wide down this line touches nothing" costs exactly as much to find out as a hit
-## does — it is the same [method PhysicsDirectSpaceState3D.cast_motion] — and it is
+## [b]An empty answer is held too[/b], and that is not an oversight. "A window this
+## wide down this line touches nothing" costs as much to find out as a hit does —
+## it is the same fan of rays, every one of them cast to the full reach — and it is
 ## what the press this class exists for produces most of the time, because a thumb
 ## parked in the sky beside a car misses every tier but the last. Holding only the
-## hits would leave the expensive case uncached, which is the whole cost.
+## hits would leave that case uncached, which is most of what a hovering press pays.
 ##
 ## [b][param reach] is part of the aim[/b] and not a detail of the query, because
 ## how wide the tool in hand works is how wide a miss the room forgives — see

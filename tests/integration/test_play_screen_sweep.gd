@@ -1,5 +1,9 @@
-## Integration test for the middle tier of the aim: [AimSweep], the sphere the
-## width of the held tool that catches a press which missed the car by a hair.
+## Integration test for the middle tier of the aim: [AimSweep], the fan of rays
+## the width of the held tool that catches a press which missed the car by a
+## hair. It was a swept sphere when this suite was written and is a ray fan now —
+## same window, same four answer keys, a hundredth of the cost ([AimSweep]'s
+## class docs carry the change) — and nothing asserted here is about which
+## engine call opens the window, which is why the suite survived the swap.
 ##
 ## [b]Through [code]main.tscn[/code], like the wash suite[/b] and for the same
 ## reason it records: a screen instanced on its own has nothing underneath it and
@@ -46,7 +50,10 @@ const WASH_FRAMES: int = 60
 ## than reasoned about.[/b] Re-measured across all ten styles for [code]#139[/code],
 ## because the bay no longer parks one blockout of one size — it draws one of ten
 ## cars that stand 1.04 m (sport) to 1.77 m (minivan) tall, and every edge below
-## is a different number on each of them:
+## is a different number on each of them. Taken when the sweep was a sphere; a
+## fan's outermost catch sits a shade inside a sphere's, so the marginal rows may
+## drift by a ray's spacing, and the quarter-metre this suite actually presses at
+## is chosen to be nowhere near either edge:
 ##
 ## [codeblock]
 ## 0.10  the exact ray already misses all ten
@@ -87,14 +94,16 @@ const NEAR_MISS_METRES: float = 0.25
 ## aim passing 1.88 m (compact) to 2.32 m (wagon) from the middle of the car.
 ##
 ## A fifth across and a seventh down, so the press is well inside the picture
-## rather than hugging an edge a letterbox could crop. Measured there on all ten:
-## the exact ray misses, a 0.4 m sweep misses, a 0.6 m sweep misses, the probe
-## misses — and a 1.2 m sphere does reach, which is what says this is a bounded
-## margin and not an aim pointed at nothing.
+## rather than hugging an edge a letterbox could crop. Measured there on all ten,
+## with the swept sphere this tier was at the time: the exact ray misses, a 0.4 m
+## sweep misses, a 0.6 m sweep misses, the probe misses — and a 1.2 m sphere did
+## reach, which is what said this is a bounded margin and not an aim pointed at
+## nothing. The fan answers only inside the sphere's window, so the misses hold
+## a fortiori and [method _the_sweep_missed] re-asserts the one that matters.
 const WELL_CLEAR_ACROSS: float = 0.2
 const WELL_CLEAR_DOWN: float = 0.15
 
-## A sphere far too small to bridge [constant NEAR_MISS_METRES], and one
+## A window far too small to bridge [constant NEAR_MISS_METRES], and one
 ## comfortably wide enough. Neither is any tool's real radius on purpose: what is
 ## being pinned is that the radius is the window, not what any particular tool's
 ## window happens to be this week.
@@ -245,7 +254,7 @@ func _the_ray_missed(at: Vector2) -> Array[Vector3]:
 	return ray
 
 
-## Asserts that not even a [constant WIDE_ENOUGH] sphere down the aim at
+## Asserts that not even a [constant WIDE_ENOUGH] window down the aim at
 ## [param at] reaches the car — the other half of [method _the_ray_missed], for
 ## the presses that are supposed to fall all the way through to the bottom tier.
 ##
@@ -258,7 +267,7 @@ func _the_sweep_missed(at: Vector2) -> void:
 	assert_true(
 		sweep.onto(_space(), ray[0], ray[1], WIDE_ENOUGH).is_empty(),
 		(
-			"a %s m sphere reached the car from %v, so this is not the fallback's press"
+			"a %s m window reached the car from %v, so this is not the fallback's press"
 			% [WIDE_ENOUGH, at]
 		)
 	)
@@ -381,15 +390,15 @@ func _is_a_panel(who: Object) -> bool:
 # ---- the sweep on its own ----------------------------------------------------
 
 
-func test_a_sphere_swept_at_a_near_miss_lands_on_a_real_panel() -> void:
+func test_a_tool_wide_fan_at_a_near_miss_lands_on_a_real_panel() -> void:
 	# The class's whole claim, against the real car rather than a fixture: where a
-	# zero-width ray found nothing, a sphere the width of a tool finds a named
+	# zero-width ray found nothing, a fan the width of a tool finds a named
 	# panel, a point on it, and a normal that was measured rather than invented.
 	await _settle()
 	var ray: Array[Vector3] = _the_ray_missed(_over_the_roof(NEAR_MISS_METRES))
 	var sweep: AimSweep = AimSweep.new(_garage().aim_reach)
 	var found: Dictionary = sweep.onto(_space(), ray[0], ray[1], WIDE_ENOUGH)
-	assert_false(found.is_empty(), "a %s m sphere down the same line found nothing" % WIDE_ENOUGH)
+	assert_false(found.is_empty(), "a %s m fan down the same line found nothing" % WIDE_ENOUGH)
 	if found.is_empty():
 		return
 	var who: Object = found["collider"]
@@ -438,22 +447,22 @@ func test_the_window_is_the_radius_it_is_given() -> void:
 	var sweep: AimSweep = AimSweep.new(_garage().aim_reach)
 	assert_true(
 		sweep.onto(_space(), ray[0], ray[1], TOO_SMALL).is_empty(),
-		"a %s m sphere bridged a %s m miss" % [TOO_SMALL, NEAR_MISS_METRES]
+		"a %s m window bridged a %s m miss" % [TOO_SMALL, NEAR_MISS_METRES]
 	)
 	assert_false(
 		sweep.onto(_space(), ray[0], ray[1], WIDE_ENOUGH).is_empty(),
-		"a %s m sphere did not bridge a %s m miss" % [WIDE_ENOUGH, NEAR_MISS_METRES]
+		"a %s m window did not bridge a %s m miss" % [WIDE_ENOUGH, NEAR_MISS_METRES]
 	)
 
 
 func test_a_sweep_with_no_width_is_refused_rather_than_cast() -> void:
-	# A sphere of nothing is the ray that has already missed. Refusing it is what
+	# A fan of no width is the ray that has already missed. Refusing it is what
 	# stops a misconfigured reach silently buying back the old behaviour instead of
 	# failing in a way somebody would notice.
 	await _settle()
 	var ray: Array[Vector3] = _the_ray_missed(_over_the_roof(NEAR_MISS_METRES))
 	var sweep: AimSweep = AimSweep.new(_garage().aim_reach)
-	assert_true(sweep.onto(_space(), ray[0], ray[1], 0.0).is_empty(), "a sphere of nothing hit")
+	assert_true(sweep.onto(_space(), ray[0], ray[1], 0.0).is_empty(), "a fan of nothing hit")
 
 
 func test_a_sweep_at_the_open_sky_finds_nothing_to_rest_on() -> void:
@@ -527,8 +536,9 @@ func test_a_press_on_the_car_is_still_answered_by_the_exact_ray() -> void:
 func test_an_aim_that_slides_off_the_car_stops_working_the_paint() -> void:
 	# [b]The guard on [code]#145[/code].[/b] The middle tier is no longer cast on
 	# every physics tick: [AimHold] keeps what the last sweep down this aim found
-	# and hands it back until the aim moves, which turns a held press from sixty
-	# four-millisecond sweeps a second into one. The whole risk of that is an answer
+	# and hands it back until the aim moves, which turned a held press from sixty
+	# sweeps a second into one — four milliseconds each, back when the tier was a
+	# swept sphere, and worth holding at any price. The whole risk of that is an answer
 	# that outlives its question — the water going on landing where the player used
 	# to be pointing — and this is the test that fails when it does.
 	#

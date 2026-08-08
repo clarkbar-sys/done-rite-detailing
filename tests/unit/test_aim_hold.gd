@@ -152,10 +152,10 @@ func test_a_tool_swapped_mid_press_is_a_new_question() -> void:
 
 
 func test_an_answer_of_nothing_is_held_like_any_other() -> void:
-	# The expensive case, and the one that looks skippable. "A sphere this wide down
-	# this line touches nothing" is the identical [method
-	# PhysicsDirectSpaceState3D.cast_motion] and costs the identical four
-	# milliseconds — and it is what a thumb parked in the sky beside the car
+	# The expensive case, and the one that looks skippable. "A window this wide down
+	# this line touches nothing" is the identical query at the identical price — a
+	# fan whose every ray ran the full reach, four milliseconds of swept sphere when
+	# the hold was built — and it is what a thumb parked in the sky beside the car
 	# produces on every tick it is held there. A cache that kept only the hits would
 	# leave the whole cost in place.
 	_held.keep({}, EYE, TOWARD.normalized(), WASH_REACH)

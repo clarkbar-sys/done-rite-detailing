@@ -216,15 +216,15 @@
 ## [i]And a press that misses by a hair is caught before any of that.[/i] The aim
 ## is answered in three tiers, each strictly wider than the one above it, and
 ## [method _under_the_finger] is where they are stacked: the exact ray, then a
-## sphere the width of the held tool swept down the same line ([AimSweep]), then
+## fan of rays the width of the held tool down the same line ([AimSweep]), then
 ## the nearest-panel fallback ([method _nearest_on_the_car]). The middle tier is
 ## the one that earns its keep on a touchscreen — [ThumbLift] throws the aim a
 ## thumb's width up the glass on purpose, and over a low car that regularly puts
 ## the ray in the sky — and what it buys is not a hit where there was none, but a
 ## hit with a [i]measured normal[/i] where the bottom tier could only invent one.
-## [AimSweep] has the whole argument, including why it is not the first tier;
-## [AimHold] has why that tier alone is taken once per aim rather than once per
-## tick, which is four milliseconds a press against the car pack's trimeshes.
+## [AimSweep] has the whole argument, including why it is not the first tier and
+## why it stopped being a swept sphere; [AimHold] has why that tier is taken once
+## per aim rather than once per tick, and the measurements behind both.
 ##
 ## [b]And the tools that work the paint draw their own sight.[/b] The water the
 ## power wash throws, the product the two bottles spray, the suds the sponge
@@ -977,10 +977,10 @@ func _take_up_aiming() -> void:
 	_sight = ToolSight.new(wash_radius_metres, scrub_radius_metres)
 	_sight.name = "ToolSight"
 	_car.get_parent().add_child(_sight)
-	# Built here rather than per press for the reason [AimSweep] gives: it owns two
-	# engine objects that would otherwise be allocated twice a tick for as long as a
-	# finger is dragging across the sky. Given the same reach the exact ray is cast
-	# at, because it is the same aim asked a wider question.
+	# Built here rather than per press for the reason [AimSweep] gives: the ring
+	# it fans the aim out into never changes, so it is worked out once rather than
+	# on every tick a finger is dragging across the sky. Given the same reach the
+	# exact ray is cast at, because it is the same aim asked a wider question.
 	_sweep = AimSweep.new(aim_reach)
 	if noisy:
 		_racket = ToolRacket.new()
@@ -1238,23 +1238,28 @@ func _reach_of(held: DetailingTool.Id) -> float:
 ## [b]Three tiers, each strictly wider than the one above it, in that order for a
 ## reason.[/b] The exact ray is first because where it hits it is exactly right,
 ## and it answers nearly every press. [AimSweep] is second and not first because a
-## swept sphere stops at the first thing it touches, which at a grazing angle is
-## the roof edge rather than the door being pointed at — asked only after the ray
-## came back empty, it has no exact answer left to steal. [param reach] is how wide
-## the tool in hand works ([method _reach_of]), which is the window it forgives by.
+## widened aim answers with the first thing inside its window, which at a grazing
+## angle is the roof edge rather than the door being pointed at — asked only after
+## the ray came back empty, it has no exact answer left to steal. [param reach] is
+## how wide the tool in hand works ([method _reach_of]), which is the window it
+## forgives by.
 ##
 ## [b]And the middle tier is the one that is not cast every tick.[/b] It goes
 ## through [AimHold], which hands back what the last sweep down this aim found for
 ## as long as the aim has not moved — the whole of [code]#145[/code]'s fix, and a
 ## statement about how often rather than about what. That class carries the
-## numbers; the short of it is four milliseconds a sweep against the car pack's
-## trimeshes, bought sixty times a second by a thumb hovering over a roofline to be
-## told the same thing every time. The other two tiers are cast every tick exactly
-## as they were, and the hold is dropped by the smallest movement of eye or aim
-## that could change the answer — so a moving press is as exact as it ever was.
+## numbers; the short of it is that the sweep was four milliseconds against the
+## car pack's trimeshes when it was a swept sphere, bought sixty times a second by
+## a thumb hovering over a roofline to be told the same thing every time. The
+## sphere has since become a fan of rays and the price a fraction of what the hold
+## was built against ([AimSweep] has that change), but a press that moves nothing
+## should still ask nothing — so the hold stays, the other two tiers are cast
+## every tick exactly as they were, and the hold is dropped by the smallest
+## movement of eye or aim that could change the answer, so a moving press is as
+## exact as it ever was.
 ##
 ## The nearest-panel fallback stays underneath both, unchanged, because it is the
-## only one of the three that always answers: a sphere the width of a sponge is
+## only one of the three that always answers: a window the width of a sponge is
 ## bounded by definition, and a press at the horizon should still put the mark on
 ## the car rather than nowhere. What the sweep took off it is the cases where it
 ## was reduced to inventing a normal — see [method _nearest_on_the_car].
