@@ -17,11 +17,6 @@ extends GutTest
 
 const MAIN_MENU: String = "res://src/screens/main_menu.tscn"
 
-## The character the credit's two lines are separated by, which is the one thing
-## in it the font is not asked to draw. See
-## [method test_the_font_can_draw_the_credit].
-const LINE_BREAK: int = 0x0A
-
 var _screen: GameScreen = null
 var _requested: Array[GameState] = []
 var _rung: Array[Bell.Voice] = []
@@ -150,38 +145,37 @@ func test_the_logo_is_framed_rather_than_pasted_on() -> void:
 	assert_eq(box.bg_color, Brand.PANEL, "the card must be the site's panel colour")
 
 
-# ---- the credit the cars arrive under ----------------------------------------
+# ---- the credits the borrowed models arrive under ----------------------------
 
 
-func test_the_car_pack_is_credited_where_a_player_can_read_it() -> void:
-	# CC-BY 4.0 is the licence assets/models/cars/ arrives under and attribution
-	# is a condition of it, not a courtesy. A file in the repository does not
-	# discharge that — the person playing the game never sees one — so the credit
-	# has to be on a screen, and this is the screen every player passes through.
+func test_every_borrowed_model_is_credited_where_a_player_can_read_it() -> void:
+	# CC-BY 4.0 is the licence the cars, the tyre cleaner's bottle and the driveway
+	# all arrive under, and attribution is a condition of it, not a courtesy. A
+	# file in the repository does not discharge that — the person playing the game
+	# never sees one — so the credit has to be on a screen, and this is the screen
+	# every player passes through.
 	#
-	# All three parts by name, because the licence asks for all three and a line
-	# that lost one of them would still look like a credit: the title of the work,
-	# who made it, and what licence it is under. Substrings rather than the whole
-	# string, so the wording around them stays the .tscn's business.
+	# Every work, and all three parts of each by name, because the licence asks
+	# for all three and a line that lost one of them would still look like a
+	# credit: the title of the work, who made it, and what licence it is under.
+	# Substrings rather than the whole string, so the wording around them stays
+	# the .tscn's business.
+	#
+	# A table rather than a test per work, so borrowing another model is a row
+	# here — which is exactly what the driveway (#114) turned out to be.
 	var credits: Label = _screen.get_node("%Credits") as Label
-	assert_not_null(credits, "the menu must carry the credit for the cars")
+	assert_not_null(credits, "the menu must carry the credits for the borrowed models")
 	if credits == null:
 		return
-	for required: String in ["Generic passenger car pack", "Comrade1280", "CC BY 4.0"]:
-		assert_string_contains(credits.text, required, "the credit must name %s" % required)
-
-
-func test_the_driveway_is_credited_where_a_player_can_read_it() -> void:
-	# The second model in the game, and the same licence — see
-	# assets/models/driveway/ATTRIBUTION.txt. Its own test rather than three more
-	# strings in the one above, because the two credits can be broken separately
-	# and a failure should say which model lost its line.
-	var credits: Label = _screen.get_node("%Credits") as Label
-	assert_not_null(credits, "the menu must carry the credit for the ground")
-	if credits == null:
-		return
-	for required: String in ["Sunken Driveway Parking Spot", "jimbogies", "CC BY 4.0"]:
-		assert_string_contains(credits.text, required, "the credit must name %s" % required)
+	var borrowed: Array[Array] = [
+		["Generic passenger car pack", "Comrade1280"],
+		["Kitchen Spray", "Jesus Osco"],
+		["Sunken Driveway Parking Spot", "jimbogies"],
+	]
+	for work: Array in borrowed:
+		for required: String in work:
+			assert_string_contains(credits.text, required, "the credit must name %s" % required)
+	assert_string_contains(credits.text, "CC BY 4.0", "the credit must name the licence")
 
 
 func test_the_credit_is_actually_on_the_screen() -> void:
@@ -205,16 +199,16 @@ func test_the_font_can_draw_the_credit() -> void:
 	# of its own, so every label is drawn in Godot's built-in Open Sans, and a
 	# glyph it does not have is a tofu box in a released build rather than an error
 	# anybody would see. The credit carries curly quotes and an em dash.
+	#
+	# The line break between the two works is skipped, and only it: a control
+	# character is layout rather than type, no font has a glyph for one, and
+	# asking whether Open Sans can draw a newline is a question with a wrong
+	# answer either way. Everything from the space upwards is still asked.
 	var credits: Label = _screen.get_node("%Credits") as Label
 	var font: Font = credits.get_theme_font("font")
 	for i: int in credits.text.length():
 		var glyph: int = credits.text.unicode_at(i)
-		# The one character in there that is not meant to be drawn. There are two
-		# credits now — the cars and the ground they stand on — and they are a line
-		# each rather than one long line broken wherever the label ran out of room.
-		# A line break is a layout instruction; no font has a glyph for it, and one
-		# that did would be the bug.
-		if glyph == LINE_BREAK:
+		if glyph < 0x20:
 			continue
 		assert_true(
 			font.has_char(glyph),

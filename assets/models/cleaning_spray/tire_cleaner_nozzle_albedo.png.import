@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://byih54gvfga0h"
-path="res://.godot/imported/tire_cleaner_window_cleaner.png-14ac9dd64adbc632ea05cbcfa1c73558.ctex"
+uid="uid://bvib7w2gbrx88"
+path="res://.godot/imported/tire_cleaner_nozzle_albedo.png-24f9dac517b3223e7b98db570e1d1c2d.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "806a0528eebc381db956e0170a19aac7"
+"md5": "55d8221dd086a9d727e257be19565bc2"
 }
 
 [deps]
 
-source_file="res://assets/models/cleaning_spray/tire_cleaner_window_cleaner.png"
-dest_files=["res://.godot/imported/tire_cleaner_window_cleaner.png-14ac9dd64adbc632ea05cbcfa1c73558.ctex"]
+source_file="res://assets/models/cleaning_spray/tire_cleaner_nozzle_albedo.png"
+dest_files=["res://.godot/imported/tire_cleaner_nozzle_albedo.png-24f9dac517b3223e7b98db570e1d1c2d.ctex"]
 
 [params]
 

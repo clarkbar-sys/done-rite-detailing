@@ -37,6 +37,17 @@ const NOT_EDGE_ON: float = 0.5
 ## look the issue asked us not to ship.
 const NOT_AIMED_AT_THE_LENS: float = 0.866
 
+## Where metal starts, for anything on the belt that is not the wand. The room's
+## own red toolboxes sit at 0.2 and read as painted steel, so this is the bar
+## already in use for the same judgement one scene away. Measured on the belt: the
+## tyre bottle's body is the only non-wand surface above zero at all, at 0.05.
+const NOT_METAL: float = 0.2
+
+## Every eighth texel each way when a metallic map is averaged — 1,024 samples of
+## a 256 px map, which is plenty for a mean and is not 65,536 `get_pixel` calls
+## per surface in a test that runs six of them.
+const METAL_STRIDE: int = 8
+
 var _garage: Garage = null
 
 
@@ -77,15 +88,67 @@ func _material(proxy: MeshInstance3D) -> StandardMaterial3D:
 	return proxy.material_override as StandardMaterial3D
 
 
-## The material actually painting [param proxy], wherever it came from: the
-## catalogue's override for a tool built out of a primitive, and the import's own
-## for a tool built out of a model. What a question about how a tool [i]looks[/i]
-## has to ask, now that those are two different places.
-func _painting(proxy: MeshInstance3D) -> StandardMaterial3D:
+## Every material actually painting [param proxy], wherever they came from: the
+## catalogue's one override for a tool built out of a primitive, and the import's
+## own for a tool built out of a model. What a question about how a tool
+## [i]looks[/i] has to ask, now that those are two different places.
+##
+## All of a model's surfaces and not just the first, because the tyre bottle is
+## six of them — body, neck, nozzle, two caps and a trigger — and a claim about
+## how a tool looks that only ever read the body would be true of a sixth of it.
+func _paintings(proxy: MeshInstance3D) -> Array[StandardMaterial3D]:
 	var override: StandardMaterial3D = _material(proxy)
 	if override != null:
-		return override
-	return proxy.mesh.surface_get_material(0) as StandardMaterial3D
+		return [override]
+	var skins: Array[StandardMaterial3D] = []
+	for surface: int in proxy.mesh.get_surface_count():
+		skins.append(proxy.mesh.surface_get_material(surface) as StandardMaterial3D)
+	return skins
+
+
+## What [param skin] renders as metal, taking its metallic map into account.
+##
+## [member BaseMaterial3D.metallic] is a multiplier over that map rather than the
+## answer on its own, and glTF's default for the factor is 1.0 — so a material
+## that carries a map and says nothing about the factor reads as "solid metal" to
+## anybody who only asks the property, and renders as whatever the map says. The
+## tyre bottle's body is exactly that: factor 1.0 over a map averaging 0.05, which
+## is a plastic bottle with a few specks of foil on the label.
+##
+## The mean of the map and not its maximum, for the same reason: what is being
+## asked is whether the tool reads as metal, and a handful of bright texels on a
+## label does not make a bottle a spanner.
+func _metallic_of(skin: StandardMaterial3D) -> float:
+	if skin.metallic_texture == null:
+		return skin.metallic
+	var map: Image = skin.metallic_texture.get_image()
+	if map == null:
+		return skin.metallic
+	# Imported textures may arrive VRAM-compressed depending on the import
+	# settings the asset ended up with, and a compressed image cannot be sampled.
+	if map.is_compressed():
+		map.decompress()
+	var total: float = 0.0
+	var samples: int = 0
+	for down: int in range(0, map.get_height(), METAL_STRIDE):
+		for across: int in range(0, map.get_width(), METAL_STRIDE):
+			total += _channel(map.get_pixel(across, down), skin.metallic_texture_channel)
+			samples += 1
+	return skin.metallic * total / maxf(float(samples), 1.0)
+
+
+## One channel of [param texel], named the way [BaseMaterial3D] names it.
+func _channel(texel: Color, channel: BaseMaterial3D.TextureChannel) -> float:
+	match channel:
+		BaseMaterial3D.TEXTURE_CHANNEL_RED:
+			return texel.r
+		BaseMaterial3D.TEXTURE_CHANNEL_GREEN:
+			return texel.g
+		BaseMaterial3D.TEXTURE_CHANNEL_BLUE:
+			return texel.b
+		BaseMaterial3D.TEXTURE_CHANNEL_ALPHA:
+			return texel.a
+	return texel.v
 
 
 ## Every proxy that is currently drawing. The list, not the count, so a failure
@@ -261,14 +324,21 @@ func test_a_modelled_tool_wears_its_own_skin_instead() -> void:
 func test_the_power_wash_is_the_only_metal_on_the_belt() -> void:
 	# Silver is a material, not a colour: at metallic 0 the same grey cylinder is
 	# light plastic. The room's red toolboxes sit at 0.2, so "more than that" is
-	# the bar, and everything else on the belt is a bottle or a rag and is not
-	# metal at all.
+	# the bar for the wand, and everything else on the belt is a bottle or a rag
+	# and has to stay under it.
+	#
+	# Under it rather than at zero, and measured through the map rather than off
+	# the property, because a modelled tool's metalness is not one number any more
+	# — see [method _metallic_of]. The worst surface of each tool, so a metal cap
+	# on an otherwise plastic bottle is caught.
 	for tool: DetailingTool in DetailingTool.catalogue():
-		var metallic: float = _painting(_view_model().proxy_for(tool.id)).metallic
+		var metallic: float = 0.0
+		for skin: StandardMaterial3D in _paintings(_view_model().proxy_for(tool.id)):
+			metallic = maxf(metallic, _metallic_of(skin))
 		if tool.id == DetailingTool.Id.POWER_WASH:
 			assert_gt(metallic, 0.5, "the wand has to read as metal")
 		else:
-			assert_almost_eq(metallic, 0.0, TOLERANCE, "%s is not metal" % tool.display_name)
+			assert_lt(metallic, NOT_METAL, "%s is not metal" % tool.display_name)
 
 
 # ---- the rag, which has one side --------------------------------------------

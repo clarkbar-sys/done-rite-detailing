@@ -83,6 +83,16 @@ max-line-length: 100
 #   lines of code under it, and the next-largest script is 659 lines. 1500
 #   leaves the check able to notice a genuinely sprawling file.
 #
+#   AND IT HAPPENED AGAIN, WHICH IS THE PART WORTH READING. #145 caches the
+#   swept aim tier, and garage.gd was sitting on 1495 of that 1500 — four lines
+#   of code and sixteen of prose put it over. The bump to 1600 was honest about
+#   what it was: the cheapest way to land one fix, taken in preference to
+#   compressing the one paragraph that says why a physics query is not repeated,
+#   because that paragraph is the thing a future reader needs and the number is
+#   not. Most of #145 already went the other way — the cache's reasoning and its
+#   two tolerances live in src/core/aim_hold.gd, where a unit test can reach
+#   them, and only the pointer to it is in garage.gd.
+#
 #   It has moved once more since, to 1700, and the same file did it: #143 gave
 #   the room a way to park a different car and garage.gd was at 1495 of 1500,
 #   so a nine-line method and its docs did not fit. Said plainly, because the

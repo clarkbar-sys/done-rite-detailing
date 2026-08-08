@@ -227,3 +227,47 @@ func test_a_settled_scoreboard_stays_where_it_is() -> void:
 	await wait_process_frames(5)
 	assert_eq(_hud.shown(), settled, "an idle scoreboard drifted")
 	assert_eq(_hud.flash(), 0.0, "an idle scoreboard re-lit itself")
+
+
+## The done percentage — [method Grime.shine] printed in the corner, and the only
+## number on this HUD that is true continuously rather than at a moment.
+##
+## Its own group of tests rather than folded in above, because everything it is
+## checked against is different: it does not roll, does not flash and does not
+## pop, and the one thing that could go wrong with it is the rounding.
+func test_the_done_readout_starts_at_nothing() -> void:
+	assert_eq(_hud.done_shown(), 0, "a car nobody has touched is not partly done")
+
+
+func test_the_done_readout_follows_the_shine() -> void:
+	_hud.done(0.42)
+	assert_eq(_hud.done_shown(), 42)
+	_hud.done(1.0)
+	assert_eq(_hud.done_shown(), 100, "a finished car does not read a hundred")
+
+
+func test_the_done_readout_rounds_down_so_a_hundred_means_finished() -> void:
+	# The one lie a progress number must not tell. At 99.6% the last patch is still
+	# muddy, and a readout that had rounded to "100% done" would be telling the
+	# player to stop.
+	_hud.done(0.996)
+	assert_eq(_hud.done_shown(), 99)
+
+
+func test_the_done_readout_takes_a_number_out_of_range_without_complaint() -> void:
+	# Fed off a running total once a frame, so a float that has drifted a
+	# ten-thousandth past one is a thing that happens rather than a bug to crash on.
+	_hud.done(1.0001)
+	assert_eq(_hud.done_shown(), 100, "past the end")
+	_hud.done(-0.0001)
+	assert_eq(_hud.done_shown(), 0, "and before the start")
+
+
+func test_the_done_readout_survives_being_told_the_same_thing_every_frame() -> void:
+	# Which is what the play screen does: it is polled, not signalled, so this is
+	# called sixty times a second with the same number for as long as nobody is
+	# cleaning. The early out is what stops that being sixty strings a second.
+	_hud.done(0.5)
+	for _frame: int in 30:
+		_hud.done(0.5)
+	assert_eq(_hud.done_shown(), 50)
