@@ -294,11 +294,53 @@ func test_the_wheels_reach_the_ground_the_car_is_parked_on() -> void:
 
 
 func test_the_car_starts_painted_one_of_the_thirteen_colors() -> void:
-	# Inherited from Car, unchanged and deliberately so: MeshCar picks a style and
-	# hands the colour back to the class that already decides colours.
+	# Which colour is still Car's to pick — MeshCar picks a style and hands that
+	# question straight back. What it adds is MeshCar.MAP_COMPENSATION, so the value
+	# on the material is a colour off the list driven up to survive the pack's
+	# greyscale map, and the list is checked through that rather than against it.
+	var offered: Array[Color] = []
+	for colour: Color in Car.PAINT_COLORS:
+		offered.append(MeshCar.compensated(colour))
 	for style: String in MeshCar.STYLES:
 		var car: MeshCar = _car_of(style)
-		assert_has(Car.PAINT_COLORS, car.paint.albedo_color, "%s: not a colour on the list" % style)
+		assert_has(offered, car.paint.albedo_color, "%s: not a colour on the list" % style)
+
+
+func test_the_paint_is_driven_up_to_survive_the_packs_greyscale_map() -> void:
+	# The half the test above cannot see: it would pass just as happily if the
+	# compensation were 1.0, because it builds its list with the same function the
+	# car does. So this one takes the sum apart — the colour on the material,
+	# divided back down, has to be an entry on the list, and the constant has to
+	# actually lift.
+	assert_gt(MeshCar.MAP_COMPENSATION, 1.0, "a compensation under 1 would darken it further")
+	var painted: Color = _car_of("sedan").paint.albedo_color
+	var plain: Color = Color(
+		painted.r / MeshCar.MAP_COMPENSATION,
+		painted.g / MeshCar.MAP_COMPENSATION,
+		painted.b / MeshCar.MAP_COMPENSATION,
+		painted.a,
+	)
+	var nearest: float = INF
+	for colour: Color in Car.PAINT_COLORS:
+		nearest = minf(
+			nearest, Vector3(plain.r - colour.r, plain.g - colour.g, plain.b - colour.b).length()
+		)
+	assert_almost_eq(nearest, 0.0, 0.001, "the paint does not divide back to a colour on the list")
+	assert_eq(painted.a, 1.0, "the tint changed the paint's opacity")
+
+
+func test_the_compensation_stays_under_what_the_bay_can_show() -> void:
+	# The ceiling MAP_COMPENSATION's docs are about, pinned so that raising it comes
+	# with re-measuring rather than by feel. The bay sets no tonemap, so a channel
+	# driven past 1.0 is one the renderer flattens to white, and Alpine White is the
+	# brightest thing on the list and hits it first. Measured over the thirteen at
+	# the showcase angle: 1.25 puts no body pixel at 255, and 1.30 puts 28.7% of
+	# Alpine White's there.
+	assert_lte(
+		MeshCar.MAP_COMPENSATION,
+		1.25,
+		"past 1.25 the light end of the palette clips — re-measure before raising this"
+	)
 
 
 func test_the_paint_keeps_the_greyscale_map_the_pack_baked() -> void:
