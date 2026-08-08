@@ -52,6 +52,20 @@ func _ground_half_width() -> float:
 	return minf(absf(box.position.x), box.end.x)
 
 
+## The height of the concrete under [param parked], read off the ground the same
+## way [method Garage._park_the_car] reads it.
+##
+## Deliberately `settle()` at the car's own spot and not `drive().end.y`. The
+## concrete is a pad sunk between kerb walls, so the box round the mesh tops out
+## 0.345 m over the surface, and a test that read the box would have agreed with
+## a room that parked ten cars in mid-air — which is exactly what happened until
+## #167. Asking the same question the room asks is the whole point of reading it
+## at all: they agree about where the concrete is because they both ask the
+## concrete.
+func _tarmac_under(parked: Car) -> float:
+	return _ground().settle(PackedVector3Array([parked.global_position]))[0]
+
+
 func test_the_room_instantiates() -> void:
 	assert_not_null(_garage, "the garage must instantiate as a Garage")
 
@@ -241,8 +255,9 @@ func test_the_car_is_sat_on_the_tarmac_and_not_in_it() -> void:
 	# move and this is a statement about the two of them together. It is the same
 	# call `Garage._park_the_car` makes, which is the point — the room and this
 	# test agree about where the concrete is because they ask the concrete.
-	var tarmac: float = _ground().drive().end.y
+	var tarmac: float = _tarmac_under(_car())
 	var box: AABB = _car().bounds()
+	assert_false(is_nan(tarmac), "there must be concrete under the car to park it on")
 	assert_gt(box.size.y, 0.0, "a car with no box is not parked anywhere")
 	assert_almost_eq(box.position.y, tarmac, TOLERANCE, "the tyres must be on the drive")
 
@@ -275,10 +290,11 @@ func test_a_car_parked_by_the_arrows_is_sat_on_the_tarmac_too() -> void:
 	# car dropped in at the last one's height is up to 18 cm through the drive or
 	# hovering over it. Garage.show_style re-parks for exactly this, and all ten are
 	# walked because the pair that breaks it is whichever two are furthest apart.
-	var tarmac: float = _ground().drive().end.y
 	for style: String in MeshCar.STYLES:
 		_garage.show_style(style)
+		var tarmac: float = _tarmac_under(_garage.car())
 		var box: AABB = _garage.car().bounds()
+		assert_false(is_nan(tarmac), "no concrete under the %s to park it on" % style)
 		assert_almost_eq(box.position.y, tarmac, TOLERANCE, "the %s is not on the drive" % style)
 
 

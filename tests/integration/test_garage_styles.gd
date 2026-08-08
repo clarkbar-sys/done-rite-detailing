@@ -183,10 +183,19 @@ func _ground_half_width(screen: GameScreen) -> float:
 	return minf(absf(box.position.x), box.end.x)
 
 
-## Where the top of the driveway is, read off the driveway. The room is allowed to
-## move and this suite is a statement about the car and the floor together.
+## Where the concrete under this screen's car is, read off the driveway. The room
+## is allowed to move and this suite is a statement about the car and the floor
+## together.
+##
+## Asked with `settle()` at the car's own spot, which is the question
+## [method Garage._park_the_car] asks. It used to be `drive().end.y` in both
+## places, and that is the box round the concrete mesh rather than a surface —
+## the pad is sunk between kerb walls, so the box's lid is the kerb and the ten
+## styles were all parked 0.345 m over their own driveway until #167. A test that
+## reads the box agrees with a room that reads the box, which is the failure mode
+## worth designing out.
 func _tarmac(screen: GameScreen) -> float:
-	return _ground_of(screen).drive().end.y
+	return _ground_of(screen).settle(PackedVector3Array([_car_of(screen).global_position]))[0]
 
 
 ## The gap between [param point] and the nearest face of [param box], and zero if

@@ -23,6 +23,18 @@ const GROUND: String = "res://src/world/ground.tscn"
 ## Close enough for a length in metres — a tenth of a millimetre.
 const TOLERANCE: float = 0.0001
 
+## How far the top of the kerb stands over the pad it fences, in metres — which
+## is also, after #167 lays the pad on the room's origin plane, where
+## [method Ground.drive]'s box tops out in world space.
+##
+## Measured off the mesh rather than declared: the concrete's two faces are
+## 0.1270 and 0.40322 up the model's own axis and the scene stands it a quarter
+## over, so the gap is 0.27622 x 1.25. It is written down here because it is the
+## number the bug was worth: every car in the pack was parked on it instead of on
+## the pad, and a change that quietly closes the sinking would otherwise look
+## like a pass.
+const KERB: float = 0.3453
+
 ## The longest car in the pack, in metres, and the widest. The pickup on both
 ## counts — see [code]src/world/mesh_car.gd[/code] — and the numbers are here
 ## rather than measured because what is being asked below is whether the concrete
@@ -62,11 +74,22 @@ func test_the_room_stands_on_a_modeled_ground() -> void:
 
 func test_the_concrete_is_the_room_s_own_floor() -> void:
 	# The line src/world/ground.tscn exists to make true. The model is authored
-	# about a point 0.403 m below its own concrete, and every car in the pack is
-	# sat on `drive().end.y` — so a placement that forgot the offset would bury
-	# ten cars in the tarmac by the same 0.403 and nothing else in the suite would
-	# say why.
-	assert_almost_eq(_ground().drive().end.y, 0.0, TOLERANCE, "the drive must be the floor")
+	# about a point 0.127 m below the face a car parks on, and every car in the
+	# pack is sat on whatever that face measures — so a placement that forgot the
+	# offset would bury ten cars in the tarmac by the same 0.127 and nothing else
+	# in the suite would say why.
+	#
+	# The floor is the pad, asked for with settle(), and not drive().end.y. Those
+	# were the same assertion until #167 and they were never the same statement:
+	# the concrete is a pad sunk between kerb walls, so the box round the mesh
+	# tops out on the kerb and a room that treats the box's lid as the floor parks
+	# its cars in mid-air. Both are pinned here, a third of a metre apart, so that
+	# the sunken shape is a thing the suite says out loud rather than a surprise
+	# waiting in the model.
+	var pad: PackedFloat32Array = _ground().settle(PackedVector3Array([Vector3.ZERO]))
+	assert_false(is_nan(pad[0]), "there must be concrete under the middle of the room")
+	assert_almost_eq(pad[0], 0.0, TOLERANCE, "the pad must be the floor")
+	assert_almost_eq(_ground().drive().end.y, KERB, TOLERANCE, "and the kerb must stand over it")
 
 
 func test_the_concrete_is_centred_on_the_car() -> void:
@@ -162,7 +185,9 @@ func test_the_ground_is_a_scene_of_its_own() -> void:
 	assert_not_null(alone, "the ground scene must be a Ground")
 	add_child_autofree(alone)
 	await wait_process_frames(1)
-	assert_almost_eq(alone.drive().end.y, 0.0, TOLERANCE, "on its own origin, wherever it stands")
+	var pad: PackedFloat32Array = alone.settle(PackedVector3Array([Vector3.ZERO]))
+	assert_false(is_nan(pad[0]), "the ground must carry its own concrete")
+	assert_almost_eq(pad[0], 0.0, TOLERANCE, "on its own origin, wherever it stands")
 
 
 func test_a_ground_that_cannot_find_its_concrete_says_so_with_an_empty_box() -> void:
@@ -190,17 +215,20 @@ func test_the_ground_says_how_high_the_concrete_is_where_the_car_stands() -> voi
 	# two therefore disagree by the depth of the sinking, and that is a fact about
 	# the model rather than a bug in either measurement.
 	#
-	# IT IS ALSO, MEASURED, WHY THE PARKED CAR FLOATS. Garage._park_the_car() sits
-	# every car on drive().end.y, which is the top of the kerb and not the surface
-	# of the pad — so the ten cars in the pack stand 0.35 m above the concrete
-	# they look parked on. The numbers, off this scene: the pad under the origin
-	# comes back at -0.345, drive().end.y at 0.00003, and the parked car's own
-	# bounds().position.y at 0.00003 with it. Parking a car is not what this file
-	# is about and the fix is not made here, but the measurement that shows it is
-	# written down rather than left for a screenshot to find.
+	# IT IS ALSO, MEASURED, WHY THE PARKED CAR USED TO FLOAT. Garage._park_the_car
+	# sat every car on drive().end.y — the top of the kerb, not the surface of the
+	# pad — so the ten cars in the pack stood 0.345 m above the concrete they
+	# looked parked on. #167 fixed it at both ends: the room asks settle() for the
+	# surface under the car, and src/world/ground.tscn was re-placed off the
+	# drivable face rather than off the kerb, which is what turned these two
+	# numbers from a 0-over-a--0.345 into a 0.3453-over-a-0. The pair of them is
+	# still the interesting thing and it is still the same distance apart, which
+	# is the assertion that survives being re-placed again.
 	var here: PackedFloat32Array = _ground().settle(PackedVector3Array([Vector3.ZERO]))
 	var drive: AABB = _ground().drive()
 	assert_false(is_nan(here[0]), "there must be concrete under the car")
+	assert_almost_eq(here[0], 0.0, TOLERANCE, "the pad under the car is the room's floor")
+	assert_almost_eq(drive.end.y, KERB, TOLERANCE, "and the slab's box tops out on the kerb")
 	assert_between(here[0], drive.position.y, drive.end.y, "the pad is part of the slab")
 	assert_lt(here[0], drive.end.y, "the pad is sunk below the top of the kerb it is let into")
 

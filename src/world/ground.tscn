@@ -30,9 +30,30 @@ concrete = NodePath("Model/Sketchfab_model/Driveway_obj_cleaner_materialmerger_g
 ;   on the pad rather than over the kerb. ground.gd argues it at length, and
 ;   tests/integration/test_ground.gd does the sum against Garage's own radius.
 ;
-;   Y -0.504 — the concrete's top face is 0.4032 m up the model's own axis, and
-;   0.4032 x 1.25 is 0.504. This is the line that makes ground.gd's drive() come
-;   back at zero, which is the height every car in the pack gets sat on.
+;   Y -0.15875 — the drivable face of the concrete is 0.1270 m up the model's
+;   own axis, and 0.1270 x 1.25 is 0.15875. This is the line that lays the pad a
+;   car parks on onto the room's own origin plane, so that the heights authored
+;   in garage.gd — eye_position, eye_height_min, eye_height_max — go on meaning
+;   heights over the floor a person would be standing on rather than over a
+;   plane that happens to pass through the scenery.
+;
+;   This number used to be -0.504, off a model-space 0.4032, and that was
+;   measured off the wrong face (#167). The concrete is not a slab: it is a
+;   sunken pad with kerb walls standing up either side of it, and 0.4032 is the
+;   top of the kerb. Placing by it put the room's origin plane on the kerb, and
+;   because the room then parked every car on ground.gd's drive() — the box
+;   round the whole mesh, whose top is that same kerb — all ten cars in the pack
+;   stood 34.5 cm above the concrete they looked parked on. The kerb has not
+;   moved relative to the pad and drive().end.y still reports it truthfully, at
+;   +0.3453 now. What changed is which of the mesh's two faces this file calls
+;   the floor, and that the room asks ground.gd's settle() for the surface under
+;   the car instead of for the lid of the box.
+;
+;   The four decimals are a measurement and not a rounding. #167 estimated the
+;   drivable face at 0.1272 from the outside; sampled through settle() over the
+;   middle of the pad it is 0.1270 flat, and 0.1272 would leave the tyres a
+;   quarter of a millimetre under the concrete — inside what a player could see
+;   and outside the 0.0001 the suite asserts to.
 ;
 ;   X -0.156 and Z -0.309 — the pad's footprint is centred on (0.125, -0.247) in
 ;   the model rather than on its origin, so without these the car would be parked
@@ -58,4 +79,4 @@ concrete = NodePath("Model/Sketchfab_model/Driveway_obj_cleaner_materialmerger_g
 ; textures arrived. They arrived with the car pack; this is that convention, and
 ; the way it is kept is by not overriding it here.
 [node name="Model" parent="." instance=ExtResource("2_model")]
-transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, -0.156, -0.504, -0.309)
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, -0.156, -0.15875, -0.309)
