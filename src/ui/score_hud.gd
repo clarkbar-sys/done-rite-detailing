@@ -116,6 +116,17 @@ const TOTAL_FONT: int = 76
 ## Point size of the multiplier under it.
 const RUN_FONT: int = 40
 
+## Point size of the done percentage under that. Between the multiplier and a
+## pop: it is the one number on this HUD that is true all the time rather than
+## for a moment, so it should be readable at a glance and never be the thing the
+## eye goes to first.
+const DONE_FONT: int = 34
+
+## What the done percentage rests at. [constant Brand.MUTED] like the total, and
+## for the same reason — it never flashes, so it never needs a colour to fall back
+## from.
+const DONE_TINT: Color = Brand.MUTED
+
 ## Point size of a pop.
 const POP_FONT: int = 36
 
@@ -139,9 +150,14 @@ var _pops: Array[Label] = []
 var _ages: PackedFloat32Array = PackedFloat32Array()
 var _next_pop: int = 0
 var _flying: int = 0
+## The done percentage last printed, as a whole number. Kept so [method done] can
+## be called every frame — which is what a number read off a running total has to
+## be — without building a string sixty times a second to say the same thing.
+var _done: int = 0
 
 @onready var _total_label: Label = %Total
 @onready var _run_label: Label = %Multiplier
+@onready var _done_label: Label = %Done
 
 
 func _ready() -> void:
@@ -165,6 +181,9 @@ func _ready() -> void:
 	_total_label.add_theme_font_size_override("font_size", TOTAL_FONT)
 	_run_label.add_theme_font_size_override("font_size", RUN_FONT)
 	_run_label.visible = false
+	_done_label.add_theme_font_size_override("font_size", DONE_FONT)
+	_done_label.add_theme_color_override("font_color", DONE_TINT)
+	_print_done()
 	_paint()
 	_relayout()
 
@@ -226,6 +245,43 @@ func tick(reached: int) -> void:
 		return
 	_total = reached
 	_roll = maxf(float(_total) - _shown, 1.0) / ROLL_SECONDS
+
+
+## How much of the car is finished, as [code]0..1[/code] — [method Grime.shine],
+## printed as a percentage.
+##
+## [b]Why this can exist at all is the whole of [code]#144[/code].[/b] Until the
+## grime was seeded only where a player can reach, the shine could not pass about
+## a half whatever anybody did to the car, because the underside of the shell and
+## the air inside every panel's box were seeded with mud nobody could take off. A
+## percentage nobody can finish is worse than no percentage, which is why there was
+## none here before. [PanelReach] is what made the number honest and this is what
+## prints it.
+##
+## [b]Polled and not signalled[/b], which is the same split the rest of this HUD
+## makes: an award is an instant and arrives through [method score], and how clean
+## the car is is true across frames, so [code]src/screens/play_screen.gd[/code]
+## reads it once a frame exactly as it reads the wage and the walk. Nothing flashes
+## and nothing pops — see [method tick], which is the same argument about the same
+## kind of number.
+##
+## [b]Rounded down, and that matters at exactly one value.[/b] A car at 99.6%
+## printing "100% done" while the last patch is still muddy is the readout calling
+## a job finished that is not, which is the one lie a progress number must not
+## tell. Flooring means the hundred arrives with the last unit of shine and not
+## before.
+func done(fraction: float) -> void:
+	var percent: int = clampi(floori(fraction * 100.0), 0, 100)
+	if percent == _done:
+		return
+	_done = percent
+	_print_done()
+
+
+## What the done readout says, as a whole percent. What a test asserts instead of
+## reading a label back.
+func done_shown() -> int:
+	return _done
 
 
 ## The colour the score throws for a patch that finished [param stage].
@@ -347,8 +403,21 @@ func _paint() -> void:
 	_total_label.add_theme_font_size_override("font_size", punched)
 
 
-## Puts the total in the corner, the multiplier under it, and both clear of
-## whatever else is already in that corner.
+## Writes the done percentage out. One place, called from [method _ready] and
+## from [method done], so the resting text and the running one cannot drift into
+## two different shapes.
+func _print_done() -> void:
+	_done_label.text = "%d%% done" % _done
+
+
+## Puts the total in the corner, the multiplier under it, the done percentage
+## under that, and all three clear of whatever else is already in that corner.
+##
+## The rows are stacked by measuring rather than by anchors, and every one of them
+## takes its height whether it is visible or not — the multiplier is hidden for
+## most of a game, and a done readout that jumped up the screen the first time a
+## run of two patches appeared would be worse than one sitting a row lower than it
+## has to.
 func _relayout() -> void:
 	if _total_label == null:
 		return
@@ -357,6 +426,8 @@ func _relayout() -> void:
 	_total_label.position = Vector2(_left(), _top())
 	_run_label.size = Vector2(width, float(RUN_FONT) * 1.4)
 	_run_label.position = Vector2(_left(), _top() + _total_label.size.y)
+	_done_label.size = Vector2(width, float(DONE_FONT) * 1.4)
+	_done_label.position = Vector2(_left(), _run_label.position.y + _run_label.size.y)
 	for index: int in _pops.size():
 		_place_pop(index)
 
@@ -389,7 +460,7 @@ func _top() -> float:
 	return ToolBeltHud.MARGIN + ceilf(TouchTarget.min_design_size()) + ToolBeltHud.GAP
 
 
-## Where a pop starts from: the bottom of the column, so it rises past the
-## multiplier and the total rather than out of them.
+## Where a pop starts from: the bottom of the column, so it rises past the done
+## readout, the multiplier and the total rather than out of them.
 func _pop_top() -> float:
-	return _top() + float(TOTAL_FONT) * 1.4 + float(RUN_FONT) * 1.4
+	return _top() + (float(TOTAL_FONT) + float(RUN_FONT) + float(DONE_FONT)) * 1.4

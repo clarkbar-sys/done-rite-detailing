@@ -248,6 +248,7 @@ func _process(_delta: float) -> void:
 	# in does not pay for the readout.
 	if _masks.is_shown() and grime != null:
 		_masks.report(grime.remaining(), grime.shine())
+	_show_how_far_along(grime)
 	_pay_for_the_work(grime)
 
 
@@ -452,6 +453,32 @@ func _on_patch_finished(_panel: String, _patch: int, stage: GrimeMap.Stage) -> v
 	var award: int = _score.score(stage)
 	_scoreboard.score(_score.total(), award, stage, _score.multiplier())
 	ring_bell(Bell.Voice.PATCH)
+
+
+## Puts how far through the job the car is in the corner, if [param grime] exists
+## yet.
+##
+## [b]Polled, and it is the fourth thing on this screen that is[/b] — after the
+## walk, the wage and the readout above. Cleaning is true across frames rather than
+## being an event, so the number is read off a running total once a frame; the
+## alternative is [Grime] emitting a float sixty times a second per tool, which is
+## exactly what [signal Garage.aimed] is shaped the way it is to avoid. The class
+## docs make the same distinction three times already and this is its fourth
+## instance.
+##
+## [method Grime.shine] rather than [method Grime.remaining], because the mud
+## coming off is the first third of the job and a bar that read "done" at that
+## point would be lying about two passes. Shine is the one reading that only ever
+## rises and reaches one exactly when the car is finished — see its docs, and
+## [PanelReach] for what had to change before it could.
+##
+## The cost is a walk over the car's seven maps adding seven floats, which is why
+## it is not gated behind the debug view the way the mask report above it is: this
+## one the player can see.
+func _show_how_far_along(grime: Grime) -> void:
+	if grime == null:
+		return
+	_scoreboard.done(grime.shine())
 
 
 ## A tally of nothing done, one entry per stage of the job.
