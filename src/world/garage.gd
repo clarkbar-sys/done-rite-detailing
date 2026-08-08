@@ -905,23 +905,49 @@ func show_style(style_name: String) -> void:
 ## the first thing anybody would see and the last thing a test measuring
 ## clearances would notice.
 ##
+## [b]The floor is a surface under the car, not the lid of the driveway's box.[/b]
+## This function used to sit every car on [code]drive().end.y[/code], and that was
+## wrong by 34.5 cm for the whole pack (#167). [method Ground.drive] is the box
+## around the concrete [i]mesh[/i], and the modeled concrete is a sunken pad with
+## kerb walls standing up either side of it — so the top of that box is the top of
+## the kerb, and the tyres were parked on the kerb while the pad they looked
+## parked on ran a third of a metre below them. The box was never lying; it was
+## being asked the wrong question. The right question is [method Ground.settle],
+## which drops a line through the car's own spot and comes back with the surface
+## it meets, and the answer to that at the middle of the drive is the pad.
+##
 ## [b]A car it cannot measure is left exactly where the scene file put it[/b],
 ## which is the same answer [method _hold_the_standoff] gives a ray that hit
 ## nothing: the honest response to having no measurement is to move nothing. A
 ## zero box means a car whose panels have no geometry yet — which on a CSG car is
 ## every car during [method Node._ready], see [method Car.bounds] — and lifting
-## one by half of nothing would sink it instead.
+## one by half of nothing would sink it instead. NAN out of [method Ground.settle]
+## is the same guard for the other half of the sum: it means there is no ground
+## under this spot at all, and a car dropped onto no measurement would land at
+## zero and look deliberate.
 func _park_the_car() -> void:
 	var box: AABB = _car.bounds()
 	if box.size.y <= 0.0:
 		return
-	# And the tarmac is asked for rather than assumed to be zero. It is zero —
-	# `src/world/ground.tscn` lays the model's concrete on the room's own origin
-	# plane deliberately — but the floor being at the origin is a fact about the
-	# ground, and reading it here is what makes re-placing the ground a change to
-	# one scene file instead of a hunt for the places that knew where it used to
-	# be. The same reason the box above is the car's own and not 1.4 m.
-	_car.global_position.y += _ground.drive().end.y - box.position.y
+	# And the floor is asked about *here*, at the car, rather than read off the
+	# slab's box or assumed to be zero. Both of those are facts the ground owns
+	# and neither is the one wanted: asking where the box tops out gets the kerb,
+	# and asking nothing at all gets whatever the origin plane happened to mean
+	# last time somebody re-placed `src/world/ground.tscn`. Asking what is under
+	# the car gets the concrete the car is standing on, and keeps re-placing the
+	# ground a change to one scene file instead of a hunt for the places that
+	# knew where it used to be. The same reason the box above is the car's own
+	# and not 1.4 m.
+	#
+	# [method Garage.show_style] re-parks on every swap, so this runs per swap.
+	# `settle()` is one bucketed pass over the ground's triangles however many
+	# spots it is handed, and this hands it one — cheap enough that caching the
+	# height would be trading a stale number for nothing. Cache it when profiling
+	# shows a hitch, not before.
+	var surface: float = _ground.settle(PackedVector3Array([_car.global_position]))[0]
+	if is_nan(surface):
+		return
+	_car.global_position.y += surface - box.position.y
 
 
 ## Puts the camera where the orbit says it should be, looking at the car.
