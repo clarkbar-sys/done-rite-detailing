@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://src/world/garage.gd" id="1_garage"]
 [ext_resource type="Script" path="res://src/world/view_model.gd" id="2_view_model"]
@@ -6,6 +6,7 @@
 [ext_resource type="Shader" path="res://src/world/sky.gdshader" id="4_sky"]
 [ext_resource type="Script" path="res://src/world/lens.gd" id="5_lens"]
 [ext_resource type="PackedScene" path="res://src/world/ground.tscn" id="6_ground"]
+[ext_resource type="PackedScene" path="res://src/world/grove.tscn" id="7_grove"]
 
 ; The sky. Every number in the *look* of it lives in the shader's own uniform
 ; defaults rather than being overridden here, so there is one file to open when
@@ -117,6 +118,21 @@ omni_range = 16.0
 ; the way in and again on every restyle.
 [node name="Ground" parent="View/World" instance=ExtResource("6_ground")]
 unique_name_in_owner = true
+
+; The trees, rolled from fixed seeds at _ready() and stood on the lawn that
+; wraps three sides of the drive. src/world/grove.gd has the argument for all of
+; it — why there are three rows and not six, why the middle of each long one is
+; bare, why the end the car drives in from is left open, and why nothing out
+; here has a collider.
+;
+; Its defaults are this driveway's numbers, measured off the model, so the only
+; thing overridden is the one thing the scene cannot know on its own: which node
+; is the ground. A sibling and not a child of Ground, which is load-bearing
+; rather than tidy — Ground.extent() is the merged box of every mesh beneath it
+; and five test files read the room's fence off it, so a wood parented in there
+; would push that fence out by a crown and move a number nobody meant to move.
+[node name="Grove" parent="View/World" instance=ExtResource("7_grove")]
+ground = NodePath("../Ground")
 
 ; The car, in the middle of the drive, on the floor — and neither of those is a
 ; number this file can state any more. Every car in the pack is authored about
