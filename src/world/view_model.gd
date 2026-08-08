@@ -699,6 +699,13 @@ func _held_pose(id: DetailingTool.Id) -> Transform3D:
 	# Tire & engine cleaner: the same idea as the window bottle, leaned further
 	# over so a glance at the corner of the screen tells them apart even before
 	# the near-black registers as a colour.
+	#
+	# These sixteen degrees carry more than they used to. The two bottles were
+	# different meshes and are now the same one in two liveries — see
+	# [code]scripts/build-window-cleaner.py[/code] — so silhouette no longer tells
+	# them apart at all, and this angle and the blue-against-grey are the whole of
+	# what does. Retune it towards the window bottle's and the belt goes back to
+	# carrying one bottle twice.
 	return _pose(Vector3(-14.0, 0.0, 30.0), -0.05)
 
 

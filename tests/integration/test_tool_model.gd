@@ -34,11 +34,12 @@ const TURNED: float = 0.9999
 ## untouched.
 ##
 ## Asserted rather than assumed because it is not a given: it depends entirely on
-## how lopsided the fit is, and the tyre bottle's is nearly uniform. Measured,
-## worst vertex, fit left out: 0.925 for the window bottle and 0.993 for the tyre
-## bottle at their catalogue extents, 0.614 and 0.814 at [constant LOPSIDED]. The
-## first of those is the thin margin this constant sits inside, and the reason
-## the same measurement is made at both extents.
+## how lopsided the fit is, and both bottles' fits are nearly uniform. Measured,
+## worst vertex, fit left out: 0.992 for the window bottle and 0.993 for the tyre
+## bottle at their catalogue extents, and 0.814 for both at [constant LOPSIDED] —
+## one number twice, because the two bottles are one mesh and that extent is one
+## box. Those first two are the thin margin this constant sits inside, and the
+## reason the same measurement is made at both extents.
 const UNTURNED_MAX: float = 0.999
 
 ## A fit nothing on the belt would ever ask for: a bottle stretched to a metre
@@ -52,7 +53,7 @@ const LOPSIDED: Vector3 = Vector3(0.1, 1.0, 0.1)
 ## normals alone cost" is a question with an answer.
 ##
 ## A ratio of the largest to the smallest, and 1.01 is a long way from every fit
-## on the belt: the window bottle's is 2.23, the tyre bottle's 1.27, and the
+## on the belt: the window bottle's is 1.29, the tyre bottle's 1.26, and the
 ## pressure washer's — whose extent is its own mesh's box at one scale, on
 ## purpose — is 1.0013. So this separates a fit that is uniform by design from
 ## every fit that is merely gentle, and it does not sit near enough to either to
@@ -225,11 +226,11 @@ func test_a_model_is_centred_where_the_cylinder_was() -> void:
 
 func test_the_fit_ignores_whatever_scale_the_export_was_saved_at() -> void:
 	# The reason the fit reads the mesh's own box instead of the node scale the
-	# [code].glb[/code] carries: the window bottle is a unit cylinder with its
-	# extent on the node as half-extents, so honouring that would ship it at twice
-	# its size, and the tyre bottle is a real sprayer in real metres, which is a
-	# third size again. Asked by fitting each asset into a box nothing else would
-	# ask for, and requiring it to land there.
+	# [code].glb[/code] carries: the bottles are real 27 cm sprayers in real
+	# metres, the sponge is a real 16 cm sponge, and the pressure washer is 21
+	# units of nothing in particular with the scale that would make it metres left
+	# on a node this class never looks at. Asked by fitting each asset into a box
+	# nothing else would ask for, and requiring it to land there.
 	for tool: DetailingTool in _modelled():
 		var box: AABB = _built(tool, LOPSIDED).get_aabb()
 		assert_almost_eq(box.size.x, LOPSIDED.x, TOLERANCE, "%s: width" % tool.display_name)
@@ -240,12 +241,16 @@ func test_the_catalogue_and_not_the_file_is_what_makes_the_bottles_different_siz
 	# The catalogue gives the two bottles different extents on purpose — [method
 	# ViewModel._held_pose] leans them apart so a glance at the corner of the
 	# screen tells them apart — and the files they are drawn from say nothing
-	# about that. They are not even close to agreeing: the window bottle is a
-	# 2 x 2.33 x 2 unit cylinder and the tyre bottle is a 27 cm sprayer in real
-	# metres, so a fit that took its size from the file would put a bottle in the
-	# player's hand that is taller than they are.
+	# about that. Since [code]scripts/build-window-cleaner.py[/code] made the
+	# window bottle out of the tyre one, the files cannot say anything about it:
+	# they are the same geometry in two liveries, down to the millimetre. So the
+	# source boxes are asserted equal and the fitted ones are asserted different,
+	# which is the whole claim of this test with nothing left to infer.
 	var window: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.WINDOW_CLEANER]
 	var tire: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.TIRE_ENGINE_CLEANER]
+	var window_source: Vector3 = _source_mesh(window.model).get_aabb().size
+	var tire_source: Vector3 = _source_mesh(tire.model).get_aabb().size
+	assert_almost_eq(window_source.y, tire_source.y, TOLERANCE, "the two files disagree on height")
 	var window_box: AABB = _built(window, window.extent).get_aabb()
 	var tire_box: AABB = _built(tire, tire.extent).get_aabb()
 	assert_gt(tire_box.size.y, window_box.size.y, "the tyre bottle is the taller of the two")
@@ -356,11 +361,16 @@ func test_the_models_own_textures_survive_the_fit() -> void:
 
 func test_no_two_modelled_tools_share_one_texture() -> void:
 	# Two tools that came out of the same tin of paint are one tool as far as a
-	# glance at the corner of the screen is concerned. Kept as a test after the
-	# tyre bottle stopped being a re-skin of the window one, because what it
-	# guards is not that history: every one of these is extracted beside its
-	# [code].glb[/code] as a PNG named after it, and a re-export that renames one
-	# onto another's file is silent everywhere else.
+	# glance at the corner of the screen is concerned — which is the whole of what
+	# separates the two bottles now that they are one mesh in two liveries. So this
+	# is no longer a guard against history repeating: it is the assertion the
+	# window bottle's blue rests on. Surface 0 and not all six on purpose, and the
+	# bake is why: [code]scripts/build-window-cleaner.py[/code] recolours the body
+	# and copies the caps, the neck, the nozzle and the trigger across byte for
+	# byte, so five of the six really are the same tin and the body is the one that
+	# must not be. Each of these is also extracted beside its [code].glb[/code] as
+	# a PNG named after it, and a re-bake that renamed one onto another's file
+	# would be silent everywhere else.
 	var textures: Array[Texture2D] = []
 	for tool: DetailingTool in _modelled():
 		var surface: StandardMaterial3D = (

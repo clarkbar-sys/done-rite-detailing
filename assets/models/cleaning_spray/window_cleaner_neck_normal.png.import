@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://csoxdbfdnni22"
-path="res://.godot/imported/window_cleaner_window_cleaner.png-9007e6fd2b6c070cece61f41a315bd85.ctex"
+uid="uid://bth2svxlxkpl1"
+path="res://.godot/imported/window_cleaner_neck_normal.png-33bef1fbc3b643863d4be908c9fe0187.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "32dd5faf13e61254965309912bbc1683"
+"md5": "f1fd6b038c65eb9396081177da61b2ff"
 }
 
 [deps]
 
-source_file="res://assets/models/cleaning_spray/window_cleaner_window_cleaner.png"
-dest_files=["res://.godot/imported/window_cleaner_window_cleaner.png-9007e6fd2b6c070cece61f41a315bd85.ctex"]
+source_file="res://assets/models/cleaning_spray/window_cleaner_neck_normal.png"
+dest_files=["res://.godot/imported/window_cleaner_neck_normal.png-33bef1fbc3b643863d4be908c9fe0187.ctex"]
 
 [params]
 

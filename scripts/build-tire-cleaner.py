@@ -316,10 +316,12 @@ def attribution_of(src: Source) -> str:
         if not extras.get(key):
             raise AssertionError(f"the source carries no {key} to credit")
     return (
-        f'tire_cleaner.glb is a processed derivative of "{extras["title"]}"\n'
+        f'tire_cleaner.glb and window_cleaner.glb are processed derivatives of "{extras["title"]}"\n'
         f'({extras["source"]}) by {extras["author"]},\n'
         f'licensed under {extras["license"]}.\n'
-        f"See scripts/build-tire-cleaner.py for what the processing does.\n"
+        f"See scripts/build-tire-cleaner.py for what the processing does, and\n"
+        f"scripts/build-window-cleaner.py for the recolour that makes the second\n"
+        f"one out of the first.\n"
         f"\n"
         f"Every other model in this folder is the project's own.\n"
     )
