@@ -182,9 +182,11 @@ static func catalogue() -> Array[DetailingTool]:
 			"res://assets/models/cleaning_spray/window_cleaner.glb"
 		)
 	)
-	# The same bottle in a different livery, and the same note about its colour:
-	# near-black rather than black, because a true 0,0,0 icon takes no light at
-	# all and reads as a hole in the badge instead of as a bottle.
+	# A trigger sprayer, and the only tool on the belt whose art came from outside
+	# the project — see [code]assets/models/cleaning_spray/ATTRIBUTION.txt[/code].
+	# The colour is the roll-up's business and not the model's, and the same note
+	# applies to it: near-black rather than black, because a true 0,0,0 icon takes
+	# no light at all and reads as a hole in the badge instead of as a bottle.
 	tools.append(
 		DetailingTool.new(
 			Id.TIRE_ENGINE_CLEANER,

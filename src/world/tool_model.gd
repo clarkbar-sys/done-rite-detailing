@@ -20,15 +20,17 @@
 ## near plane, the car, the ground — then means the same thing it meant about the
 ## primitive, because it is measured against the same box.
 ##
-## [b]The [code].glb[/code]'s own scale is deliberately thrown away.[/b] Both
-## bottles are authored in Blender as a unit cylinder with a
-## [code](0.1, 0.26, 0.1)[/code] scale on the node — which is the window
-## cleaner's catalogue extent read as half-extents, so the exported bottle is
-## twice the size the catalogue asks for, and the tyre cleaner is exported at the
-## window cleaner's numbers rather than at its own. Honouring that scale would
-## ship one bottle at the wrong size and two at the same size. Reading the mesh's
-## box instead makes the export's scale irrelevant: re-export the same shape at
-## any scale at all and the thing in the player's hand does not move.
+## [b]The [code].glb[/code]'s own scale is deliberately thrown away.[/b] The
+## window bottle is authored in Blender as a unit cylinder with a
+## [code](0.1, 0.26, 0.1)[/code] scale on the node — its catalogue extent read as
+## half-extents, so the exported bottle is twice the size the catalogue asks for.
+## The tyre bottle has the opposite problem and it is not a mistake either: it is
+## a real 27 cm trigger sprayer modelled in real metres, which is a perfectly good
+## number and is not the 30 cm the catalogue gives that tool. Honouring either
+## file would hand the player a bottle at a size nothing else in the game agrees
+## with. Reading the mesh's box instead makes the export's scale irrelevant:
+## re-export the same shape at any scale at all and the thing in the player's
+## hand does not move.
 ##
 ## [b]Fitted by rebuilding the mesh, not by scaling the node.[/b] The proxy's
 ## transform is rewritten every frame by its [ToolCarry] out of an orthonormal
@@ -49,8 +51,13 @@
 ## lit from the wrong angle rather than as a bug. The inverse transpose of a
 ## diagonal matrix is the reciprocal of its diagonal, so that is a component-wise
 ## divide; tangents are directions [i]along[/i] the surface and take the fit
-## itself. Neither is expensive: it is one pass over a couple of thousand
-## vertices, once, while the scene is loading.
+## itself. Neither is expensive per vertex and both are paid once, while the
+## screen is loading: measured in [method ViewModel._build], the window bottle's
+## 2,352 vertices take 5 ms and the tyre bottle's 37,286 take 37 ms. The second
+## of those is a real number rather than a rounding error, and it is the price of
+## a model this class deliberately does not decimate — see
+## [code]scripts/build-tire-cleaner.py[/code], which says the same thing about
+## the triangle count.
 class_name ToolModel
 extends MeshInstance3D
 
@@ -98,6 +105,13 @@ static func _mesh_in(model_path: String) -> Mesh:
 ## anything an artist left in the scene — an empty, a camera, a light — and the
 ## bottles are one mesh each. A model that grows a second one wants a class that
 ## keeps the hierarchy, not a silent second answer from here.
+##
+## [b]One mesh each is a property of the assets, and it is maintained.[/b] The
+## tyre bottle is six modelled parts — body, neck, nozzle, two caps and a trigger
+## — and [code]scripts/build-tire-cleaner.py[/code] flattens them into one mesh of
+## six surfaces on the way in, for exactly this contract. Read that way round,
+## the bake is what keeps the belt simple rather than this class being naive
+## about art.
 static func _first_mesh(node: Node) -> MeshInstance3D:
 	var here: MeshInstance3D = node as MeshInstance3D
 	if here != null and here.mesh != null:
