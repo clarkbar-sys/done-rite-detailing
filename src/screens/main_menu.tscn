@@ -169,32 +169,45 @@ text = "How to Play"
 ; The credits for the borrowed models, along the bottom of the menu.
 ;
 ; CC-BY 4.0 is the licence the ten models in assets/models/cars/ arrive under —
-; and the licence the tyre cleaner's bottle and the driveway all three of them
-; are used on arrive under too — and attribution is a condition of it, not a
-; courtesy. So it has to be somewhere a player can actually read, and this is the
-; screen every player passes through on the way to the bay. The same lines are in
-; README.md and in the three ATTRIBUTION.txt files beside the assets; this is the
-; copy the licence is actually satisfied by, because the others ship to whoever
-; clones the repo rather than to whoever plays the game.
+; and the licence the tyre cleaner's bottle, the sponge and the driveway all four
+; of them are used on arrive under too — and attribution is a condition of it,
+; not a courtesy. So it has to be somewhere a player can actually read, and this
+; is the screen every player passes through on the way to the bay. The same lines
+; are in README.md and in the four ATTRIBUTION.txt files beside the assets; this
+; is the copy the licence is actually satisfied by, because the others ship to
+; whoever clones the repo rather than to whoever plays the game.
 ;
-; One line per work, and all but the first link the author's page rather than the
-; model's: the car pack has a skfb.ly short link and the other two do not, and
-; their full URLs are 60-odd characters of hex that would wrap the line on a
-; phone. The direct link to each model is in the ATTRIBUTION.txt beside it and in
-; README.md.
+; Every work names what it is used for, its title, its author and a link, and all
+; but the first link the author's page rather than the model's: the car pack has
+; a skfb.ly short link and the others do not, and their full URLs are 60-odd
+; characters of hex that would wrap the line on a phone. The direct link to each
+; model is in the ATTRIBUTION.txt beside it and in README.md.
 ;
-; The third line arrived with the driveway (#114), and it is what took the type
-; from 20 down to 16. Three lines at 20 is 84 design px of credit standing under
-; a menu that leaves 90 between the How to Play pill's own words and the bottom
-; of the frame — the first line landed across the button's label. Sixteen fits
-; the three of them into 75 and clears it. The credit is small type along the
-; foot of the menu by design and this is a little smaller again, which is the
-; cost of a third borrowed model; a fourth would need the menu to give ground
-; rather than the type.
+; TWO WORKS PER LINE SINCE THE SPONGE (#155), AND THE COUNT IS THE REASON.
+; The line this replaced said a fourth work would have to be paid for by the menu
+; giving ground rather than by the type getting smaller again. Measured at the
+; 1280x720 design size, the menu has no ground to give: the column runs from
+; y = 21 to y = 699, both pills are already at the floor
+; TouchTarget.min_design_size() puts them at, and the How to Play label sits in
+; y = 584.5 .. 645.5. That leaves 62 px between the label and the 12 px margin at
+; the bottom of the frame — 4 lines would have to be 15 px apart to fit in it,
+; where 16 px type sets on 23, and even 3 lines at 23 overhang it by 6. So the
+; credit went from four lines to two, one pair of works each, and the whole block
+; is 46 px sitting in y = 662 .. 708: clear of the button's label by 16 px, and
+; with room for a fifth work before any of this has to be thought about again.
+; The lines are 1,105 and 1,166 px wide in a 1,248 px label, and the design width
+; is a floor rather than a target (window/stretch/aspect is "expand"), so neither
+; wraps on any screen shape.
 ;
-; A credit laid out off the bottom of the picture is not a credit —
-; tests/integration/test_main_menu.gd measures that rather than trusting the
-; offsets here.
+; vertical_alignment 2 is what makes those numbers true of the text rather than
+; of the box: the label's own height only grows past the offsets below once the
+; text needs more than they give, so a bottom-aligned block sits on the bottom
+; margin at two lines and at four, and never drifts up towards the button as
+; works are removed.
+;
+; A credit laid out off the bottom of the picture, or across the button, is not a
+; credit — tests/integration/test_main_menu.gd measures both rather than trusting
+; the offsets here.
 ;
 ; Bottom-left and quiet on purpose. It is not a design element and it is not a
 ; secret: the licence asks for the title, the author and the licence, "reasonable
@@ -221,7 +234,8 @@ offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_font_sizes/font_size = 16
-text = "Car models: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) — CC BY 4.0\nSpray bottle: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nDriveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0"
+text = "Cars: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) · Bottle: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nSponge: “Sponge” by Aullwen (sketchfab.com/Aullwen) · Driveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0"
+vertical_alignment = 2
 autowrap_mode = 3
 
 [node name="Build" type="Label" parent="."]

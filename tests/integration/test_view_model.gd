@@ -271,6 +271,16 @@ func test_every_proxy_is_the_shape_and_size_the_catalogue_gives_it() -> void:
 					cylinder.top_radius, tool.extent.x * 0.5, TOLERANCE, "x is a width"
 				)
 			DetailingTool.Shape.BOX:
+				# Measured off the mesh's own box for the same reason the cylinders
+				# are: the sponge is a modelled mesh fitted into this extent rather
+				# than a [BoxMesh] of it, and the box is what everything downstream
+				# reads either way.
+				var solid: AABB = proxy.get_aabb()
+				assert_almost_eq(solid.size.x, tool.extent.x, TOLERANCE, "x is a width")
+				assert_almost_eq(solid.size.y, tool.extent.y, TOLERANCE, "y is a thickness")
+				assert_almost_eq(solid.size.z, tool.extent.z, TOLERANCE, "z is a depth")
+				if not tool.model.is_empty():
+					continue
 				var box: BoxMesh = proxy.mesh as BoxMesh
 				assert_not_null(box, "%s is a box" % tool.display_name)
 				if box == null:

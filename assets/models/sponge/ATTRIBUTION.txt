@@ -1,0 +1,4 @@
+sponge.glb is a processed derivative of "Sponge"
+(https://sketchfab.com/3d-models/sponge-97aee64edf0c4521b82416f3b30c61ce) by Aullwen (https://sketchfab.com/Aullwen),
+licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+See scripts/build-sponge.py for what the processing does.

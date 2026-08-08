@@ -16,11 +16,11 @@
 ## buried in a mesh nobody can diff, and a real model drops in later without
 ## moving anything else.
 ##
-## [b]Two of them have now dropped in, and nothing else moved.[/b] The spray
-## bottles carry a [member model] — a glTF exported out of
+## [b]Three of them have now dropped in, and nothing else moved.[/b] The two
+## spray bottles and the sponge carry a [member model] — a glTF baked out of
 ## [code]src-models/[/code] — and [ToolModel] fits it into exactly the
-## [member extent] box the cylinder occupied. So this table still decides how big
-## a bottle is, the roll-up still draws its icon from the same row, and the three
+## [member extent] box the primitive occupied. So this table still decides how big
+## a sponge is, the roll-up still draws its icon from the same row, and the two
 ## tools with no model in their row are still primitives. What a model brings that
 ## a primitive could not is a texture, which is the whole reason to have one.
 class_name DetailingTool
@@ -83,7 +83,7 @@ var roughness: float
 ## The modelled mesh this tool is drawn by in the player's hands, as a
 ## [code]res://[/code] path, or [code]""[/code] for a tool still drawn as the
 ## primitive above. This is the "a real model drops in later" the class docs
-## promise, arriving for the two spray bottles.
+## promise, arriving for the two spray bottles and now for the sponge.
 ##
 ## [b]Everything above still applies to a tool that has one.[/b] [ToolModel]
 ## fits the mesh into exactly the [member extent] box the primitive occupied, so
@@ -93,6 +93,12 @@ var roughness: float
 ## and [member roughness] stop painting the mesh and go on describing it — which
 ## is what the roll-up reads them for, and why they are not deleted for a tool
 ## that has a model.
+##
+## [b]And [member shape] goes on meaning what it meant.[/b] The sponge is still a
+## [constant Shape.BOX] with a model in the same row: the roll-up draws that box,
+## and it is the shape the fit puts the mesh in whether or not a primitive is
+## built from it. A modelled tool that quietly stopped declaring a shape would
+## leave the icon with nothing to draw.
 ##
 ## A path rather than a [PackedScene] because this is data: the catalogue is
 ## built by a unit test with no renderer behind it, and a [code]preload[/code]
@@ -141,7 +147,10 @@ static func catalogue() -> Array[DetailingTool]:
 		)
 	)
 	# Stretched, as specified — a cube reads as a dice, and the thing that says
-	# "sponge" is that it is wider than it is thick.
+	# "sponge" is that it is wider than it is thick. Modelled since #155, and the
+	# box is unchanged by that: it is what the roll-up draws, what [ReachCarry]
+	# halves for the standoff, and the box the mesh is fitted into. The yellow is
+	# the roll-up's, not the mesh's — see [member model].
 	tools.append(
 		DetailingTool.new(
 			Id.SPONGE,
@@ -150,7 +159,8 @@ static func catalogue() -> Array[DetailingTool]:
 			Vector3(0.24, 0.10, 0.17),
 			Color(0.93, 0.82, 0.16),
 			0.0,
-			0.95
+			0.95,
+			"res://assets/models/sponge/sponge.glb"
 		)
 	)
 	# A plane has no thickness at all, so this one is the flattest thing on the
@@ -167,9 +177,10 @@ static func catalogue() -> Array[DetailingTool]:
 			0.9
 		)
 	)
-	# A spray bottle, and the first tool on the belt to be a modelled mesh rather
-	# than a primitive. The colour is what the roll-up draws it in and is unchanged
-	# — the other blue on the belt, deliberately a long way from the rag's.
+	# A spray bottle, and the first tool on the belt that was given a modelled mesh
+	# rather than a primitive. The colour is what the roll-up draws it in and is
+	# unchanged — the other blue on the belt, deliberately a long way from the
+	# rag's.
 	tools.append(
 		DetailingTool.new(
 			Id.WINDOW_CLEANER,
@@ -182,8 +193,10 @@ static func catalogue() -> Array[DetailingTool]:
 			"res://assets/models/cleaning_spray/window_cleaner.glb"
 		)
 	)
-	# A trigger sprayer, and the only tool on the belt whose art came from outside
-	# the project — see [code]assets/models/cleaning_spray/ATTRIBUTION.txt[/code].
+	# A trigger sprayer, and one of the two tools on the belt whose art came from
+	# outside the project — see
+	# [code]assets/models/cleaning_spray/ATTRIBUTION.txt[/code], and the sponge's
+	# above it.
 	# The colour is the roll-up's business and not the model's, and the same note
 	# applies to it: near-black rather than black, because a true 0,0,0 icon takes
 	# no light at all and reads as a hole in the badge instead of as a bottle.

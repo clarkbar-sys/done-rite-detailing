@@ -96,6 +96,33 @@ func _how_to_play_button() -> Button:
 	return _screen.get_node("%HowToPlay") as Button
 
 
+## The box [param credits] actually draws its lines in.
+##
+## Bottom-aligned inside its own rect (see [code]main_menu.tscn[/code]), so the
+## text sits on the bottom of the box and the unused height is above it — which
+## is the half that matters here, because what is above it is the menu.
+func _drawn_credit(credits: Label) -> Rect2:
+	var font: Font = credits.get_theme_font("font")
+	var size: int = credits.get_theme_font_size("font_size")
+	var widest: float = 0.0
+	for line: String in credits.text.split("\n"):
+		widest = maxf(widest, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+	var box: Rect2 = credits.get_global_rect()
+	var tall: float = credits.get_line_count() * credits.get_line_height()
+	return Rect2(Vector2(box.position.x, box.end.y - tall), Vector2(widest, tall))
+
+
+## The box [param pill]'s own words are drawn in — centred both ways in a button
+## that is mostly padding, and the only part of it a credit can be said to be
+## drawn across.
+func _drawn_label(pill: Button) -> Rect2:
+	var words: Vector2 = pill.get_theme_font("font").get_string_size(
+		pill.text, HORIZONTAL_ALIGNMENT_LEFT, -1, pill.get_theme_font_size("font_size")
+	)
+	var box: Rect2 = pill.get_global_rect()
+	return Rect2(box.position + (box.size - words) * 0.5, words)
+
+
 func _sound_toggle() -> SoundToggle:
 	return _screen.get_node("%Sound") as SoundToggle
 
@@ -149,20 +176,18 @@ func test_the_logo_is_framed_rather_than_pasted_on() -> void:
 
 
 func test_every_borrowed_model_is_credited_where_a_player_can_read_it() -> void:
-	# CC-BY 4.0 is the licence the cars, the tyre cleaner's bottle and the driveway
-	# all arrive under, and attribution is a condition of it, not a courtesy. A
-	# file in the repository does not discharge that — the person playing the game
-	# never sees one — so the credit has to be on a screen, and this is the screen
-	# every player passes through.
+	# CC-BY 4.0 is the licence the cars, the tyre cleaner's bottle, the sponge and
+	# the driveway all arrive under, and attribution is a condition of it, not a
+	# courtesy. A file in the repository does not discharge that — the person
+	# playing the game never sees one — so the credit has to be on a screen, and
+	# this is the screen every player passes through.
 	#
 	# Every work, and all three parts of each by name, because the licence asks
 	# for all three and a line that lost one of them would still look like a
 	# credit: the title of the work, who made it, and what licence it is under.
 	# Substrings rather than the whole string, so the wording around them stays
-	# the .tscn's business.
-	#
-	# A table rather than a test per work, so borrowing another model is a row
-	# here — which is exactly what the driveway (#114) turned out to be.
+	# the .tscn's business — including how many of them share a line, which is two
+	# apiece since the sponge (#155).
 	var credits: Label = _screen.get_node("%Credits") as Label
 	assert_not_null(credits, "the menu must carry the credits for the borrowed models")
 	if credits == null:
@@ -170,6 +195,7 @@ func test_every_borrowed_model_is_credited_where_a_player_can_read_it() -> void:
 	var borrowed: Array[Array] = [
 		["Generic passenger car pack", "Comrade1280"],
 		["Kitchen Spray", "Jesus Osco"],
+		["Sponge", "Aullwen"],
 		["Sunken Driveway Parking Spot", "jimbogies"],
 	]
 	for work: Array in borrowed:
@@ -191,6 +217,28 @@ func test_the_credit_is_actually_on_the_screen() -> void:
 	var design: Vector2i = get_tree().root.content_scale_size
 	assert_lte(box.end.y, float(design.y), "the credit is off the bottom of the picture")
 	assert_true(credits.is_visible_in_tree(), "the credit must be drawn")
+
+
+func test_the_credit_does_not_cross_the_how_to_play_label() -> void:
+	# The bug the driveway's third line found (#114) and the sponge's fourth work
+	# would have found again: a credit is bottom-anchored and grows upwards, the
+	# menu column is centred, and past a certain number of lines the top one is
+	# drawn straight through "How to Play". It is legible neither as a credit nor
+	# as a button, and nothing else on this screen can see it happen — the two
+	# nodes are siblings that never touch, and both are laid out exactly as their
+	# offsets ask.
+	#
+	# Both boxes are measured off the text rather than off the control: a Label
+	# is as tall as its offsets whatever it has in it, and a pill is mostly
+	# padding. Measured in the viewport this suite is running in, so the claim
+	# holds at whatever size the window happens to be rather than only at the
+	# design one.
+	var credits: Label = _screen.get_node("%Credits") as Label
+	var pill: Button = _how_to_play_button()
+	assert_false(
+		_drawn_credit(credits).intersects(_drawn_label(pill)),
+		"the credit is drawn across the How to Play label"
+	)
 
 
 func test_the_font_can_draw_the_credit() -> void:
