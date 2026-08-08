@@ -1,0 +1,59 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/world/grove.gd" id="1_grove"]
+
+; The unit trunk: 1 m tall, 1 m across at the base, standing on its own origin
+; so the script can scale it by a height and a radius and be done. Eight sides,
+; and tapered a little toward the top, which is as much tree as a cylinder seen
+; from ten metres away can usefully be.
+[sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
+top_radius = 0.85
+bottom_radius = 1.0
+height = 1.0
+radial_segments = 8
+rings = 0
+
+; The unit leaf blob: radius 1, scaled per sphere. Kept coarse on purpose —
+; the crown is meant to read as blocked-out lumps, and at eight segments a
+; sphere still silhouettes as round while its shading stays chunky.
+[sub_resource type="SphereMesh" id="SphereMesh_blob"]
+radius = 1.0
+height = 2.0
+radial_segments = 8
+rings = 5
+
+; Bark and leaf, matte throughout: the driveway's only shiny things are the
+; paint and the power wash, and a tree that caught a highlight would pull the
+; eye off both. Two barks and three greens, dealt round in src/world/grove.gd.
+;
+; The greens are the ones the blockout wood carried, kept rather than retuned
+; against the modeled lawn. They are darker and less yellow than the grass
+; texture they now stand on, which is what a tree canopy is next to open turf,
+; and the alternative — sampling the albedo and matching it — would give a wood
+; that vanishes into the ground it is planted on.
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bark_dark"]
+albedo_color = Color(0.28, 0.19, 0.12, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bark_pale"]
+albedo_color = Color(0.38, 0.27, 0.17, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaf_deep"]
+albedo_color = Color(0.11, 0.3, 0.12, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaf_mid"]
+albedo_color = Color(0.16, 0.42, 0.15, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaf_pale"]
+albedo_color = Color(0.24, 0.52, 0.19, 1)
+roughness = 0.95
+
+[node name="Grove" type="Node3D"]
+script = ExtResource("1_grove")
+trunk_mesh = SubResource("CylinderMesh_trunk")
+leaf_mesh = SubResource("SphereMesh_blob")
+bark = Array[StandardMaterial3D]([SubResource("StandardMaterial3D_bark_dark"), SubResource("StandardMaterial3D_bark_pale")])
+leaves = Array[StandardMaterial3D]([SubResource("StandardMaterial3D_leaf_deep"), SubResource("StandardMaterial3D_leaf_mid"), SubResource("StandardMaterial3D_leaf_pale")])

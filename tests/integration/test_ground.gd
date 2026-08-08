@@ -175,3 +175,76 @@ func test_a_ground_that_cannot_find_its_concrete_says_so_with_an_empty_box() -> 
 	lost.concrete = NodePath("NoSuchNode")
 	assert_eq(lost.drive().size, Vector3.ZERO, "no concrete is an empty box")
 	assert_eq(lost.extent().size, Vector3.ZERO, "and nothing drawn is an empty box")
+	var nowhere: PackedFloat32Array = lost.settle(PackedVector3Array([Vector3.ZERO]))
+	assert_eq(nowhere.size(), 1, "one answer per spot asked about, always")
+	assert_true(is_nan(nowhere[0]), "and nothing to stand on is NAN")
+
+
+func test_the_ground_says_how_high_the_concrete_is_where_the_car_stands() -> void:
+	# What settle() is for, asked in the one place the model's own shape makes
+	# interesting. It measures the surface a thing standing here would rest on,
+	# which in the middle of the drive is the concrete pad. [method drive] is a
+	# different measurement of the same mesh — the whole slab as a single box —
+	# and the slab is a sunken pad with kerb walls standing up either side of it,
+	# so its box reaches from the bottom of the pad to the top of those walls. The
+	# two therefore disagree by the depth of the sinking, and that is a fact about
+	# the model rather than a bug in either measurement.
+	#
+	# IT IS ALSO, MEASURED, WHY THE PARKED CAR FLOATS. Garage._park_the_car() sits
+	# every car on drive().end.y, which is the top of the kerb and not the surface
+	# of the pad — so the ten cars in the pack stand 0.35 m above the concrete
+	# they look parked on. The numbers, off this scene: the pad under the origin
+	# comes back at -0.345, drive().end.y at 0.00003, and the parked car's own
+	# bounds().position.y at 0.00003 with it. Parking a car is not what this file
+	# is about and the fix is not made here, but the measurement that shows it is
+	# written down rather than left for a screenshot to find.
+	var here: PackedFloat32Array = _ground().settle(PackedVector3Array([Vector3.ZERO]))
+	var drive: AABB = _ground().drive()
+	assert_false(is_nan(here[0]), "there must be concrete under the car")
+	assert_between(here[0], drive.position.y, drive.end.y, "the pad is part of the slab")
+	assert_lt(here[0], drive.end.y, "the pad is sunk below the top of the kerb it is let into")
+
+
+func test_the_lawn_stands_above_the_drive_and_climbs_away_from_it() -> void:
+	# The fact the trees are planted on and the reason a constant would not do.
+	# The model is a pad let into a field that rises on every closed side, so a
+	# spot out on a bank has to come back higher than the concrete does, and a
+	# spot further out has to come back higher again. Two banks rather than one,
+	# because a settle() that had its X and Z crossed would still pass on a single
+	# sample taken down the middle.
+	var drive: float = _ground().drive().end.y
+	for side: float in [-1.0, 1.0]:
+		var up: PackedFloat32Array = _ground().settle(
+			PackedVector3Array([Vector3(side * 4.5, 0.0, 0.0), Vector3(side * 5.8, 0.0, 0.0)])
+		)
+		assert_false(is_nan(up[0]), "no ground on the near side of a bank")
+		assert_false(is_nan(up[1]), "no ground on the crest of a bank")
+		assert_gt(up[0], drive, "the lawn must stand above the drive")
+		assert_gt(up[1], up[0], "and climb away from it")
+
+
+func test_there_is_no_ground_past_the_edge_of_the_model() -> void:
+	# The other half of settle()'s contract, and the half a caller can only get
+	# wrong in one direction. The model's outer edge is a hard edge with sky past
+	# it — no backdrop, nothing underneath — so "how high is the grass out there"
+	# has to answer "there is no grass out there" rather than zero. A grove that
+	# believed zero would plant a tree standing in mid-air off the side of the
+	# world. Asked a metre past the ground's own reach, so it moves with the model.
+	var box: AABB = _ground().extent()
+	var past: PackedVector3Array = PackedVector3Array(
+		[
+			Vector3(box.end.x + 1.0, 0.0, 0.0),
+			Vector3(box.position.x - 1.0, 0.0, 0.0),
+			Vector3(0.0, 0.0, box.end.z + 1.0),
+			Vector3(0.0, 0.0, box.position.z - 1.0),
+		]
+	)
+	for height: float in _ground().settle(past):
+		assert_true(is_nan(height), "the model grew ground past its own edge")
+
+
+func test_asking_about_nothing_is_answered_with_nothing() -> void:
+	# The empty call, which is worth a line because settle() walks 31,420
+	# triangles before it can say anything and the caller with no spots to ask
+	# about is a grove that planted no rows. It returns rather than walking them.
+	assert_eq(_ground().settle(PackedVector3Array()).size(), 0, "no spots, no answers")
