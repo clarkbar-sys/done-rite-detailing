@@ -1,0 +1,61 @@
+[gd_scene load_steps=3 format=3]
+
+; The ground: the imported driveway, placed. src/world/ground.gd has the whole
+; argument — what the model is, why this scene exists at all, and why nothing out
+; here has a collider. What is written down here is the arithmetic that turns the
+; model's own metres into the room's floor, because that is what a scene file is
+; for and because every number in it is a measurement of the glb beside it rather
+; than a taste.
+;
+; It is named "Ground" and not "Driveway" for the same reason mesh_car.tscn is
+; named "Car": the room instances one of these under that name and types it as a
+; Ground, and the model is the whole of the outdoors — the concrete, the lawn it
+; is let into and the banks that rise away from it — not just the bit the car
+; stands on.
+
+[ext_resource type="Script" path="res://src/world/ground.gd" id="1_ground"]
+[ext_resource type="PackedScene" path="res://assets/models/driveway/sunken_driveway_parking_spot.glb" id="2_model"]
+
+[node name="Ground" type="Node3D"]
+script = ExtResource("1_ground")
+concrete = NodePath("Model/Sketchfab_model/Driveway_obj_cleaner_materialmerger_gles/Object_4")
+
+; The one transform in the room that is not a design decision. Every number in it
+; is measured off the model, and the model's own frame is the reason each is
+; needed:
+;
+;   SCALE 1.25 — the camera's, not the artist's. The showcase circuit sweeps a
+;   5.6 m disc and the model at 1:1 reaches 5.04 m either side of its concrete.
+;   A quarter over stands the outer edge 6.30 m out and puts the walk's standoff
+;   on the pad rather than over the kerb. ground.gd argues it at length, and
+;   tests/integration/test_ground.gd does the sum against Garage's own radius.
+;
+;   Y -0.504 — the concrete's top face is 0.4032 m up the model's own axis, and
+;   0.4032 x 1.25 is 0.504. This is the line that makes ground.gd's drive() come
+;   back at zero, which is the height every car in the pack gets sat on.
+;
+;   X -0.156 and Z -0.309 — the pad's footprint is centred on (0.125, -0.247) in
+;   the model rather than on its origin, so without these the car would be parked
+;   a hand's width off the middle of its own drive. Same quarter applied: 0.125 x
+;   1.25 = 0.156, and 0.247 x 1.25 = 0.309. The sign on Z is the importer's
+;   doing — the glb is authored Z-up and comes in turned, which sends the model's
+;   +Y down the room's -Z.
+;
+; What is deliberately NOT here: any import setting. The .import sidecars beside
+; the glb are Godot's defaults, and two of those defaults are load-bearing.
+;
+; No collision is generated, because generating it is something a glTF node asks
+; for with a -col suffix and nothing in this model is named that way. That is the
+; promise the trees this replaced were held to as well, and it is worth knowing
+; it is a default rather than a box somebody remembered to untick — see ground.gd
+; on the two rays it would otherwise answer.
+;
+; The two textures are extracted beside the glb rather than left embedded in it —
+; sunken_driveway_parking_spot_0.jpg is the albedo and _1.png the normal map —
+; and imported lossless with mipmaps and detect_3d, which is byte for byte the
+; same set of parameters the ten cars' maps in assets/models/cars/ already carry.
+; #114 asked for a texture convention to be set deliberately the first time
+; textures arrived. They arrived with the car pack; this is that convention, and
+; the way it is kept is by not overriding it here.
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, -0.156, -0.504, -0.309)
