@@ -58,8 +58,9 @@
 ## [b]And the credit for the borrowed models is on this screen[/b], along the
 ## bottom. The ten cars in [code]assets/models/cars/[/code], the tyre cleaner's
 ## bottle in [code]assets/models/cleaning_spray/[/code], the sponge in
-## [code]assets/models/sponge/[/code] and the driveway the whole job happens on
-## in [code]assets/models/driveway/[/code] are CC-BY 4.0,
+## [code]assets/models/sponge/[/code], the pressure washer in
+## [code]assets/models/pressure_washer/[/code] and the driveway the whole job
+## happens on in [code]assets/models/driveway/[/code] are CC-BY 4.0,
 ## which makes attribution a condition of using them rather than a courtesy, and
 ## a licence is not satisfied by a file in a repository the player never sees.
 ## This is the screen everybody passes through on the way to the bay, so this is

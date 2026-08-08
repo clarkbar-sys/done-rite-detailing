@@ -1,0 +1,10 @@
+"homemade flamethrower" (https://sketchfab.com/3d-models/homemade-flamethrower-1d41ddbb089a4f2ab0d8a0fe780936d6)
+by excellenthe (https://sketchfab.com/excellenthe) is licensed under Creative Commons Attribution
+(http://creativecommons.org/licenses/by/4.0/).
+
+homemade_flamethrower.glb is the Sketchfab download, unmodified — the file name is
+the artist's and the game's use of it is not. It is what DetailingTool.Id.POWER_WASH
+puts in the player's hands; ToolModel fits it into that tool's catalogue extent and
+nothing here is re-scaled, re-oriented or re-textured on the way in. The three .png
+files beside it are the textures Godot extracts out of the .glb on import, which is
+why they are committed alongside their .import sidecars.

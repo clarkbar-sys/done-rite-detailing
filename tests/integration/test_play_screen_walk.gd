@@ -48,11 +48,11 @@ const LIFT_DOWN: String = "camera_down"
 ## Every one of them, for the tests that sweep the set.
 const ACTIONS: Array[String] = [TURN_LEFT, TURN_RIGHT, LIFT_UP, LIFT_DOWN]
 
-## How far a held thing may stick out from the anchor in any direction. Half the
-## longest tool on the belt (the power wash wand, 0.72 m) plus room to spare —
-## the same number [code]test_play_screen.gd[/code] holds the parked shot to, and
-## the point of repeating it here is that a walk has to keep the promise at every
-## angle rather than at one.
+## How far a held thing may stick out from the anchor in any direction. The
+## corner of the biggest box on the belt — the modelled power wash — reaches
+## 0.391 m of it; the same number [code]test_play_screen.gd[/code] holds the
+## parked shot to, and the point of repeating it here is that a walk has to keep
+## the promise at every angle rather than at one.
 const HELD_REACH: float = 0.45
 
 ## The band the eye has to stay in as it walks: never nearer the bodywork than

@@ -64,9 +64,10 @@ const EXTREMES: Array[String] = ["pickup", "minivan", "sport", "compact"]
 ## size rather than for the one that was drawn.
 const REACHED_THE_CAR: float = 3.0
 
-## How far a held thing may stick out from the anchor in any direction. Half the
-## longest tool on the belt (the power wash wand, 0.72 m) plus room to spare.
-## Again the same number the parked shot and the whole walk are held to.
+## How far a held thing may stick out from the anchor in any direction. The
+## corner of the biggest box on the belt — the modelled power wash — reaches
+## 0.391 m of it. Again the same number the parked shot and the whole walk are
+## held to.
 const HELD_REACH: float = 0.45
 
 ## Long enough for the standoff to have eased from where the standing shot puts

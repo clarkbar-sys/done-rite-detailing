@@ -16,13 +16,14 @@
 ## buried in a mesh nobody can diff, and a real model drops in later without
 ## moving anything else.
 ##
-## [b]Three of them have now dropped in, and nothing else moved.[/b] The two
-## spray bottles and the sponge carry a [member model] — a glTF baked out of
-## [code]src-models/[/code] — and [ToolModel] fits it into exactly the
-## [member extent] box the primitive occupied. So this table still decides how big
-## a sponge is, the roll-up still draws its icon from the same row, and the two
-## tools with no model in their row are still primitives. What a model brings that
-## a primitive could not is a texture, which is the whole reason to have one.
+## [b]Four of them have now dropped in, and nothing else moved.[/b] The two spray
+## bottles, the sponge and the power wash carry a [member model] — a glTF under
+## [code]assets/models/[/code], downloaded or baked out of [code]src-models/[/code]
+## — and [ToolModel] fits it into exactly the [member extent] box the primitive
+## occupied. So this table still decides how big a bottle is, the roll-up still
+## draws its icon from the same row, and the one tool with no model in its row is
+## still a primitive. What a model brings that a primitive could not is a texture,
+## which is the whole reason to have one.
 class_name DetailingTool
 extends RefCounted
 
@@ -83,7 +84,8 @@ var roughness: float
 ## The modelled mesh this tool is drawn by in the player's hands, as a
 ## [code]res://[/code] path, or [code]""[/code] for a tool still drawn as the
 ## primitive above. This is the "a real model drops in later" the class docs
-## promise, arriving for the two spray bottles and now for the sponge.
+## promise, arriving for the two spray bottles, then the sponge, and now for the
+## power wash.
 ##
 ## [b]Everything above still applies to a tool that has one.[/b] [ToolModel]
 ## fits the mesh into exactly the [member extent] box the primitive occupied, so
@@ -105,6 +107,34 @@ var roughness: float
 ## here would drag two meshes and their textures into every one of those runs.
 var model: String
 
+## How far [member model] has to be turned, in degrees, before it is the way up
+## the game holds it. [code]Vector3.ZERO[/code] for a mesh that already is, which
+## is every one of these but the power wash.
+##
+## [b]An artist's frame is not the game's, and only one of them can be wrong
+## here.[/b] [ToolModel] fits a mesh axis by axis into [member extent], so a model
+## has to arrive with its long axis on [code]+Y[/code] and the end it emits from
+## at the top — which is where the [CylinderMesh] it replaces put them, and where
+## [ViewModel] hangs the [code]Muzzle[/code] marker. Three of the four models on
+## the belt were authored that way. The pressure washer was authored Z-up, with
+## its barrel at the [code]-Y[/code] end of the mesh, so fitted as it arrives it
+## sprays out of its own hose end.
+##
+## [b]A row here rather than an edit to the file or a branch in [ToolModel].[/b]
+## The asset is a CC-BY download this project keeps byte for byte — see
+## [code]assets/models/pressure_washer/ATTRIBUTION.txt[/code] — and "which way up
+## did this artist model it" is a fact about one asset, which is what this table
+## is for. [ToolModel] applies it before it measures the box, so [member extent]
+## goes on describing the tool the player actually ends up holding.
+##
+## [b]Right angles only.[/b] This is for righting a frame, not for posing a tool —
+## posing is [method ViewModel._held_pose]'s, and a tool turned a few degrees here
+## would be turned in the roll-up's box as well as in the hand. [ToolModel]
+## measures the turned box off the unturned one, which is exact at multiples of
+## 90° and slack at anything else, so an odd angle here would quietly fit the mesh
+## into something smaller than [member extent] says.
+var model_turn: Vector3
+
 
 func _init(
 	tool_id: Id,
@@ -114,7 +144,8 @@ func _init(
 	proxy_albedo: Color,
 	proxy_metallic: float,
 	proxy_roughness: float,
-	proxy_model: String = ""
+	proxy_model: String = "",
+	proxy_model_turn: Vector3 = Vector3.ZERO
 ) -> void:
 	id = tool_id
 	display_name = name_shown
@@ -124,6 +155,7 @@ func _init(
 	metallic = proxy_metallic
 	roughness = proxy_roughness
 	model = proxy_model
+	model_turn = proxy_model_turn
 
 
 ## The five tools, in belt order.
@@ -134,16 +166,57 @@ func _init(
 ## startup is not a cost worth designing around.
 static func catalogue() -> Array[DetailingTool]:
 	var tools: Array[DetailingTool] = []
-	# A wand: thin, long, and the only metal on the belt.
+	# A wand: long, aimed, and the only metal on the belt. Modelled now — see
+	# [code]assets/models/pressure_washer/ATTRIBUTION.txt[/code] — and the model is
+	# what all three numbers below come from.
+	#
+	# [b]All three, because the fit is per axis.[/b] [ToolModel] maps the mesh's own
+	# box onto this one axis by axis, and the mesh is not a bare barrel: it is
+	# 5.632 x 21.391 x 14.655 in its own units, a pipe with a gas bottle strapped
+	# across it. The old 0.06 x 0.72 x 0.06 would have squashed that to a third of
+	# its width and a twelfth of its depth. These three are the mesh's own box at
+	# one scale, so the fit is uniform to a tenth of a per cent and the pipe stays
+	# round.
+	#
+	# [b]And the scale is the hand's clearance budget rather than taste.[/b] This is
+	# the one tool that stays in the hand and turns about it, so what it spends is
+	# the corner of this box: it has to stay inside the 0.45 m a held thing may
+	# reach and in front of the camera's 0.05 m near plane, at rest and at every
+	# press the glass allows. Both are measured — in
+	# [code]tests/integration/test_view_model.gd[/code] and
+	# [code]tests/integration/test_play_screen_wand.gd[/code] — and both failed on
+	# the way here rather than in theory. At the 0.72 m the barrel used to be, the
+	# corner reaches 0.495 m and comes to 0.03 m of the lens; at 0.60 m the reach is
+	# fine and the lens is still only 0.037 m away. At 0.55 m the corner is 0.391 m
+	# out and clears the near plane by 0.068 m at rest and 0.072 m aimed.
+	#
+	# So the tool is a fifth shorter than the barrel it replaces and several times
+	# bulkier, which is the trade this model is: a thin 6 cm tube could be long
+	# because it was thin, and a pipe with a bottle across it cannot.
+	#
+	# [b]And it is turned end over end, because the artist's frame is not this
+	# one.[/b] The download is authored Z-up — the wrapper node the exporter writes
+	# carries the quarter turn that would say so, and [ToolModel] never looks at a
+	# node — so in the mesh's own space the barrel is at [code]-Y[/code] and the
+	# hose end is at [code]+Y[/code]. Fitted as it arrives, the wand sprays out of
+	# the end nearest the hand: reported as "the washer is shooting out the opposite
+	# end", which is exactly what it was doing. Half a turn about [code]Z[/code]
+	# rather than about [code]X[/code], and that is the axis with the argument: both
+	# put the barrel at the top, and only this one leaves the mesh's own up —
+	# [code]+Z[/code], the side the barrel sits on above the bottle — pointing out
+	# of the screen at the player once [method ViewModel._held_pose] has tipped the
+	# wand away. About [code]X[/code] the player would be shown its underside.
 	tools.append(
 		DetailingTool.new(
 			Id.POWER_WASH,
 			"Power Wash",
 			Shape.CYLINDER,
-			Vector3(0.06, 0.72, 0.06),
+			Vector3(0.145, 0.550, 0.377),
 			Color(0.78, 0.80, 0.84),
 			0.9,
-			0.25
+			0.25,
+			"res://assets/models/pressure_washer/homemade_flamethrower.glb",
+			Vector3(0.0, 0.0, 180.0)
 		)
 	)
 	# Stretched, as specified — a cube reads as a dice, and the thing that says
@@ -193,10 +266,10 @@ static func catalogue() -> Array[DetailingTool]:
 			"res://assets/models/cleaning_spray/window_cleaner.glb"
 		)
 	)
-	# A trigger sprayer, and one of the two tools on the belt whose art came from
+	# A trigger sprayer, and one of the three tools on the belt whose art came from
 	# outside the project — see
-	# [code]assets/models/cleaning_spray/ATTRIBUTION.txt[/code], and the sponge's
-	# above it.
+	# [code]assets/models/cleaning_spray/ATTRIBUTION.txt[/code], and the sponge's and
+	# the pressure washer's above it.
 	# The colour is the roll-up's business and not the model's, and the same note
 	# applies to it: near-black rather than black, because a true 0,0,0 icon takes
 	# no light at all and reads as a hole in the badge instead of as a bottle.

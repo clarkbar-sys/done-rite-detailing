@@ -1,5 +1,5 @@
 ## A tool drawn as a modelled mesh instead of as a primitive — which, so far, is
-## the two spray bottles and the sponge.
+## the two spray bottles, the sponge and the power wash.
 ##
 ## [b]What this is for.[/b] [DetailingTool] says a tool is a shape, a size and a
 ## colour, and [method ViewModel._mesh_for] has always turned that into a
@@ -28,10 +28,27 @@
 ## a real 27 cm trigger sprayer modelled in real metres, which is a perfectly good
 ## number and is not the 30 cm the catalogue gives that tool. The sponge is a
 ## third answer again — a 16 cm one, which is a real sponge and is not the 24 cm
-## the catalogue hands the player. Honouring any of those files would put a tool
-## in the hand at a size nothing else in the game agrees with. Reading the mesh's
-## box instead makes the export's scale irrelevant: re-export the same shape at
-## any scale at all and the thing in the player's hand does not move.
+## the catalogue hands the player. The pressure washer is a fourth: a download
+## whose vertices are in no unit at all — 21 of them from end to end, with the
+## root node carrying the scale that would make it metres, and this class never
+## looks at a node. Honouring any of those files would put a tool in the hand at a
+## size nothing else in the game agrees with. Reading the mesh's box instead makes
+## the export's scale irrelevant: re-export the same shape at any scale at all and
+## the thing in the player's hand does not move.
+##
+## [b]Its orientation is not thrown away, and the turn that fixes one is data.[/b]
+## The fit is axis by axis, so a mesh has to arrive with its long axis on
+## [code]+Y[/code] and its business end at the top — which is where a
+## [CylinderMesh] put them, and which is what [method ViewModel._build] hangs the
+## [code]Muzzle[/code] marker off. Three of the four models honour that as
+## authored. The pressure washer does not: it is a Sketchfab download whose own
+## frame is Z-up, and the barrel it is meant to spray out of is at the
+## [code]-Y[/code] end of its mesh, so fitted as it arrives the water leaves the
+## butt. So a model may name a turn — [member DetailingTool.model_turn] — and it
+## is applied [i]before[/i] the box is measured, which is what keeps the
+## catalogue's extent describing the tool the player ends up holding. In the table
+## rather than in here, because "which way up did this artist model it" is a fact
+## about one asset and this class must not grow a list of them.
 ##
 ## [b]Fitted by rebuilding the mesh, not by scaling the node.[/b] The proxy's
 ## transform is rewritten every frame by its [ToolCarry] out of an orthonormal
@@ -75,18 +92,29 @@ extends MeshInstance3D
 ## fourth of handedness, which is a sign and must survive the fit untouched.
 const TANGENT_STRIDE: int = 4
 
+## Degrees to radians, for [member DetailingTool.model_turn]. Degrees in the
+## catalogue for the same reason [method ViewModel._held_pose] uses them: half a
+## turn is what somebody deciding it actually thinks in.
+const PER_DEGREE: float = PI / 180.0
 
-## Builds the proxy for [param model_path], fitted into [param extent] metres.
+
+## Builds the proxy for [param model_path], turned [param turn_degrees] and then
+## fitted into [param extent] metres.
+##
+## [param turn_degrees] is [member DetailingTool.model_turn] and is zero for a
+## model authored the way up the game holds it, which is most of them. It is
+## applied first and the box is measured after, so [param extent] describes the
+## turned mesh — see [method _fitted].
 ##
 ## Leaves itself empty rather than half-built if the path holds no mesh — a
 ## missing model is a tool you cannot see, which is visible immediately, where a
 ## missing model that also took the belt down with it would be a black screen.
-func _init(model_path: String, extent: Vector3) -> void:
+func _init(model_path: String, extent: Vector3, turn_degrees: Vector3 = Vector3.ZERO) -> void:
 	var source: Mesh = _mesh_in(model_path)
 	if source == null:
 		push_error("ToolModel: no mesh in %s" % model_path)
 		return
-	mesh = _fitted(source, extent)
+	mesh = _fitted(source, extent, Basis.from_euler(turn_degrees * PER_DEGREE))
 
 
 ## The mesh inside the scene at [param model_path], or [code]null[/code] if there
@@ -135,17 +163,30 @@ static func _first_mesh(node: Node) -> MeshInstance3D:
 	return null
 
 
-## [param source] rebuilt at the size [param extent] gives it, centred on its own
-## origin.
+## [param source] turned by [param turn], rebuilt at the size [param extent]
+## gives it, and centred on its own origin.
 ##
 ## Surface by surface, and each surface keeps the material the import gave it —
 ## the texture on these bottles is the entire reason they are models rather than
 ## coloured cylinders, so a fit that dropped it would have thrown away the point.
 ##
+## [b]The turn happens first, and the box is measured afterwards.[/b] It has to:
+## the fit is per axis, so measuring the mesh as authored and turning it after
+## would hand a model that arrives lying down the length the catalogue meant for
+## its width. Measuring the turned box instead means [param extent] describes the
+## tool the player holds whatever frame its artist worked in. A rigid turn also
+## composes with the rest of this without a special case — it goes in front of the
+## fit on the vertices, in front of the reciprocal on the normals, and in front of
+## the fit again on the tangents.
+##
+## The turned box is the source box turned, rather than the turned vertices
+## measured again: exact at the right angles [member DetailingTool.model_turn]
+## allows, and one pass of arithmetic rather than one pass over the mesh.
+##
 ## Returns [code]null[/code] for a mesh with no width to measure, which is a mesh
 ## with nothing in it.
-static func _fitted(source: Mesh, extent: Vector3) -> ArrayMesh:
-	var box: AABB = source.get_aabb()
+static func _fitted(source: Mesh, extent: Vector3, turn: Basis) -> ArrayMesh:
+	var box: AABB = Transform3D(turn, Vector3.ZERO) * source.get_aabb()
 	if box.size.x <= 0.0 or box.size.y <= 0.0 or box.size.z <= 0.0:
 		return null
 	var fit: Vector3 = extent / box.size
@@ -154,52 +195,57 @@ static func _fitted(source: Mesh, extent: Vector3) -> ArrayMesh:
 	for surface: int in source.get_surface_count():
 		var arrays: Array = source.surface_get_arrays(surface)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-		arrays[Mesh.ARRAY_VERTEX] = _placed(vertices, fit, centred)
+		arrays[Mesh.ARRAY_VERTEX] = _placed(vertices, turn, fit, centred)
 		# Guarded rather than assumed: which of these a surface carries is decided by
 		# the import settings on the asset ([code].glb.import[/code]'s
 		# [code]ensure_tangents[/code], among others), and a mesh with no tangents is
 		# a null in the array rather than an empty one.
 		if arrays[Mesh.ARRAY_NORMAL] != null:
 			var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-			arrays[Mesh.ARRAY_NORMAL] = _turned(normals, Vector3.ONE / fit)
+			arrays[Mesh.ARRAY_NORMAL] = _turned(normals, turn, Vector3.ONE / fit)
 		if arrays[Mesh.ARRAY_TANGENT] != null:
 			var tangents: PackedFloat32Array = arrays[Mesh.ARRAY_TANGENT]
-			arrays[Mesh.ARRAY_TANGENT] = _leaned(tangents, fit)
+			arrays[Mesh.ARRAY_TANGENT] = _leaned(tangents, turn, fit)
 		built.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		built.surface_set_material(surface, source.surface_get_material(surface))
 	return built
 
 
-## [param vertices] scaled by [param fit] and slid by [param offset] — the fit
-## itself, which is the one array where the transform is the obvious one.
+## [param vertices] turned by [param turn], scaled by [param fit] and slid by
+## [param offset] — the fit itself, which is the one array where the transform is
+## the obvious one.
 static func _placed(
-	vertices: PackedVector3Array, fit: Vector3, offset: Vector3
+	vertices: PackedVector3Array, turn: Basis, fit: Vector3, offset: Vector3
 ) -> PackedVector3Array:
 	var placed: PackedVector3Array = PackedVector3Array()
 	placed.resize(vertices.size())
 	for at: int in vertices.size():
-		placed[at] = vertices[at] * fit + offset
+		placed[at] = turn * vertices[at] * fit + offset
 	return placed
 
 
-## [param directions] turned by [param by] and re-normalised.
-static func _turned(directions: PackedVector3Array, by: Vector3) -> PackedVector3Array:
+## [param directions] turned by [param turn], then by [param by], and
+## re-normalised. Two turns and not one because they are different things: the
+## first is the model's own righting, which is rigid, and the second is the
+## reciprocal of a non-uniform fit.
+static func _turned(directions: PackedVector3Array, turn: Basis, by: Vector3) -> PackedVector3Array:
 	var turned: PackedVector3Array = PackedVector3Array()
 	turned.resize(directions.size())
 	for at: int in directions.size():
-		turned[at] = (directions[at] * by).normalized()
+		turned[at] = (turn * directions[at] * by).normalized()
 	return turned
 
 
-## [param tangents] turned by [param fit], keeping every fourth float — the
-## handedness — exactly as it was. Flattened rather than a
-## [PackedVector3Array] because that is the format
+## [param tangents] turned by [param turn] and then by [param fit], keeping every
+## fourth float — the handedness — exactly as it was. A rigid turn cannot change
+## handedness, so the sign is as safe here as it was before there was one.
+## Flattened rather than a [PackedVector3Array] because that is the format
 ## [method ArrayMesh.add_surface_from_arrays] reads them back in.
-static func _leaned(tangents: PackedFloat32Array, fit: Vector3) -> PackedFloat32Array:
+static func _leaned(tangents: PackedFloat32Array, turn: Basis, fit: Vector3) -> PackedFloat32Array:
 	var leaned: PackedFloat32Array = tangents.duplicate()
 	for at: int in range(0, leaned.size() - TANGENT_STRIDE + 1, TANGENT_STRIDE):
 		var along: Vector3 = Vector3(leaned[at], leaned[at + 1], leaned[at + 2])
-		along = (along * fit).normalized()
+		along = (turn * along * fit).normalized()
 		leaned[at] = along.x
 		leaned[at + 1] = along.y
 		leaned[at + 2] = along.z
