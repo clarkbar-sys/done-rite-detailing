@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.13.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.12.0...v1.13.0) (2026-08-08)
+
+
+### Features
+
+* **core:** persist the sound toggle across sessions via a Settings class ([#153](https://github.com/clarkbar-sys/done-rite-detailing/issues/153)) ([e588198](https://github.com/clarkbar-sys/done-rite-detailing/commit/e58819843306078a1dae92afb681ca70c35b584e))
+* **rag:** weave the drying rag out of microfibre instead of flat blue ([#165](https://github.com/clarkbar-sys/done-rite-detailing/issues/165)) ([c093bfe](https://github.com/clarkbar-sys/done-rite-detailing/commit/c093bfe00f387d052825fb822881fca0aa7597c3))
+* **ui:** add a sound on/off toggle to the title card, menu and bay ([#146](https://github.com/clarkbar-sys/done-rite-detailing/issues/146)) ([64c2425](https://github.com/clarkbar-sys/done-rite-detailing/commit/64c2425cca9b649b468bc5235e547ed957e4fb3b))
+* **ui:** let the player pick which of the ten cars the bay parks ([#150](https://github.com/clarkbar-sys/done-rite-detailing/issues/150)) ([82c24fb](https://github.com/clarkbar-sys/done-rite-detailing/commit/82c24fbccda489953193b0fb30495d30c7cf2c69)), closes [#143](https://github.com/clarkbar-sys/done-rite-detailing/issues/143)
+* **world:** draw the power wash as a real pressure washer, sprayed from the right end ([#164](https://github.com/clarkbar-sys/done-rite-detailing/issues/164)) ([ab15801](https://github.com/clarkbar-sys/done-rite-detailing/commit/ab158015507a16484ceed8f1e75be3f9463c31f7))
+* **world:** draw the tyre &amp; engine cleaner as a real trigger sprayer ([#151](https://github.com/clarkbar-sys/done-rite-detailing/issues/151)) ([2547f49](https://github.com/clarkbar-sys/done-rite-detailing/commit/2547f49680adb96754ef1ddcd30503b397f8267d))
+* **world:** draw the window cleaner as the same trigger sprayer in blue ([#168](https://github.com/clarkbar-sys/done-rite-detailing/issues/168)) ([b9fa242](https://github.com/clarkbar-sys/done-rite-detailing/commit/b9fa242fe46f0e576dc508bfedb773aad4e54b54))
+* **world:** plant the wood again, on the ground that is actually there ([#166](https://github.com/clarkbar-sys/done-rite-detailing/issues/166)) ([485d8b6](https://github.com/clarkbar-sys/done-rite-detailing/commit/485d8b66c3c12c4d3cfdb8ec5b6b26b8017bd3c8))
+* **world:** put a modelled sponge in the player's hand ([#157](https://github.com/clarkbar-sys/done-rite-detailing/issues/157)) ([dc244af](https://github.com/clarkbar-sys/done-rite-detailing/commit/dc244afbe0762238f16af887f25bd2f29c1c9df3)), closes [#155](https://github.com/clarkbar-sys/done-rite-detailing/issues/155)
+* **world:** stand the room on a modeled driveway instead of boxes and rolled trees ([#152](https://github.com/clarkbar-sys/done-rite-detailing/issues/152)) ([fad7cf4](https://github.com/clarkbar-sys/done-rite-detailing/commit/fad7cf42013406faa6e0ce41c1d7774975e25ffa))
+
+
+### Bug Fixes
+
+* **world:** drive the paint past the greyscale map it is multiplied into ([#163](https://github.com/clarkbar-sys/done-rite-detailing/issues/163)) ([95c4694](https://github.com/clarkbar-sys/done-rite-detailing/commit/95c4694568763b62110920b98b7395274c1017e0))
+* **world:** park the car on the pad it looks parked on, not on the kerb ([#169](https://github.com/clarkbar-sys/done-rite-detailing/issues/169)) ([1c948a9](https://github.com/clarkbar-sys/done-rite-detailing/commit/1c948a90a17a08234cc0eac721143b5710098c46)), closes [#167](https://github.com/clarkbar-sys/done-rite-detailing/issues/167)
+
 ## [1.12.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.11.0...v1.12.0) (2026-08-07)
 
 
