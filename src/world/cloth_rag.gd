@@ -35,6 +35,15 @@
 ## would ripple and the shading would not, which reads as a rendering fault. They
 ## come off the neighbouring points, which is the same surface the triangles are
 ## built from and so cannot disagree with it.
+##
+## [b]And so are tangents, for the same reason and one more.[/b] A normal map is
+## read in the surface's own tangent frame, so a mesh built by hand that ships no
+## [constant Mesh.ARRAY_TANGENT] gets whatever the renderer has lying around —
+## which is how a [Microfiber] weave ends up lit from a direction the cloth is not
+## facing. A [PlaneMesh] of this size ships one ([code](1, 0, 0)[/code] with a
+## [code]+1[/code] binormal sign, measured rather than assumed), and the whole of
+## this class is about being that plane, so this ships the same frame bent along
+## with the sheet.
 class_name ClothRag
 extends MeshInstance3D
 
@@ -65,9 +74,24 @@ const SAG: float = 2.0
 ## which the link lengths in [Cloth] make about as likely as it sounds.
 const FLAT: Vector3 = Vector3.UP
 
+## The tangent handed back in the same case, and for the same reason: the flat
+## sheet's own [code]+X[/code], which is the direction [member Cloth.size]'s
+## [code]x[/code] runs and so the way the weave's [code]u[/code] increases.
+const SIDEWAYS: Vector3 = Vector3.RIGHT
+
+## The binormal sign written after every tangent. Positive, because that is what
+## a [PlaneMesh] of this size writes and this is standing in for one — a sheet
+## that flipped it would light its weave as though the texture were mirrored.
+const HANDED: float = 1.0
+
+## How many floats a tangent takes in [constant Mesh.ARRAY_TANGENT]: three for
+## the direction and a fourth for [constant HANDED].
+const TANGENT_STRIDE: int = 4
+
 var _cloth: Cloth = null
 var _local: PackedVector3Array = PackedVector3Array()
 var _normals: PackedVector3Array = PackedVector3Array()
+var _tangents: PackedFloat32Array = PackedFloat32Array()
 var _uvs: PackedVector2Array = PackedVector2Array()
 var _triangles: PackedInt32Array = PackedInt32Array()
 var _sheet: ArrayMesh = null
@@ -79,6 +103,7 @@ func _init(size: Vector2) -> void:
 	_cloth = Cloth.new(size, ACROSS, DOWN)
 	_local.resize(_cloth.count())
 	_normals.resize(_cloth.count())
+	_tangents.resize(_cloth.count() * TANGENT_STRIDE)
 	_face()
 	_wind()
 	_sheet = ArrayMesh.new()
@@ -147,24 +172,31 @@ func _reshape_from_world() -> void:
 func _reshape() -> void:
 	for row: int in _cloth.rows():
 		for column: int in _cloth.columns():
-			_normals[_cloth.index_of(column, row)] = _normal_at(column, row)
+			_frame_at(column, row)
 	var surface: Array = []
 	surface.resize(Mesh.ARRAY_MAX)
 	surface[Mesh.ARRAY_VERTEX] = _local
 	surface[Mesh.ARRAY_NORMAL] = _normals
+	surface[Mesh.ARRAY_TANGENT] = _tangents
 	surface[Mesh.ARRAY_TEX_UV] = _uvs
 	surface[Mesh.ARRAY_INDEX] = _triangles
 	_sheet.clear_surfaces()
 	_sheet.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface)
 
 
-## The surface normal at [param column], [param row]: across the sheet crossed
-## with along it, measured between the point's two neighbours on each axis.
+## Writes the normal and the tangent at [param column], [param row], both
+## measured from the same two spans across the sheet and along it.
+##
+## One function for the pair rather than two, because they are one measurement:
+## a tangent that was taken from a different neighbourhood than the normal it is
+## paired with is a tangent frame that is not square to its own surface, and the
+## weave shears where the cloth folds. Written in place rather than returned
+## because GDScript has no cheap way to hand back both.
 ##
 ## Clamped at the edges rather than wrapped, so a border point measures against
 ## itself and its one neighbour — half the span, the same direction, and the
 ## normalisation takes the difference back out.
-func _normal_at(column: int, row: int) -> Vector3:
+func _frame_at(column: int, row: int) -> void:
 	var last_column: int = _cloth.columns() - 1
 	var last_row: int = _cloth.rows() - 1
 	var across: Vector3 = (
@@ -179,9 +211,18 @@ func _normal_at(column: int, row: int) -> Vector3:
 	# +Z along, and Z cross X is +Y — which is the face a [PlaneMesh] of the same
 	# size would have presented.
 	var facing: Vector3 = along.cross(across)
-	if facing.is_zero_approx():
-		return FLAT
-	return facing.normalized()
+	var normal: Vector3 = FLAT if facing.is_zero_approx() else facing.normalized()
+	var index: int = _cloth.index_of(column, row)
+	_normals[index] = normal
+	# The `u` axis is the span across, less whatever of it is leaning out of the
+	# surface — Gram-Schmidt, and the reason a fold does not tilt the weave out of
+	# the cloth it is woven into.
+	var sideways: Vector3 = across - normal * across.dot(normal)
+	var tangent: Vector3 = SIDEWAYS if sideways.is_zero_approx() else sideways.normalized()
+	_tangents[index * TANGENT_STRIDE] = tangent.x
+	_tangents[index * TANGENT_STRIDE + 1] = tangent.y
+	_tangents[index * TANGENT_STRIDE + 2] = tangent.z
+	_tangents[index * TANGENT_STRIDE + 3] = HANDED
 
 
 ## The UVs, which never change: the sheet's own grid, corner to corner. Built

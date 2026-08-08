@@ -362,6 +362,17 @@ func test_the_rag_is_double_sided() -> void:
 	assert_eq(cull, BaseMaterial3D.CULL_DISABLED, "a cloth has no back to cull")
 
 
+func test_the_rag_is_made_of_cloth_rather_than_painted_one_colour() -> void:
+	# The pair of it: [ClothRag] makes the rag move like a sheet and [Microfiber]
+	# makes it made of something. Asserted here because this is where the two meet
+	# — a rag that quietly went back to a flat [StandardMaterial3D] would pass every
+	# other test in this file, colour, roughness and all, and would be a blue card
+	# again. What the weave itself is, is tests/unit/test_microfiber.gd's.
+	var rag: MeshInstance3D = _view_model().proxy_for(DetailingTool.Id.DRYING_RAG)
+	assert_true(rag is ClothRag, "the rag is a simulated sheet")
+	assert_true(_material(rag) is Microfiber, "and it is woven rather than painted")
+
+
 func test_the_rag_never_presents_its_edge() -> void:
 	# The other half. A plane seen edge-on is literally zero pixels, so the pose
 	# has to keep its normal well away from perpendicular to the view. Measured
