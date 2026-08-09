@@ -44,16 +44,71 @@ const HEIGHT: float = 1.4
 
 var _car: Car = null
 
+## The colour the blockout rolled for itself, kept so [method before_each] can put
+## it back — see there.
+var _paint_before: Color = Color.WHITE
 
-func before_each() -> void:
+
+## One blockout for the whole file. Every assertion below is about a shape, a
+## group or a material, and the shape is CSG: it is built deferred, it costs the
+## frame this waits for, and it was being built and thrown away twenty-five times
+## to hold the same twelve panels still.
+##
+## [b]The one thing that moves is the paint, and [method before_each] puts it
+## back.[/b] That is the condition on sharing a fixture: a test that leaves the
+## car changed couples the suite into an order-dependent one, which passes in
+## file order and fails in any other — and two tests here really do repaint the
+## car on purpose, while a third asserts it is still one of the thirteen colours
+## it shipped with. Checked by running the file with its tests in reverse.
+##
+## [b]This does not weaken the deferred-build claim[/b] the class docs are about.
+## [method test_the_bounds_are_only_trustworthy_once_a_frame_has_passed] builds
+## its own car inside the test and waits its own frame, which is the only way
+## that claim was ever pinned — `before_each` waiting a frame was how the *other*
+## twenty-four tests got a car worth measuring, not what proved the rule.
+##
+## Measured on a four-core box with this suite run on its own: 1.9 s to 1.1 s, of
+## which about 0.9 s is Godot starting up either way — so it is most of the work
+## rather than most of the clock. The blockout is a cheap car to build next to
+## `garage.tscn` or one out of the pack, which is why the same change was left off
+## [code]tests/integration/test_grime.gd[/code] and
+## [code]tests/integration/test_grime_flash.gd[/code]: on the four-slab fixture
+## those two run on, it measured nothing at all.
+##
+## [method add_child] rather than [method GutTest.add_child_autofree]: GUT empties
+## its autofree list after every *test*, so a fixture registered with it here
+## would be freed out from under test two.
+func before_all() -> void:
 	var packed: PackedScene = load(CAR) as PackedScene
 	assert_not_null(packed, "could not load %s" % CAR)
 	if packed == null:
 		return
 	var car: Car = packed.instantiate() as Car
 	_car = car
-	add_child_autofree(_car)
+	add_child(_car)
 	await wait_process_frames(1)
+	_paint_before = _car.paint.albedo_color
+
+
+## [method Node.free] and not [method Node.queue_free]: GUT counts the test
+## script's children the moment `after_all` returns, and a queued free has not
+## happened yet — the car would be reported as a leak on its way out.
+func after_all() -> void:
+	if _car != null:
+		_car.free()
+		_car = null
+
+
+## The explicit reset the shared car is worth, and deliberately only this.
+##
+## Repainting is the whole of what the tests below write to the fixture — the two
+## that do it are checking that every panel shares one material, which is a claim
+## you can only make by changing the colour and looking. Everything else in here
+## reads. So the reset is one line rather than a rebuild, and the rebuild it
+## replaces was twenty-five copies of a CSG car for the sake of it.
+func before_each() -> void:
+	if _car != null:
+		_car.paint.albedo_color = _paint_before
 
 
 func _panel(named: String) -> Node3D:
@@ -333,7 +388,12 @@ func test_marking_a_node_trim_covers_everything_under_it() -> void:
 	holder.add_child(shape)
 	_car.add_child(holder)
 	assert_eq(_car.panels().size(), before, "a trim node hides its children as well as itself")
-	holder.queue_free()
+	# Taken back off the car rather than queued, because the car outlives this test
+	# now — see [method before_all]. `queue_free` alone leaves the node hanging off
+	# the fixture for the rest of the frame, which is the shape of leftover a
+	# shared fixture must not accumulate.
+	_car.remove_child(holder)
+	holder.free()
 
 
 func test_every_panel_of_the_blockout_is_something_a_ray_can_find() -> void:
