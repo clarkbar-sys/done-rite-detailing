@@ -94,7 +94,7 @@ uniform vec4 gloss_colour : source_color = vec4(0.02, 0.02, 0.03, 1.0);
 uniform float gloss_roughness : hint_range(0.0, 1.0) = 0.06;
 
 // How opaque a fully buffed coat is looking straight at it. Deliberately low:
-// this darkens the paint it lies over, so a heavy coat turns Alpine White into
+// this darkens the paint it lies over, so a heavy coat turns Viper White into
 // grey and calls it a shine. A fifth deepens the colour the way wax does and
 // leaves the paint its own.
 uniform float gloss_strength : hint_range(0.0, 1.0) = 0.13;
