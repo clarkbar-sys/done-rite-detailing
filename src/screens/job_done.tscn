@@ -1,0 +1,199 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/screens/job_done.gd" id="1_jobdone"]
+[ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
+
+[node name="JobDone" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_jobdone")
+
+; The same room on the same four switches the menu and the rules screen set —
+; the bay playing itself, with a car in it. Not the car the player just
+; finished: the room instances its own, and every screen in this game shows the
+; bay rather than a still of it. See src/screens/how_to_play.gd for what that
+; costs and what it buys.
+[node name="Garage" parent="." instance=ExtResource("2_garage")]
+orbiting = false
+first_person = true
+walkaround = true
+attracting = true
+
+; At least 16 px of room left showing on every side, so the card reads as a
+; sheet held up in the bay rather than a new screen that replaced it — the same
+; frame src/screens/how_to_play.tscn uses, for the same reason.
+[node name="Frame" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+; What stops the card stretching to whatever shape the screen is. The design is
+; 1280x720 and project.godot stretches it "expand", so a portrait phone hands
+; this screen the design width and as much extra design *height* as its aspect
+; asks for; the card takes its own height and this row centres what is left over.
+; how_to_play.tscn's own Sheet has the long version of that argument.
+[node name="Sheet" type="VBoxContainer" parent="Frame"]
+layout_mode = 2
+alignment = 1
+
+[node name="Card" type="PanelContainer" parent="Frame/Sheet"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="Column" type="VBoxContainer" parent="Frame/Sheet/Card"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+; "New High Score" while the initials are being dialled, "Top Scores — <car>"
+; once they are in. Set by src/screens/job_done.gd on the way in; what is in the
+; file is what a scene-file reader should see rather than an empty string, the
+; same convention main_menu.tscn's CarName follows.
+[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "New High Score"
+horizontal_alignment = 1
+
+; What the run scored, zero-padded to ScoreHud.DIGITS so it reads as the same
+; number the corner of the play screen was showing a second ago — the padding
+; is the arcade convention that HUD already follows, and the two would look like
+; different scores without it.
+[node name="Score" type="Label" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 76
+text = "000000"
+horizontal_alignment = 1
+
+; The three letters. Up on this row is the biggest type in the game, because it
+; is the one thing on this screen the player is actually operating and it has to
+; be legible at a third of the design size in a hand.
+;
+; 110 px wide each holds the widest capital Open Sans has at this size with room
+; either side, so the row does not shuffle sideways as the wheel turns — the same
+; pinned-field reasoning ScoreHud's zero padding is for.
+[node name="Letters" type="HBoxContainer" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 24
+
+[node name="Letter0" type="Label" parent="Frame/Sheet/Card/Column/Letters"]
+custom_minimum_size = Vector2(110, 150)
+layout_mode = 2
+theme_override_font_sizes/font_size = 110
+text = "A"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Letter1" type="Label" parent="Frame/Sheet/Card/Column/Letters"]
+custom_minimum_size = Vector2(110, 150)
+layout_mode = 2
+theme_override_font_sizes/font_size = 110
+text = "A"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Letter2" type="Label" parent="Frame/Sheet/Card/Column/Letters"]
+custom_minimum_size = Vector2(110, 150)
+layout_mode = 2
+theme_override_font_sizes/font_size = 110
+text = "A"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+; The four verbs, as words rather than as arrows — src/screens/job_done.gd has
+; why (Open Sans has no ▲, and a glyph the font lacks is a blank rectangle in a
+; released build).
+;
+; 168 tall is the height the menu's How to Play pill wears: a few pixels above
+; TouchTarget.min_design_size() (164 for this design on a 375 px screen), which
+; is the floor anything a finger has to hit stops shrinking at. Four of them at
+; 240 wide with 24 between is 1,032 px of the 1,248 the frame leaves.
+[node name="Keys" type="HBoxContainer" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 24
+
+[node name="Up" type="Button" parent="Frame/Sheet/Card/Column/Keys"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 168)
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Up"
+
+[node name="Down" type="Button" parent="Frame/Sheet/Card/Column/Keys"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 168)
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Down"
+
+[node name="Next" type="Button" parent="Frame/Sheet/Card/Column/Keys"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 168)
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Next"
+
+; The red one, and the only red one while the prompt is up: Brand.RED is the
+; site's one accent and it belongs to the thing you are meant to press.
+[node name="Enter" type="Button" parent="Frame/Sheet/Card/Column/Keys"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 168)
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Enter"
+
+; The board: HighScores.KEEP places in two columns of five, which is six grid
+; columns of rank, initials and score. The thirty labels in it are built by
+; src/screens/job_done.gd rather than written out here — thirty nodes in a scene
+; file is not a layout, it is a copy of a loop, and it would go out of date the
+; first time KEEP changes. What this owns is that there are six columns and how
+; far apart they sit; `columns` is set here as well as in code so a reader of the
+; scene file can see the shape.
+[node name="Table" type="GridContainer" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 6
+columns = 6
+
+; The two ways off this screen. Play Again is the red one for the reason the
+; menu's Play is: red is the answer to the screen it is on, and there is at most
+; one of them. Same 168 floor as the keys above.
+[node name="Exits" type="HBoxContainer" parent="Frame/Sheet/Card/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 24
+
+[node name="MainMenu" type="Button" parent="Frame/Sheet/Card/Column/Exits"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 168)
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Main Menu"
+
+[node name="PlayAgain" type="Button" parent="Frame/Sheet/Card/Column/Exits"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 168)
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Play Again"

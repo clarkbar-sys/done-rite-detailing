@@ -136,6 +136,31 @@
 ## is why the readout has a second, quieter entry point that neither flashes nor
 ## pops.
 ##
+## [b]And the sixth loop is the end of the run[/b], which is the only one that
+## happens once. The clock counts down and the room reports how far along the job
+## is; when either of them is out, the run is written down in [RunResult] and the
+## screen asks to be replaced by [JobDoneGameState]. See
+## [method _hand_in_the_job].
+##
+## [b]A run ends two ways, and the clock is the one that actually fires.[/b]
+## [RunClock] gives the player three minutes, and [method Grime.shine] reaching
+## one ends it early — finishing the whole car is about a thousand patches, so
+## that is the win condition rather than the usual one. Both land in the same
+## place and the only difference downstream is a heading:
+## [method RunResult.remember] carries which it was.
+##
+## The clock is the reason there is a run at all rather than an afternoon. It
+## makes the question "how much can you get done" instead of "will you get it
+## done", which is the question a score answers and the one two players can
+## compare — [RunClock] has the rest of that argument, and the number is on it
+## rather than here.
+##
+## [b]It is started on [signal Garage.grimed] and not in [method Node._ready].[/b]
+## Laying the mud on casts tens of thousands of rays at the car and is the longest
+## frame the room will ever have, so a clock running from the moment the screen
+## exists would charge the player for a load. The first instant there is anything
+## to clean is the first instant the meter should be running.
+##
 ## The eye walks a rail around the car and cannot look away from it, and that is
 ## a decision rather than an omission: turning your head brings a look control
 ## the phone has no thumb spare for, and walking anywhere else brings a character
@@ -186,8 +211,41 @@ const NO_FINGER: int = -1
 ## shared the "nobody" value would be released by the first stray touch.
 const MOUSE_FINGER: int = -2
 
+## How much shine counts as the whole car being finished — see
+## [method _hand_in_the_job].
+##
+## [b]Not 1.0, and the missing ten-thousandth is not superstition.[/b]
+## [method Grime.shine] is a mean of seven panels' means over tens of thousands
+## of texels, every one of them a float, so a car whose last texel has genuinely
+## been buffed can read a hair under one — which is why
+## [code]tests/integration/test_play_screen_done.gd[/code] asserts that reading
+## with a tolerance rather than for equality. A run that ended on exactly 1.0 or
+## not at all would be a run whose one win condition mostly did not fire. The gap
+## it leaves is about a tenth of what one patch of a thousand-patch car is worth,
+## so a car with anything left on it cannot reach this either.
+const FINISHED: float = 0.9999
+
+## How long this run gets, in seconds.
+##
+## [b]An export purely so a suite can run a whole run out in a frame.[/b] Three
+## minutes of real time is not a thing a headless test can wait for, and the end
+## of a run is the one path on this screen that had nothing exercising it. Set
+## before the node enters the tree, the same seam
+## [code]src/screens/job_done.gd[/code] gives its save path and
+## [code]tests/integration/test_play_screen_done.gd[/code] uses to pin the car it
+## wants. Nothing in the game ever sets it.
+@export var run_seconds: float = RunClock.SECONDS
+
 var _belt: ToolBelt = null
 var _finger: int = NO_FINGER
+
+## The meter. Built here rather than read off anything, for [member _score]'s
+## reason below: the room is also what the title card is showing off, and an
+## attract mode with a clock on it would be a demo that ends.
+##
+## Stopped until [method _on_grimed] starts it — see [RunClock] and the class
+## docs.
+var _clock: RunClock = null
 
 ## The running score. Built here rather than read off anything, because unlike
 ## the belt there is nothing else in the game that has one — and unlike the belt
@@ -212,6 +270,7 @@ var _worked: PackedFloat64Array = _fresh_work()
 @onready var _readout: Label = $PanelReadout
 @onready var _masks: GrimeDebug = $GrimeDebug
 @onready var _scoreboard: ScoreHud = $ScoreHud
+@onready var _meter: TimeHud = $TimeHud
 
 
 func _ready() -> void:
@@ -230,6 +289,10 @@ func _ready() -> void:
 	# screen that had been forgotten — which is exactly what it would be.
 	_readout.add_theme_font_override("font", Brand.DISPLAY_FACE)
 	_readout.text = ""
+	# Built here and not in the member above, because the length is an export and
+	# an export is only the scene's value once the node has been instanced.
+	_clock = RunClock.new(run_seconds)
+	_meter.show_time(_clock.left())
 
 
 ## Hands the room what the player is asking for, every frame.
@@ -243,7 +306,7 @@ func _ready() -> void:
 ## than two. [method Input.get_axis] is the engine's own idiom for a held pair and
 ## returns the same [code]-1..1[/code] the pad does — the difference being that a
 ## key is only ever at an end of that range and a thumb can be anywhere in it.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var turn: float = _pad.turn() + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
 	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
 	_garage.steer(turn, lift)
@@ -255,6 +318,10 @@ func _process(_delta: float) -> void:
 		_masks.report(grime.remaining(), grime.shine())
 	_show_how_far_along(grime)
 	_pay_for_the_work(grime)
+	_run_the_clock(delta)
+	# Last, and nothing after it: this is the call that can free the screen this
+	# function is running on.
+	_hand_in_the_job(grime)
 
 
 ## Keys, for the half of the players who will never tap the [b]T[/b].
@@ -428,6 +495,9 @@ func _on_grimed() -> void:
 	# grime does not exist until this fires, so there is nothing to listen to
 	# before it.
 	grime.patch_finished.connect(_on_patch_finished)
+	# And this is the first instant there is anything to clean, which is the first
+	# instant the meter should be running. See the class docs.
+	_clock.start()
 
 
 ## A bit of the car finished a step of the job, so the player hears about it,
@@ -484,6 +554,71 @@ func _show_how_far_along(grime: Grime) -> void:
 	if grime == null:
 		return
 	_scoreboard.done(grime.shine())
+
+
+## Ends the run if the clock is out or [param grime] says the car is finished:
+## writes down what it was worth and asks for the screen that puts it on the
+## board.
+##
+## [b]Two ends, one exit.[/b] Which one it was is carried on
+## [member RunResult.finished] and changes nothing else — the score is the score,
+## and a car finished at 1:20 and a car half done at 0:00 go onto the same board
+## by the same rule.
+##
+## [b]Polled, like the four things above it[/b], and for the same reason rather
+## than for want of a signal. [Grime] emits [signal Grime.patch_finished] per
+## patch and has nothing to say about the car as a whole; "every panel is done"
+## is a property of a running total, so it is read off one once a frame exactly
+## as the walk, the wage and the percentage are. A signal for it would be a
+## seventh thing [Grime] has to know it is being asked, to answer a question the
+## number it already publishes answers. The clock is the same shape from the
+## other direction: a [Timer] node would be a second clock in the tree, running
+## on a callback this screen would then have to reconcile with the frame it is
+## already reading everything else on.
+##
+## [b][method Node.set_process] first, and it is not tidiness.[/b]
+## [method GameScreen.request_transition] reaches the host synchronously and the
+## host removes and frees this screen on the next line, so this is a function
+## that deletes the node it is running in. Turning the frame callback off first
+## means that even if the free is deferred a frame — which it is, [method
+## Node.queue_free] is — there is no second pass through here asking for a second
+## transition. The alternative, a [code]_handed_in[/code] flag, is a second piece
+## of state saying what the disabled callback already says.
+##
+## The style is read off the room rather than off [member CarChoice.chosen], for
+## the reason [code]src/screens/main_menu.gd[/code] reads it that way too: the
+## car in the bay is the answer, and a remembered one is free to disagree with it.
+func _hand_in_the_job(grime: Grime) -> void:
+	var whole: bool = grime != null and grime.shine() >= FINISHED
+	if not whole and not _clock.is_up():
+		return
+	set_process(false)
+	RunResult.remember(_parked_style(), _score.total(), _score.patches(), whole)
+	request_transition(JobDoneGameState.new())
+
+
+## Which of the ten is parked in the bay, or [code]""[/code] for a room parking
+## something that is not one of them — which is every fixture under
+## [code]tests/fixtures/[/code], and reads as a run on no car rather than a crash
+## on the way to the board.
+func _parked_style() -> String:
+	var parked: MeshCar = _garage.car() as MeshCar
+	return "" if parked == null else parked.style
+
+
+## Spends [param delta] off the meter and puts what is left on screen.
+##
+## [b]Polled, and it is the fifth thing on this screen that is.[/b] A countdown
+## is a quantity being spent at the rate the frames arrive, which is the same
+## shape as the walk and the wage rather than a different one — and reading it
+## off the frame is what stops the clock and the game disagreeing about how long
+## a hitch was. [TimeHud] does its own once-a-second early-out, so handing it a
+## float sixty times a second costs a comparison.
+##
+## A no-op before [method _on_grimed] has started the clock. See [RunClock].
+func _run_the_clock(delta: float) -> void:
+	_clock.tick(delta)
+	_meter.show_time(_clock.left())
 
 
 ## A tally of nothing done, one entry per stage of the job.

@@ -36,6 +36,11 @@ const SETTLE_SECONDS: float = 1.0
 ## it is not fading at all.
 const FADE_TIMEOUT_MSEC: int = 3000
 
+## A six-figure score, for the one case where "the digits have arrived" and "the
+## digits are on the total" come apart on purpose rather than by luck of the
+## frame. See [method ScoreHud._process] and the test at the bottom of this file.
+const BIG_SCORE: int = 200_000
+
 var _hud: ScoreHud = null
 
 
@@ -192,6 +197,31 @@ func test_a_trickle_every_frame_is_tracked_and_lands() -> void:
 	assert_gt(_hud.shown(), 0, "the digits never moved under a trickle")
 	await wait_seconds(SETTLE_SECONDS)
 	assert_eq(_hud.shown(), total, "the digits never caught up with the trickle")
+
+
+## A point added to a six-figure score has to arrive, and the reason it might not
+## has no float luck in it at all.
+##
+## [code]#183[/code] took [method @GlobalScope.is_equal_approx] out of
+## [method ScoreHud._process]'s arrival test, and the trickle case above is what
+## found it: at 1,200 the tolerance is 0.012, so the bug needs the last step of
+## the roll to land inside a hundredth of the target, which is a thing one
+## frame's delta decides. That is a real case and a poor guard — it passed on its
+## own and failed behind a heavier suite.
+##
+## This is the same bug with the luck taken out. The tolerance is proportional,
+## so at 200,000 it is 2.0 and a single-point tick is inside it from the first
+## frame: the roll is declared arrived before it has moved, and the point is
+## swallowed outright rather than landing a hundredth short. Nothing here depends
+## on a delta, so it fails on the old comparison every time.
+func test_a_point_on_a_six_figure_score_still_arrives() -> void:
+	_hud.tick(BIG_SCORE)
+	await wait_seconds(SETTLE_SECONDS)
+	assert_eq(_hud.shown(), BIG_SCORE, "the digits never reached the big total")
+	_hud.tick(BIG_SCORE + 1)
+	await wait_seconds(SETTLE_SECONDS)
+	assert_eq(_hud.shown(), BIG_SCORE + 1, "a point on a six-figure score went missing")
+	assert_eq(_hud.total(), BIG_SCORE + 1, "and the readout disagrees with the score")
 
 
 ## A patch landing mid-trickle still gets its flash and its pop — the two halves

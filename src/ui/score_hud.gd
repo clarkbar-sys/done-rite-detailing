@@ -239,6 +239,14 @@ func _ready() -> void:
 ## after. Not caught sooner because a headless test run used to free-wheel at
 ## thousands of tiny frames a second, where the last step happened to land on
 ## the target rather than a hundredth short of it.
+##
+## [b]And the tolerance is bigger than a point above 100,000.[/b] It scales, so
+## at 200,000 it is 2.0 — the same bug with no float luck in it at all, where a
+## single-point tick was swallowed outright rather than landing a hundredth
+## short. That is the case
+## [code]tests/integration/test_score_hud.gd[/code] pins deterministically,
+## because the 1,200 one above only fails when a frame's delta puts the last step
+## in the wrong place.
 func _process(delta: float) -> void:
 	if _flying <= 0 and _flash <= 0.0 and _shown == float(_total):
 		return
