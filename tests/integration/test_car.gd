@@ -58,8 +58,8 @@ var _paint_before: Color = Color.WHITE
 ## back.[/b] That is the condition on sharing a fixture: a test that leaves the
 ## car changed couples the suite into an order-dependent one, which passes in
 ## file order and fails in any other — and two tests here really do repaint the
-## car on purpose, while a third asserts it is still one of the thirteen colours
-## it shipped with. Checked by running the file with its tests in reverse.
+## car on purpose, while a third asserts it is still one of the six colours it
+## shipped with. Checked by running the file with its tests in reverse.
 ##
 ## [b]This does not weaken the deferred-build claim[/b] the class docs are about.
 ## [method test_the_bounds_are_only_trustworthy_once_a_frame_has_passed] builds
@@ -248,11 +248,9 @@ func test_the_glass_is_not_the_same_material_as_the_paint() -> void:
 	assert_ne(windshield.material, hood.material, "glass is not paint")
 
 
-func test_the_car_starts_painted_one_of_the_thirteen_colors() -> void:
+func test_the_car_starts_painted_one_of_the_six_colors() -> void:
 	assert_has(
-		Car.PAINT_COLORS,
-		_car.paint.albedo_color,
-		"the car must start in one of the thirteen colours"
+		Car.PAINT_COLORS, _car.paint.albedo_color, "the car must start in one of the six colours"
 	)
 
 
