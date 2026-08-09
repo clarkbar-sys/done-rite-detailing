@@ -212,6 +212,30 @@ text = "How to Play"
 ; characters of hex that would wrap the line on a phone. The direct link to each
 ; model is in the ATTRIBUTION.txt beside it and in README.md.
 ;
+; AND THE LAST LINE SAYS WHICH OF THEM WERE CHANGED (#159), BECAUSE THE LICENCE
+; ASKS FOR THAT TOO. CC-BY 4.0 3(a)(1)(B) wants an indication that the material
+; was modified, on the same footing as the title and the author — and three of
+; these four are modified rather than placed: the cars are baked into ten
+; per-style .glb files by scripts/build-car-pack.py with the body greyscaled so
+; the game can tint it, the bottles are one sprayer processed and then recoloured
+; by scripts/build-tire-cleaner.py and scripts/build-window-cleaner.py, and the
+; sponge is flattened and its maps cut down by scripts/build-sponge.py. The
+; driveway is the artist's file as downloaded, which is why it is named as the
+; one that is not. README.md has said all of this since the bakes existed; this
+; line is what puts it in front of the player, which is where the licence asks
+; for it.
+;
+; ONE LINE FOR ALL FOUR RATHER THAN A WORD ON EACH, AND THAT IS THE WIDTH AGAIN.
+; ", modified" twice on the first line measures 1,316 px in a 1,248 px label —
+; wider than the box, so it wraps, and the thing it wraps over is the pill. The
+; sentence on its own is 621 px and fits with room to spare. Vertically it is the
+; third line #174's arithmetic already priced and #162 handed back: 12 px
+; Silkscreen sets on 16, so the block is 48 px against the 68 the offsets below
+; give it, sitting in y = 660 .. 708 and clearing the last row of ink in "How to
+; Play" (y = 550 .. 582) by 78 px where two lines cleared it by 94. Measured, not
+; assumed, and tests/integration/test_main_menu.gd measures it again off the font
+; rather than off these offsets. Nothing else on the screen moves.
+;
 ; TWO WORKS PER LINE SINCE THE SPONGE (#155), AND THE COUNT IS THE REASON.
 ; The line this replaced said a fourth work would have to be paid for by the menu
 ; giving ground rather than by the type getting smaller again. Measured at the
@@ -317,7 +341,7 @@ offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_font_sizes/font_size = 12
-text = "Cars: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) · Bottles: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nSponge: “Sponge” by Aullwen (sketchfab.com/Aullwen) · Driveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0"
+text = "Cars: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) · Bottles: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nSponge: “Sponge” by Aullwen (sketchfab.com/Aullwen) · Driveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0\nCars, bottles and sponge are modified from the originals; the driveway is not."
 vertical_alignment = 2
 autowrap_mode = 3
 

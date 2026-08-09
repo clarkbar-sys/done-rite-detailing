@@ -17,6 +17,54 @@ extends GutTest
 
 const MAIN_MENU: String = "res://src/screens/main_menu.tscn"
 
+## Where every model the game loads lives, one directory each.
+##
+## Walked rather than listed, so a model that arrives without a credit fails a
+## test instead of shipping quietly — see
+## [method test_every_model_directory_is_either_credited_or_first_party].
+const MODELS_DIR: String = "res://assets/models"
+
+## The borrowed works, one row per directory under [constant MODELS_DIR]:
+##
+## [codeblock]
+## [directory, title of the work, who made it, what the credit calls it,
+##  the script that changes it — "" if the file is placed as it was downloaded]
+## [/codeblock]
+##
+## The title and the author are two of the three things CC-BY 4.0 asks a credit
+## to carry, the licence itself is the third, and the last column is the fourth
+## thing the licence asks for and the one this list exists to keep honest: an
+## indication of whether the material was modified. Every row's script is
+## checked to exist, so "modified" is a fact about the repository rather than a
+## claim in a table.
+##
+## The directory is the first column because it is what makes this list a
+## coverage check rather than a wish: the tests below read
+## [constant MODELS_DIR] and require every directory in it to appear here or in
+## [constant FIRST_PARTY], which is what stops the twelfth model from being the
+## one nobody credited.
+const BORROWED: Array[Array] = [
+	["cars", "Generic passenger car pack", "Comrade1280", "Cars", "build-car-pack.py"],
+	["cleaning_spray", "Kitchen Spray", "Jesus Osco", "Bottles", "build-tire-cleaner.py"],
+	["sponge", "Sponge", "Aullwen", "Sponge", "build-sponge.py"],
+	["driveway", "Sunken Driveway Parking Spot", "jimbogies", "Driveway", ""],
+]
+
+## The model directories that owe nobody a credit, because the game drew what is
+## in them.
+##
+## Named rather than inferred, and that is the point: a directory that is in
+## neither this list nor [constant BORROWED] is a model somebody added without
+## deciding where it came from, and that is the failure this pair is for.
+const FIRST_PARTY: Array[String] = ["pressure_washer"]
+
+## Where the bakes named in [constant BORROWED] live.
+const BUILD_SCRIPTS: String = "res://scripts/"
+
+## The file every model directory carries saying where its contents came from —
+## for whoever clones the repo, where the menu's line is for whoever plays it.
+const ATTRIBUTION: String = "ATTRIBUTION.txt"
+
 var _screen: GameScreen = null
 var _requested: Array[GameState] = []
 var _rung: Array[Bell.Voice] = []
@@ -185,24 +233,112 @@ func test_every_borrowed_model_is_credited_where_a_player_can_read_it() -> void:
 	# Every work, and all three parts of each by name, because the licence asks
 	# for all three and a line that lost one of them would still look like a
 	# credit: the title of the work, who made it, and what licence it is under.
+	# What the game uses it for is on the line too and checked here with them —
+	# not a licence condition, but the thing that makes a title on a menu mean
+	# anything to the person reading it.
+	#
 	# Substrings rather than the whole string, so the wording around them stays
 	# the .tscn's business — including how many of them share a line, which was
 	# 2 + 2 + 1 while the power wash was a borrowed flamethrower and is 2 + 2 now
-	# that the wand is drawn by this project (#162) and owes nobody anything.
+	# that the wand is drawn by this project (#162) and owes nobody anything, with
+	# the modification note of #159 under both.
+	#
+	# Off [constant BORROWED] rather than a list written out here, so this suite
+	# has one idea of what was borrowed and the coverage check below can hold it
+	# against what is actually on disk.
 	var credits: Label = _screen.get_node("%Credits") as Label
 	assert_not_null(credits, "the menu must carry the credits for the borrowed models")
 	if credits == null:
 		return
-	var borrowed: Array[Array] = [
-		["Generic passenger car pack", "Comrade1280"],
-		["Kitchen Spray", "Jesus Osco"],
-		["Sponge", "Aullwen"],
-		["Sunken Driveway Parking Spot", "jimbogies"],
-	]
-	for work: Array in borrowed:
-		for required: String in work:
+	for work: Array in BORROWED:
+		for required: String in [work[1], work[2], work[3]]:
 			assert_string_contains(credits.text, required, "the credit must name %s" % required)
 	assert_string_contains(credits.text, "CC BY 4.0", "the credit must name the licence")
+
+
+func test_the_credit_says_which_of_the_models_were_changed() -> void:
+	# The fourth thing CC-BY 4.0 asks for, and the one this menu went years
+	# without: 3(a)(1)(B) wants an indication that the material was modified,
+	# alongside the title, the author and the licence the test above checks. Three
+	# of these four are modified — baked into the shapes the game wants by the
+	# scripts named in [constant BORROWED] — and the driveway is the artist's file
+	# placed as it was downloaded, so the note has to distinguish them rather than
+	# say "some of this was changed".
+	#
+	# The note is the last line, and the semicolon in it is the contract: what is
+	# changed is named before it and what is not is named after. That is a real
+	# coupling to the wording in main_menu.tscn, and it is the cheapest one that
+	# can tell the two halves apart — a test that only asked whether the word
+	# "modified" appeared somewhere would pass a line that put the driveway on the
+	# wrong side of it, which is the one way this sentence can be wrong and still
+	# look right.
+	var credits: Label = _screen.get_node("%Credits") as Label
+	var lines: PackedStringArray = credits.text.split("\n")
+	var note: String = lines[lines.size() - 1].to_lower()
+	assert_string_contains(note, "modified", "the credit must say the models were modified")
+	var changed: String = note.get_slice(";", 0)
+	var untouched: String = note.get_slice(";", 1)
+	assert_ne(changed, note, "the note must separate what was changed from what was not")
+	for work: Array in BORROWED:
+		var called: String = str(work[3]).to_lower()
+		var bake: String = str(work[4])
+		if bake.is_empty():
+			assert_string_contains(untouched, called, "%s is unmodified and must say so" % called)
+			continue
+		assert_string_contains(changed, called, "%s is modified and must say so" % called)
+		assert_true(
+			FileAccess.file_exists(BUILD_SCRIPTS + bake),
+			"%s is credited as modified by a script that is not there" % called
+		)
+
+
+func test_every_model_directory_is_either_credited_or_first_party() -> void:
+	# What "all of them" is measured against, rather than asserted about a list
+	# somebody remembered to update. The credit above names four works; this is
+	# what makes four the right number — every directory under assets/models/ is
+	# either a borrowed work with a line on the menu or a model this project drew,
+	# and a new one is neither until somebody says which.
+	#
+	# Both directions, because the credit has been wrong in both. A model added
+	# without a credit is the licence breach; a credit left behind by a model that
+	# went away is the smaller thing #162 had to clean up by hand when the
+	# borrowed flamethrower became a drawn pressure washer.
+	var on_disk: PackedStringArray = DirAccess.get_directories_at(MODELS_DIR)
+	assert_gt(on_disk.size(), 0, "no model directories found under %s" % MODELS_DIR)
+	var accounted: Array[String] = FIRST_PARTY.duplicate()
+	for work: Array in BORROWED:
+		accounted.append(str(work[0]))
+	for directory: String in on_disk:
+		assert_true(
+			accounted.has(directory),
+			(
+				(
+					"assets/models/%s is credited nowhere: add it to BORROWED and to the menu's"
+					+ " credit line, or to FIRST_PARTY if this project drew it"
+				)
+				% directory
+			)
+		)
+	for directory: String in accounted:
+		assert_true(
+			on_disk.has(directory),
+			"assets/models/%s is gone — take its credit off the menu with it" % directory
+		)
+
+
+func test_every_model_directory_says_where_it_came_from() -> void:
+	# The copy of the credit that ships to whoever clones the repository, which
+	# the menu's line does not replace and which does not replace the menu's line:
+	# a player never opens a .txt, and a reader of the source never sees the
+	# screen. Required of the first-party directories too — "nothing here is
+	# borrowed" is an answer to "where did this come from", and a directory with
+	# no file at all is silence.
+	for directory: String in DirAccess.get_directories_at(MODELS_DIR):
+		var beside: String = "%s/%s/%s" % [MODELS_DIR, directory, ATTRIBUTION]
+		assert_true(
+			FileAccess.file_exists(beside),
+			"assets/models/%s must say where it came from" % directory
+		)
 
 
 func test_the_credit_is_actually_on_the_screen() -> void:
