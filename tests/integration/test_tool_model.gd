@@ -54,10 +54,11 @@ const LOPSIDED: Vector3 = Vector3(0.1, 1.0, 0.1)
 ##
 ## A ratio of the largest to the smallest, and 1.01 is a long way from every fit
 ## on the belt: the window bottle's is 1.29, the tyre bottle's 1.26, and the
-## pressure washer's — whose extent is its own mesh's box at one scale, on
-## purpose — is 1.0013. So this separates a fit that is uniform by design from
-## every fit that is merely gentle, and it does not sit near enough to either to
-## be tuning.
+## pressure washer's is exactly 1 — that wand is drawn at the size the catalogue
+## holds it (see [code]scripts/build-pressure-washer.py[/code]), so its fit is the
+## identity and there is nothing left for a reciprocal to do. So this separates a
+## fit that is uniform by design from every fit that is merely gentle, and it does
+## not sit near enough to either to be tuning.
 const LOPSIDED_ENOUGH: float = 1.01
 
 ## A path with nothing behind it, for the one test that asks what a missing model
@@ -67,16 +68,29 @@ const NOWHERE: String = "res://assets/models/nothing_here.glb"
 
 ## How much thicker one end of the wand has to be than the other before the two
 ## can be told apart by measurement rather than by eye. Twice over, against a real
-## 4.4 — a margin, and deliberately not a threshold anybody has to tune: the ends
-## of this model are a 4 cm pipe and a 22 cm flat, and nothing between them is
-## close.
+## 9.6 — a margin, and deliberately not a threshold anybody has to tune: the ends
+## of this model are the 12 mm nozzle the water leaves and the 36 mm hose swivel
+## it arrives through, and nothing between them is close.
 const BLUNTER: float = 2.0
 
+## How wide the top of the wand may be, in metres, and still be the thing water
+## comes out of. [constant WashJet.NOZZLE] is the hole the droplets are born in
+## and it is a centimetre of radius, so this is that doubled into a diameter with
+## a little over: a nozzle, and not the shoulder of a bottle or the flat of a
+## strap that happens to sit square on the axis.
+const NOZZLE_WIDE: float = 0.025
+
+## How thin a slice off the top of a mesh counts as its end face, in metres. A
+## millimetre: thick enough to take a whole ring of a round nozzle rather than the
+## one vertex that happens to be highest, and thinner than anything that could
+## widen the slice into the taper below it.
+const END_FACE: float = 0.001
+
 ## What counts as "the end" of a fitted tool when its two ends are being compared:
-## the tenth of its length nearest each. Small enough that the bottle strapped
-## across the middle of the wand is in neither, and large enough that the count of
-## vertices in each is in the hundreds rather than the handful a face or two would
-## give.
+## the tenth of its length nearest each. Small enough that the wand's grip and its
+## trigger are in neither — they are what a hand is on, and both are wider than
+## the nozzle — and large enough to take a whole ring of a round part rather than
+## the one vertex that happens to be furthest along.
 const AN_END: float = 0.1
 
 
@@ -98,9 +112,9 @@ func _built(tool: DetailingTool, extent: Vector3) -> ToolModel:
 
 
 ## The turn [param tool] asks for, as the [Basis] [ToolModel] will build from it.
-## Zero for every tool but the power wash, which is the identity — so every
-## measurement below reads the same as it did before turns existed, for every
-## model that does not name one.
+## Zero for every tool on the belt today, which is the identity — so every
+## measurement below reads the same as it did before turns existed, and goes on
+## reading correctly for the next borrowed model that has to be righted.
 func _turn_of(tool: DetailingTool) -> Basis:
 	return Basis.from_euler(tool.model_turn * (PI / 180.0))
 
@@ -112,11 +126,13 @@ func _turn_of(tool: DetailingTool) -> Basis:
 ## a test that read the array back through it would be grading the fit against
 ## itself.
 ##
-## Depth first, and that is not tidiness. The two bottles are baked by this
-## project and their mesh hangs straight off the root; the pressure washer is a
-## Sketchfab download and its mesh is two nodes down, under the wrapper and the
-## scene root the exporter writes. A search of the root's own children finds
-## nothing there and would hand every test below a null to measure.
+## Depth first, and that is not tidiness. Every asset here is written by this
+## project as one mesh at the root of its file, so today the mesh is one node
+## under the imported scene — but the pressure washer was a Sketchfab download
+## until [code]#162[/code] and its mesh was two nodes down, under the wrapper the
+## exporter writes as well. A search of the root's own children found nothing
+## there and handed every test below a null to measure, and the next download will
+## arrive the same way.
 func _source_mesh(model_path: String) -> Mesh:
 	var scene: Node = (load(model_path) as PackedScene).instantiate()
 	autofree(scene)
@@ -195,6 +211,26 @@ func _cross_section(mesh: Mesh, at_top: bool) -> float:
 	return across.size.x * across.size.z
 
 
+## The box around the topmost [constant END_FACE] of [param mesh] — the face the
+## water leaves, for a tool whose business end is at [code]+Y[/code].
+##
+## Its own box rather than the mesh's, because what is being asked is where that
+## face sits across the wand and how wide it is, and both are answers about those
+## vertices alone.
+func _nozzle_face(mesh: Mesh) -> AABB:
+	var top: float = mesh.get_aabb().end.y - END_FACE
+	var face: AABB = AABB()
+	var found: bool = false
+	for surface: int in mesh.get_surface_count():
+		var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		for vertex: Vector3 in vertices:
+			if vertex.y < top:
+				continue
+			face = face.expand(vertex) if found else AABB(vertex, Vector3.ZERO)
+			found = true
+	return face
+
+
 # ---- the drop-in ------------------------------------------------------------
 
 
@@ -227,10 +263,13 @@ func test_a_model_is_centred_where_the_cylinder_was() -> void:
 func test_the_fit_ignores_whatever_scale_the_export_was_saved_at() -> void:
 	# The reason the fit reads the mesh's own box instead of the node scale the
 	# [code].glb[/code] carries: the bottles are real 27 cm sprayers in real
-	# metres, the sponge is a real 16 cm sponge, and the pressure washer is 21
-	# units of nothing in particular with the scale that would make it metres left
-	# on a node this class never looks at. Asked by fitting each asset into a box
-	# nothing else would ask for, and requiring it to land there.
+	# metres, the sponge is a real 16 cm sponge, and the wand is drawn at the exact
+	# size the catalogue hands it — three different relationships between a file
+	# and a tool, and the fit is not allowed to care which it is looking at. Asked
+	# by fitting each asset into a box nothing else would ask for, and requiring it
+	# to land there. The wand is the one that would notice a class that had started
+	# quietly trusting the file, because it is the one the file happens to agree
+	# with at its own extent.
 	for tool: DetailingTool in _modelled():
 		var box: AABB = _built(tool, LOPSIDED).get_aabb()
 		assert_almost_eq(box.size.x, LOPSIDED.x, TOLERANCE, "%s: width" % tool.display_name)
@@ -280,18 +319,20 @@ func test_a_model_made_of_several_parts_arrives_with_all_of_them() -> void:
 
 func test_the_wand_is_thinnest_at_the_end_the_water_leaves() -> void:
 	# The bug this pins was reported as "the washer is shooting out the opposite
-	# end", and it was: the download is authored Z-up with its barrel at the
-	# mesh's own [code]-Y[/code], [ToolModel] never looks at the node that would
-	# say so, and the nozzle marker [ViewModel] hangs off the wand is at
-	# [code]+Y[/code] whatever arrives there. So the jet left the hose end.
+	# end", and it was: the download the wand used to be drawn from was authored
+	# Z-up with its barrel at the mesh's own [code]-Y[/code], [ToolModel] never
+	# looks at the node that would say so, and the nozzle marker [ViewModel] hangs
+	# off the wand is at [code]+Y[/code] whatever arrives there. So the jet left
+	# the hose end.
 	#
-	# Measured as a shape rather than as a rotation, because "the barrel is at the
-	# top" is the thing that has to be true and the half-turn in the catalogue is
-	# only how it is currently spelled. A barrel is a pipe: the tenth of the wand
-	# nearest the muzzle is a thin round section, and the tenth nearest the butt is
-	# the wide flat end the bottle is strapped to. Measured, at the catalogue
-	# extent: 0.00157 m² at the muzzle against 0.00694 m² at the butt, four times
-	# over, so [constant BLUNTER] is nowhere near either.
+	# Measured as a shape rather than as a rotation, because "the nozzle is at the
+	# top" is the thing that has to be true and how the asset gets that way — a
+	# turn in the catalogue then, the way it is drawn now — is only how it is
+	# currently spelled. A wand is a pipe: the tenth of it nearest the muzzle is a
+	# thin round section, and the tenth nearest the butt is the wide hose swivel.
+	# Measured, at the catalogue extent: 0.000135 m² at the muzzle against
+	# 0.001296 m² at the butt, nine times over, so [constant BLUNTER] is nowhere
+	# near either.
 	var wand: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.POWER_WASH]
 	var mesh: Mesh = _built(wand, wand.extent).mesh
 	assert_lt(
@@ -301,20 +342,50 @@ func test_the_wand_is_thinnest_at_the_end_the_water_leaves() -> void:
 	)
 
 
-func test_the_same_wand_without_its_turn_is_upside_down() -> void:
+func test_the_same_wand_turned_end_over_end_is_upside_down() -> void:
 	# What keeps the test above from passing on a model that happens to be roughly
-	# symmetrical end to end, and what says the catalogue's turn is load-bearing
-	# rather than decoration: build the same asset with no turn at all and the
-	# thin end is the butt. Delete [member DetailingTool.model_turn]'s row and this
-	# is the test that says which way the wand went.
+	# symmetrical end to end, and what keeps [member DetailingTool.model_turn]
+	# honest now that no tool on the belt asks for one: build the same asset with a
+	# half-turn nobody wants and the thin end has to arrive at the bottom. So the
+	# turn is applied, it is applied about the axis it says, and the wand really
+	# does have two distinguishable ends.
+	#
+	# The turn the flamethrower used to carry, and not an arbitrary one, because
+	# that is the case the row exists for: the next borrowed model that arrives
+	# lying the wrong way up is righted by putting it back.
 	var wand: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.POWER_WASH]
-	var untold: ToolModel = ToolModel.new(wand.model, wand.extent)
-	autofree(untold)
+	var over: ToolModel = ToolModel.new(wand.model, wand.extent, Vector3(0.0, 0.0, 180.0))
+	autofree(over)
 	assert_lt(
-		_cross_section(untold.mesh, false) * BLUNTER,
-		_cross_section(untold.mesh, true),
-		"the wand needs no turn, so the turn in the catalogue is doing nothing"
+		_cross_section(over.mesh, false) * BLUNTER,
+		_cross_section(over.mesh, true),
+		"a half-turn left the wand the same way up, so the turn did nothing"
 	)
+
+
+func test_the_water_leaves_the_wand_where_the_nozzle_marker_is() -> void:
+	# Issue #162, and the half of it no test could have caught: the water was
+	# leaving a point 12 cm from the end of the nozzle, and every assertion about
+	# the jet passed the whole time. [ViewModel] hangs the [code]Muzzle[/code]
+	# marker at [method ToolCarry.nozzle] — the top of the catalogue's box, on the
+	# box's own axis — and [ToolSight] fires [WashJet] from there, so what the
+	# marker means is "the model's business end is here". The flamethrower's was
+	# not: its box was sized by the gas bottle strapped across it, which put the
+	# barrel's end face 46 mm off the axis in X and 121 mm in Z.
+	#
+	# So this is the property the marker rests on, asserted where it can be
+	# measured: the topmost slice of the fitted mesh is a nozzle-sized face and it
+	# is centred on the box's own axis. Measured on the wand this project draws:
+	# 11.6 mm across and centred to a ten-thousandth.
+	var wand: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.POWER_WASH]
+	var mesh: Mesh = _built(wand, wand.extent).mesh
+	var face: AABB = _nozzle_face(mesh)
+	assert_almost_eq(face.get_center().x, 0.0, TOLERANCE, "the nozzle is off the wand's axis in x")
+	assert_almost_eq(face.get_center().z, 0.0, TOLERANCE, "the nozzle is off the wand's axis in z")
+	# And it is a nozzle rather than the flat top of something else that happens
+	# to be centred: a hole the water can plausibly have come out of, which is
+	# [constant WashJet.NOZZLE]'s centimetre with room to spare.
+	assert_lt(maxf(face.size.x, face.size.z), NOZZLE_WIDE, "the top of the wand is not a nozzle")
 
 
 func test_a_turn_leaves_the_box_and_the_centre_exactly_where_they_were() -> void:
@@ -322,11 +393,11 @@ func test_a_turn_leaves_the_box_and_the_centre_exactly_where_they_were() -> void
 	# ToolModel._fitted] — precisely so that it cannot move the tool: the catalogue
 	# extent has the hand's whole clearance budget in it (see [method
 	# DetailingTool.catalogue]) and a model that grew or wandered when somebody
-	# righted it would spend that budget silently. Asserted against a turn no tool
-	# asks for as well as the one the wand does, because a half-turn about Z leaves
-	# a box the same size by symmetry and would prove very little on its own.
+	# righted it would spend that budget silently. Asserted against a quarter turn
+	# as well as the half-turn and the none, because a half-turn about Z leaves a
+	# box the same size by symmetry and would prove very little on its own.
 	var wand: DetailingTool = DetailingTool.catalogue()[DetailingTool.Id.POWER_WASH]
-	for turn: Vector3 in [wand.model_turn, Vector3.ZERO, Vector3(90.0, 0.0, 0.0)]:
+	for turn: Vector3 in [wand.model_turn, Vector3(0.0, 0.0, 180.0), Vector3(90.0, 0.0, 0.0)]:
 		var built: ToolModel = ToolModel.new(wand.model, wand.extent, turn)
 		autofree(built)
 		var box: AABB = built.get_aabb()
@@ -423,11 +494,11 @@ func test_a_fit_that_left_the_normals_alone_would_fail_the_two_tests_above() -> 
 	# against the untouched normal, and require it to miss.
 	#
 	# [b]Except where the fit really is uniform, which is not a loophole.[/b] The
-	# power wash's catalogue extent is its mesh's own box at one scale — see
-	# [method DetailingTool.catalogue], which picks it that way so the pipe stays
-	# round — so its three fit factors agree to a tenth of a per cent, and a normal
-	# turned by the reciprocal of that [i]is[/i] the normal left alone. There is
-	# nothing to prove at that extent and no bug that could hide there.
+	# power wash's catalogue extent is its mesh's own box — the wand is drawn at
+	# the size the game holds it, see [method DetailingTool.catalogue] — so its
+	# three fit factors are exactly 1, and a normal turned by the reciprocal of
+	# that [i]is[/i] the normal left alone. There is nothing to prove at that
+	# extent and no bug that could hide there.
 	# [constant LOPSIDED] still asks the question of every tool including that one,
 	# and the count at the end is what stops "skip it" from quietly becoming
 	# "skip them all".
