@@ -15,18 +15,93 @@ const TOLERANCE: float = 0.0001
 
 var _garage: Garage = null
 
+## The style the bay parked for itself, so [method before_each] can put it back
+## after one of the arrow tests has shown a different one — see there.
+var _style_before: String = ""
 
+
+## One room for the whole file. Twenty-four rooms was twenty-four copies of a
+## driveway's worth of imported mesh, a wood and a car out of the pack, and the
+## great majority of what this file asks of one is where things are rather than
+## what they do.
+##
+## [b]Two things move, and [method before_each] puts both of them back.[/b] That
+## is the condition on sharing a fixture: a test that leaves the room changed
+## couples the suite into an order-dependent one, which passes in file order and
+## fails in any other. The two are [member Garage.orbiting], which one test
+## switches off, and which of the ten is parked, which the arrow tests change on
+## purpose. Checked by running the file with its tests in reverse.
+##
+## [b]What deliberately is not put back is the camera's angle round the car.[/b]
+## Half the tests here drive [method Garage._process] to make it move — that is
+## the point of them — and no assertion in the file is about where on the circle
+## it ended up: they are about the distance it stands at, the thing it points at,
+## and how far one second of it goes. The one test that really is about the first
+## frame builds its own room, and says so.
+##
+## Measured on a four-core box with this suite run on its own: 13.4 s to 4.5 s,
+## of which about 0.9 s is Godot starting up either way. It does not fall as far
+## as the two suites next door because half of what is left is real waiting — the
+## frames [method test_the_camera_moves_on_its_own] and its neighbours need, and
+## the ten re-parkings [method test_a_car_parked_by_the_arrows_is_sat_on_the_tarmac_too]
+## asks for.
+##
+## [method add_child] rather than [method GutTest.add_child_autofree]: GUT empties
+## its autofree list after every *test*, so a fixture registered with it here
+## would be freed out from under test two.
+func before_all() -> void:
+	_garage = _a_room()
+	if _garage == null:
+		return
+	add_child(_garage)
+	await wait_process_frames(1)
+	var parked: MeshCar = _garage.car() as MeshCar
+	_style_before = "" if parked == null else parked.style
+
+
+## [method Node.free] and not [method Node.queue_free]: GUT counts the test
+## script's children the moment `after_all` returns, and a queued free has not
+## happened yet — the room would be reported as a leak on its way out.
+func after_all() -> void:
+	if _garage != null:
+		_garage.free()
+		_garage = null
+
+
+## The explicit reset the shared room is worth, and deliberately only these two —
+## see [method before_all] for what is not on the list and why.
+##
+## The re-park is skipped outright when the right car is already there, rather
+## than left to [method Garage.show_style]'s own no-op, because of the frame
+## below: this costs a rebuild and a frame after one of the arrow tests and
+## nothing at all after the other twenty-one.
 func before_each() -> void:
+	if _garage == null:
+		return
+	_garage.orbiting = true
+	var parked: MeshCar = _garage.car() as MeshCar
+	if parked == null or parked.style == _style_before:
+		return
+	_garage.show_style(_style_before)
+	# A frame, so the car it replaced is actually gone rather than queued — the
+	# same wait test_grove.gd's replant makes, and for the same reason: without it
+	# the felled panels are still alive when the test that follows finishes and
+	# GUT reports twenty-one orphans against it.
+	await wait_process_frames(1)
+
+
+## A room, instanced but not yet in a tree — the caller adds it and decides how
+## long it lives. [method before_all]'s room outlives every test in the file and
+## so cannot go through GUT's autofree; the one test that builds its own wants
+## exactly the opposite.
+func _a_room() -> Garage:
 	var packed: PackedScene = load(GARAGE) as PackedScene
 	assert_not_null(packed, "could not load %s" % GARAGE)
 	if packed == null:
-		return
-	# Into a typed local first: GUT's add_child_autofree is untyped, and autofree
-	# is what stops a failure here being reported as a leak against the next test.
+		return null
+	# Into a typed local first: add_child is untyped.
 	var garage: Garage = packed.instantiate() as Garage
-	_garage = garage
-	add_child_autofree(_garage)
-	await wait_process_frames(1)
+	return garage
 
 
 func _camera() -> Camera3D:
@@ -80,8 +155,22 @@ func test_the_camera_is_aimed_before_the_first_frame() -> void:
 	# `_ready()` aims it, so whatever transform the scene file happens to have
 	# saved never reaches the screen. Without this, a screen that never orbits
 	# would show the camera's parked-at-the-origin view instead of the car.
-	var to_car: Vector3 = (_car().global_position - _camera().global_position).normalized()
-	var looking: Vector3 = -_camera().global_transform.basis.z
+	#
+	# ON A ROOM OF ITS OWN, and it is the only test in this file that gets one.
+	# "Before the first frame" is a claim about a room that has not had one, and
+	# the shared room has had every frame the tests above it asked for — the aim
+	# would still come out right, because it is recomputed every frame, and the
+	# test would no longer be able to tell that apart from `_ready()` doing it.
+	# One extra room out of twenty-four is what the claim costs.
+	var fresh: Garage = _a_room()
+	assert_not_null(fresh, "could not build a room that has not had a frame")
+	if fresh == null:
+		return
+	add_child_autofree(fresh)
+	var car: Node3D = fresh.get_node("%Car") as Node3D
+	var eye: Camera3D = fresh.get_node("%Camera") as Camera3D
+	var to_car: Vector3 = (car.global_position - eye.global_position).normalized()
+	var looking: Vector3 = -eye.global_transform.basis.z
 	assert_almost_eq(looking.dot(to_car), 1.0, TOLERANCE, "the camera must look at the car")
 
 

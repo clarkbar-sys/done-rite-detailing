@@ -172,6 +172,45 @@ whose entire body is `pass`. So `make gut` gates on the run summary as well —
 at least one script collected, zero risky/pending tests — exactly like
 `make smoke` gates on its log; the Makefile records the specifics.
 
+#### Shared fixtures: `before_all`, and the one condition on it
+
+`tests/integration/` is where the suite's time goes, and most of that time is
+scene construction rather than assertion: a suite that instances `garage.tscn`
+in `before_each` builds a driveway's worth of imported mesh, a wood and a car
+out of the pack once per test to ask one question of it.
+
+**A suite may build its fixture once in `before_all` if — and only if — every
+test leaves it exactly as it found it.** That is not a style preference, it is
+the whole risk: a shared fixture one test writes to couples the suite into an
+order-dependent one, which passes in file order and fails in any other, and the
+day it goes red it will look like a bug in whatever changed that week. Three
+shapes are allowed, in order of preference:
+
+| The suite | Do this |
+| --------- | ------- |
+| never writes to the fixture | `before_all`, nothing else |
+| writes to one named thing | `before_all` plus an explicit reset in `before_each` for that thing — not a rebuild |
+| has one test that needs a fixture nobody has touched | keep the shared one, and let *that* test build its own and say why |
+
+A test whose subject is a first frame — "aimed before anything ran", "exact on
+the frame it arrives", "before anything was equipped" — always falls in the
+third row. A fixture the file has been holding since it started cannot answer a
+question about a fixture that has just arrived.
+
+**Two mechanical traps, both measured.** GUT empties its autofree list after
+every *test*, so `add_child_autofree` in `before_all` frees the fixture out from
+under test two: use `add_child` and free in `after_all`. And free it with
+`free()` rather than `queue_free()` — GUT counts the test script's children the
+moment `after_all` returns, and a queued free has not happened yet, so the
+fixture is reported as a leak on its way out.
+
+**The guard.** GUT 9.7.1 has no shuffle flag; it collects tests from
+`get_method_list()`, which reports them in declaration order. So the check is to
+reorder the file — reversing the `func test_*` definitions in a scratch copy is
+enough — and confirm it still passes. Do it once per converted suite. It has
+teeth: run against the same suites with their `before_each` resets removed, the
+reversed copies go red on exactly the assertions the resets exist for.
+
 #### Why GUT and not GdUnit4
 
 Both are alive and both would work; this is a preference, not a verdict.
