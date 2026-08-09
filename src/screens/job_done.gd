@@ -43,6 +43,18 @@
 ## [kbd]Enter[/kbd] still presses it, and the arrows are doing the thing the
 ## player came here to do. They are handed back the moment the board appears.
 ##
+## [b]The board is the arcade's, and a simulation run does not get a place on
+## it.[/b] The whole claim a high score makes is "this much, in five minutes" —
+## see [HighScores] on why the ten cars are ten boards rather than one — and a
+## run with no clock on it has not answered that question at all. It has all the
+## time it wants, so given enough of it any player reaches the same number, which
+## is the number the car is worth rather than the number they are. So an untimed
+## run is shown its score and shown the car's board, and is never asked for three
+## letters: the alternative is a table that fills up with runs nobody can be
+## outdone at. Nothing is hidden from the player about this — the heading says
+## the job was handed in rather than timed out, and the score is on the screen in
+## the same digits as always.
+##
 ## [b]The theme comes back and no bell rings.[/b] The menu's Play faded the music
 ## out on the way into the game — see [code]src/screens/main_menu.gd[/code] — so
 ## this is where it returns, which is the sound of a run being over rather than
@@ -178,7 +190,7 @@ func _ready() -> void:
 	_style = RunResult.style
 	_finished = RunResult.finished
 	_table = HighScores.read_table(_style, scores_path)
-	if RunResult.handed_in():
+	if _earns_a_place():
 		_rank = HighScores.placed(_table, _score)
 	if _rank != HighScores.NOT_PLACED:
 		_dial = Initials.new()
@@ -356,13 +368,37 @@ func _show_the_screen() -> void:
 	_play_again.grab_focus()
 
 
+## Whether the run that just ended may take a place on the board.
+##
+## Two conditions and they are unrelated to each other, which is why they are
+## here together rather than in [method HighScores.placed]: there has to have
+## been a run at all — a scene instanced by a test or by somebody opening it in
+## the editor has none — and it has to have been a timed one. The class docs have
+## the argument for the second.
+##
+## [member GameMode.chosen] rather than something carried on [RunResult],
+## because a mode is the player's standing choice and not a fact about one run's
+## arithmetic: it is set on the menu, and the only way back to the menu is off
+## this screen. [RunResult] exists for the three numbers that [i]are[/i] a fact
+## about the run, which cannot survive their screen being freed.
+static func _earns_a_place() -> bool:
+	return RunResult.handed_in() and GameMode.is_timed(GameMode.chosen)
+
+
 ## What the board is called: how the run ended, and the car it ended on.
 ##
-## [b]The two ends of a run are worth different words.[/b] Finishing a car inside
-## three minutes is the thing the game is asking for, and reporting it in the same
+## [b]The ends of a run are worth different words.[/b] Finishing a car inside
+## five minutes is the thing the game is asking for, and reporting it in the same
 ## sentence as running out of time would take the one moment worth celebrating and
 ## call it a timeout. Nothing else on this screen knows the difference — see
 ## [member RunResult.finished].
+##
+## [b]And an untimed run has a third ending[/b], which is neither of those: the
+## player pressed Finish in the bay because a simulation run has no clock to end
+## it — see [code]src/screens/play_screen.gd[/code]. "Time Up" would be a
+## sentence about a clock that was never running, so the mode is asked before the
+## word is chosen. Finishing the car still outranks both, in either mode, because
+## it is the same achievement whether or not anything was counting down.
 ##
 ## A screen instanced with no run behind it — a test, or somebody opening the
 ## scene — has no car and no ending, and gets the plain heading rather than a
@@ -370,7 +406,21 @@ func _show_the_screen() -> void:
 func _board_heading() -> String:
 	if _style.is_empty():
 		return "Top Scores"
-	return "%s — %s" % ["Car Finished" if _finished else "Time Up", CarChoice.label_for(_style)]
+	return "%s — %s" % [_ending(), CarChoice.label_for(_style)]
+
+
+## Which of the three endings this run got, in the two or three words the heading
+## puts in front of the car's name.
+##
+## Off [member _finished] rather than off [member RunResult.finished], for the
+## reason every other reading on this screen is taken from the copy: the fields
+## are process-wide and this screen's answer was decided when it opened.
+func _ending() -> String:
+	if _finished:
+		return "Car Finished"
+	if GameMode.is_timed(GameMode.chosen):
+		return "Time Up"
+	return "Job Handed In"
 
 
 ## Writes the three letters into their labels, the one under the cursor in the
@@ -475,9 +525,15 @@ func _on_main_menu_pressed() -> void:
 	request_transition(MainMenuGameState.new())
 
 
-## Another car, the same three steps the menu's Play makes: the bell, the fade,
-## then the transition, in that order and for
+## Another car, the same three steps the menu's mode pills make: the bell, the
+## fade, then the transition, in that order and for
 ## [code]src/screens/main_menu.gd[/code]'s reasons.
+##
+## In the mode that was just played, without saying so or having to: the mode is
+## [member GameMode.chosen] and nothing between here and the bay touches it, so
+## "again" means the same game as well as the same car. A player who wants the
+## other one takes the other pill, which is on the menu this screen's other exit
+## leads to.
 func _on_play_again_pressed() -> void:
 	ring_bell(Bell.Voice.START)
 	stop_music()

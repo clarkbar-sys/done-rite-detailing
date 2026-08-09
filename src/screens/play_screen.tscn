@@ -87,8 +87,44 @@ offset_top = 12.0
 offset_right = 200.0
 offset_bottom = 118.0
 grow_horizontal = 2
-text = "3:00"
+text = "5:00"
 script = ExtResource("8_time")
+
+; The way out of a run with no clock on it, directly under the readout that says
+; there isn't one — see `_on_finish_pressed` in play_screen.gd, which owns both
+; what it does and whether it is on the screen at all. An arcade run never shows
+; it; it is left visible here because what a scene file should show a reader is
+; the screen with everything on it.
+;
+; The clock's own column and the clock's own anchor (preset 5, grown from the top
+; middle), so the two read as one thing rather than as a button that happened to
+; land near a label — and so the pill follows the readout onto a portrait phone
+; instead of drifting off a design-pixel offset.
+;
+; 280x176: the height the menu's pills wear, comfortably over the 164
+; TouchTarget.min_design_size() puts the floor at, and wide enough for "Finish"
+; at the 32 px Brand.DISPLAY_FACE sets it in — six characters advance a whole em
+; each, so the word is 192 px inside a 280 px pill. Narrower than the readout
+; above it on purpose: it is the second thing in that column, and a pill as wide
+; as the clock would read as the clock's own frame.
+;
+; 128 is the readout's 118 plus ToolBeltHud.GAP (10), which is what every other
+; pair of stacked HUD pieces in this game stands apart by — the grime board under
+; its own toggle included.
+[node name="Finish" type="Button" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 176)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -140.0
+offset_top = 128.0
+offset_right = 140.0
+offset_bottom = 304.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 32
+text = "Finish"
 
 ; The score, in the top-right corner. Before the grime board in the tree so the
 ; board's toggle and its thumbnails draw over it rather than under — the two

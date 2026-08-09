@@ -112,7 +112,20 @@ func _press_start() -> void:
 
 
 ## Menu to game, which is where the bell and the fade live now.
-func _press_play() -> void:
+##
+## Arcade rather than Play since #214 split that pill into the two modes. These
+## walks are about the host swapping screens rather than about which clock the
+## run gets, so they take the pill the menu opens focused; what each mode is
+## worth is [code]tests/unit/test_game_mode.gd[/code]'s and
+## [code]tests/integration/test_play_screen_clock.gd[/code]'s.
+func _press_arcade() -> void:
+	await _press("Arcade")
+
+
+## The rules screen's own way into the game, which is still one button called
+## Play — see [code]src/screens/how_to_play.gd[/code] on why the split stayed on
+## the menu.
+func _press_play_on_the_rules() -> void:
 	await _press("Play")
 
 
@@ -137,7 +150,7 @@ func test_the_walk_from_the_title_card_to_the_game() -> void:
 	# the only place that proves the asking gets answered.
 	await _press_start()
 	assert_eq(_current_screen_path(), MAIN_MENU, "Start must open the menu")
-	await _press_play()
+	await _press_arcade()
 	assert_eq(_current_screen_path(), PLAY_SCREEN)
 	assert_eq(_current_screen_path(), PlayGameState.SCENE_PATH, "the state decides this")
 
@@ -159,7 +172,7 @@ func test_the_rules_screen_can_start_the_game_itself() -> void:
 	# again.
 	await _press_start()
 	await _press("HowToPlay")
-	await _press_play()
+	await _press_play_on_the_rules()
 	assert_eq(_current_screen_path(), PLAY_SCREEN, "Play on the rules screen must open the game")
 
 
@@ -185,7 +198,7 @@ func test_play_rings_and_keeps_ringing_after_the_screen_it_was_pressed_on_is_gon
 	# Play would sound like a click. The host outlives every screen — which is
 	# also why moving the ding one screen down the flow cost nothing here.
 	await _press_start()
-	await _press_play()
+	await _press_arcade()
 	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
 	assert_eq(_bell().rings(), 1, "Play rang no bell")
 	assert_true(_bell().is_ringing(), "the bell was cut off with the screen that asked for it")
@@ -226,7 +239,7 @@ func test_play_fades_the_music_and_it_keeps_playing_after_the_screen_is_gone() -
 	await _touch()
 	assert_true(_music().playing(), "nothing to fade")
 	await _press_start()
-	await _press_play()
+	await _press_arcade()
 	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
 	assert_true(_music().playing(), "the music was cut off with the screen that asked for it")
 	assert_true(_music().fading(), "the music is playing on into the game instead of fading")
@@ -241,7 +254,7 @@ func test_the_theme_survives_the_long_way_round_as_well() -> void:
 	await _press("HowToPlay")
 	assert_true(_music().playing(), "the rules screen stopped the theme")
 	assert_false(_music().fading(), "reading is not leaving")
-	await _press_play()
+	await _press_play_on_the_rules()
 	assert_eq(_current_screen_path(), PLAY_SCREEN, "the swap must have happened")
 	assert_true(_music().fading(), "the rules screen's Play left the theme running into the game")
 
@@ -277,7 +290,7 @@ func test_only_one_screen_is_mounted_at_a_time() -> void:
 	assert_eq(host.get_child_count(), 1, "after How to Play")
 	await _press("MainMenu")
 	assert_eq(host.get_child_count(), 1, "after Main Menu")
-	await _press_play()
+	await _press_arcade()
 	assert_eq(host.get_child_count(), 1, "after Play")
 
 
@@ -286,7 +299,7 @@ func test_no_screen_comes_along_into_the_game() -> void:
 	# mounted would be drawn over the room and still be taking taps, which is the
 	# bug `test_only_one_screen_is_mounted_at_a_time` catches from the other side.
 	await _press_start()
-	await _press_play()
+	await _press_arcade()
 	var host: Control = _main.get_node("%ScreenHost") as Control
 	assert_eq(host.get_child_count(), 1)
 	assert_false(host.get_child(0).has_node("%Start"), "the game has no Start button on it")

@@ -74,7 +74,7 @@ func _start() -> void:
 	(title.get_node("%Start") as Button).pressed.emit()
 	await wait_process_frames(1)
 	var menu: GameScreen = _host().get_child(0) as GameScreen
-	(menu.get_node("%Play") as Button).pressed.emit()
+	(menu.get_node("%Arcade") as Button).pressed.emit()
 	await wait_process_frames(SETTLE_FRAMES)
 
 

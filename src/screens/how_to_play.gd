@@ -359,6 +359,13 @@ func _on_main_menu_pressed() -> void:
 ## "start the game" helper on [GameScreen], which would put a rule about the
 ## music and the bell into the base class that every screen inherits and only two
 ## screens are allowed to use.
+##
+## [b]It does not choose a mode, and that is why it still says Play.[/b] The menu
+## has the two pills; this screen has one button and it means "the game", which
+## is whatever [member GameMode.chosen] already is — the arcade, unless the
+## player has been in the bay and come back. A third mode pill on the rules
+## screen would be the same choice offered twice, in a place a player came to
+## read rather than to decide.
 func _on_play_pressed() -> void:
 	ring_bell(Bell.Voice.START)
 	stop_music()

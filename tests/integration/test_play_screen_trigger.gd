@@ -78,10 +78,11 @@ func before_each() -> void:
 	var title: GameScreen = _host().get_child(0) as GameScreen
 	(title.get_node("%Start") as Button).pressed.emit()
 	await wait_process_frames(2)
-	# Start opens the menu; the menu's Play opens the game. Two presses rather
-	# than one since #91 put a menu between the title card and the bay.
+	# Start opens the menu; the menu's Arcade pill opens the game. Two presses
+	# rather than one since #91 put a menu between the title card and the bay,
+	# and Arcade rather than Play since #214 split that pill into the two modes.
 	var menu: GameScreen = _host().get_child(0) as GameScreen
-	(menu.get_node("%Play") as Button).pressed.emit()
+	(menu.get_node("%Arcade") as Button).pressed.emit()
 	await wait_process_frames(2)
 
 
