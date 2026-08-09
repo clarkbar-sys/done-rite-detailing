@@ -159,6 +159,34 @@ other's half. There is deliberately no target and no percentage: the car still
 has spots a tool cannot reach, and a completion figure nobody can close is a
 worse thing to print on screen all game than a number that only goes up.
 
+And a run is now three minutes long, which is what makes the score mean
+something. The clock along the top starts the instant the mud is on the car —
+not when the screen opens, because laying it on is the longest frame the room
+will ever have and a meter counting through a load is charging you for it — and
+it turns red for the last thirty seconds. Finishing the whole car ends the run
+early and is the win; on a thousand-patch car that is a real thing to chase
+rather than the only way out. Either ending asks the same question the cabinet
+did, which is how much you got done and not whether you got it done, and that is
+the question a score can answer and two people can compare.
+
+Then the score outlives the tab it was earned in. When a run ends it asks for
+three letters the way a cabinet does: a wheel of
+thirty-six characters, a cursor that wraps, Up, Down, Next and Enter, and the
+arrow keys or the letter keys for anybody at a desk. What it writes is
+`user://high_scores.json`, which on the web build is IndexedDB behind
+Emscripten's filesystem, so the write is followed by the same `FS.syncfs` flush
+the sound toggle already needed — without it a score looks saved and is gone on
+the next reload. Ten places per car and not one table for all ten, because a
+wagon has more paint on it than a coupe does and a single board would be a
+ranking of which car is biggest with somebody's name beside it. A mangled save
+degrades to an empty board rather than a crash, which is the same rule the
+settings file follows and for the same reason.
+[`RunClock`](./src/core/run_clock.gd) is the three minutes,
+[`HighScores`](./src/core/high_scores.gd) is the board and the file,
+[`Initials`](./src/core/initials.gd) is the three-letter wheel, and
+[`job_done.tscn`](./src/screens/job_done.tscn) is the screen that draws the last
+two.
+
 And the title screen now plays it, which is what an arcade cabinet does with a
 machine nobody is standing at. Behind the logo the car is under mud and
 somebody is working it: the power wash takes a panel back to bare paint, the

@@ -51,6 +51,11 @@ const TOLERANCE: float = 0.0001
 var _screen: GameScreen = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
+## Every state the screen has asked the host for. The run ends by the screen
+## asking to be replaced — see [code]src/screens/play_screen.gd[/code] — so this
+## is how the two tests at the bottom watch for it happening when it should not.
+var _requested: Array[GameState] = []
+
 
 func before_each() -> void:
 	# A headless window is 64x64, which is smaller than one tap target, and the HUD
@@ -69,12 +74,18 @@ func before_each() -> void:
 	assert_not_null(car, "the bay must park a MeshCar for any of this to mean anything")
 	if car != null:
 		car.style = STYLE
+	_requested = []
 	add_child_autofree(_screen)
+	_screen.transition_requested.connect(_record)
 	await wait_for_signal(_garage().grimed, GRIME_TIMEOUT)
 
 
 func after_each() -> void:
 	get_tree().root.size = _window_size_before
+
+
+func _record(state: GameState) -> void:
+	_requested.append(state)
 
 
 func _garage_of(screen: GameScreen) -> Garage:
@@ -227,3 +238,26 @@ func test_a_panel_of_a_pack_car_can_be_finished() -> void:
 	assert_true(map.is_clean(), "the mud did not all come off")
 	assert_true(map.is_finished(), "and the panel does not call itself done")
 	assert_almost_eq(map.shine(), 1.0, TOLERANCE, "so its progress number cannot reach one")
+
+
+# ---- and the end of the run, which is the same number read once more ----------
+
+
+func test_a_car_nobody_has_touched_does_not_end_the_run() -> void:
+	# The failure this exists for is subtle and would be total: Grime.shine reads
+	# zero for a car with no reachable mud on it, so a run that ended at
+	# PlayScreen.FINISHED would have to be sure the mud is on before it starts
+	# watching. It is — see that method — and this is the assertion that says so.
+	await wait_process_frames(2)
+	assert_eq(_requested.size(), 0, "the run ended before the player had done anything")
+
+
+func test_finishing_one_panel_does_not_end_the_run() -> void:
+	var wheel: Node3D = _panel_named(MeshCar.WHEEL_PART)
+	assert_not_null(wheel, "the car has no wheels")
+	if wheel == null:
+		return
+	_do_the_whole_job(wheel)
+	await wait_process_frames(2)
+	assert_gt(_scoreboard().done_shown(), 0, "the wheel did not count, so this proves nothing")
+	assert_eq(_requested.size(), 0, "one clean wheel is not a finished car")
