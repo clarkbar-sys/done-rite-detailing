@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cd4c7bwtqf44o"
-path="res://.godot/imported/homemade_flamethrower_0.png-73c93f3c9218e8313625498c08b6945d.ctex"
+uid="uid://dm5oe8c4hxe61"
+path="res://.godot/imported/pressure_washer_atlas.png-19ffa7dac5760405493a03e02fa6b00a.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "71a999628c301bdb189e37ce89136f38"
+"md5": "516ab595bc7d68f9af993ba887bccaf4"
 }
 
 [deps]
 
-source_file="res://assets/models/pressure_washer/homemade_flamethrower_0.png"
-dest_files=["res://.godot/imported/homemade_flamethrower_0.png-73c93f3c9218e8313625498c08b6945d.ctex"]
+source_file="res://assets/models/pressure_washer/pressure_washer_atlas.png"
+dest_files=["res://.godot/imported/pressure_washer_atlas.png-19ffa7dac5760405493a03e02fa6b00a.ctex"]
 
 [params]
 
