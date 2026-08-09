@@ -19,6 +19,19 @@ const TOOL_BELT_HUD: String = "res://src/ui/tool_belt_hud.tscn"
 ## a snappier roll-up does not silently start being measured mid-flight.
 const SETTLE_SECONDS: float = ToolBeltHud.EXPAND_SECONDS * 2.0
 
+## The character a sprite row uses for "nothing here". Not one of
+## [constant ToolBeltHud.ROLES] on purpose — the painter draws only what it can
+## resolve, so transparency is the absence of a role rather than a role of its
+## own, and this file checks that from the other side.
+const TRANSPARENT: String = "."
+
+## How saturated an albedo has to be before "is it still its own hue" is a
+## question with an answer. Two of the five tools are all but grey — the wand's
+## silver and the tyre bottle's near-black — and a hue read off a colour whose
+## three channels are a hundredth apart is noise, not a colour. Well under the
+## three that are actually coloured, which sit at 0.77 and above.
+const TINTABLE_SATURATION: float = 0.15
+
 var _hud: ToolBeltHud = null
 var _belt: ToolBelt = null
 var _underneath: Button = null
@@ -150,9 +163,9 @@ func test_the_icons_are_in_belt_order() -> void:
 			tools[index].display_name,
 			"icon %d must stand for the tool at that place on the belt" % index
 		)
-		# The equipped badge is white on red and is checked in its own test below;
-		# what is being pinned here is that every *other* badge is drawn in the
-		# colour of the tool sitting at its own index, rather than at some other.
+		# The equipped badge is lifted against its red plate and is checked in its
+		# own test below; what is being pinned here is that every *other* badge is
+		# drawn in the colour of the tool sitting at its own index, not some other.
 		if index != _belt.equipped_index():
 			assert_eq(
 				icon.fill_color().to_html(false),
@@ -268,53 +281,156 @@ func test_every_badge_glyph_can_be_seen_on_its_own_plate() -> void:
 		)
 
 
-func test_every_tool_has_its_own_silhouette_and_it_stays_on_the_grid() -> void:
-	# Shape carries what colour was carrying alone, so "every tool has a shape" is
-	# a claim worth checking rather than an intention. The bounds half is the bug
-	# a stroke table develops silently: a point at 30 on a 24-unit grid draws
-	# outside the plate and looks like a rendering glitch, not like a typo.
+func test_every_tool_has_its_own_picture_and_every_picture_is_well_formed() -> void:
+	# Shape carries what colour was carrying alone, so "every tool has a picture"
+	# is a claim worth checking rather than an intention.
+	#
+	# The rest of this replaces the off-grid assertion the stroke table needed,
+	# and it is the same property one format along: a table that is a picture in
+	# the source can go wrong by being the wrong shape, and a row one character
+	# short shifts every pixel after it a column left — which looks like a
+	# rendering bug and is a typo. Six marks are walked here, not five: the corner
+	# went pixel with the badges (see [ToolBeltHud.BeltMark]).
 	var seen: Array[String] = []
 	for carried: DetailingTool in DetailingTool.catalogue():
-		var paths: Array[PackedVector2Array] = ToolBeltHud.ToolIcon.glyph(carried.id)
-		assert_gt(paths.size(), 0, "%s has no silhouette" % carried.display_name)
-		var shape: String = str(paths)
-		assert_false(
-			seen.has(shape), "%s draws the same picture as another tool" % carried.display_name
+		_assert_well_formed(ToolBeltHud.ToolIcon.sprite(carried.id), carried.display_name, seen)
+	for open_corner: bool in [false, true]:
+		_assert_well_formed(
+			ToolBeltHud.BeltMark.sprite(open_corner), "the corner (open=%s)" % open_corner, seen
 		)
-		seen.append(shape)
-		for path: PackedVector2Array in paths:
-			assert_gt(
-				path.size(), 1, "%s has a stroke with nothing to stroke" % carried.display_name
-			)
-			for point: Vector2 in path:
-				assert_between(
-					point.x, 0.0, ToolBeltHud.GLYPH_GRID, "%s off grid" % carried.display_name
-				)
-				assert_between(
-					point.y, 0.0, ToolBeltHud.GLYPH_GRID, "%s off grid" % carried.display_name
-				)
 
 
-func test_the_equipped_icon_is_a_red_plate_and_no_other_is() -> void:
+func test_every_role_in_a_sprite_has_a_colour_and_they_are_in_tonal_order() -> void:
+	# The palette is the promise [DetailingTool] makes — the icon and the mesh
+	# read the same field — carried one format further, so it is checked from
+	# both ends: every role in ToolBeltHud.ROLES resolves to a colour, and the
+	# four derived from the base come out in the order their names claim. A
+	# highlight darker than its own base would draw a lit face as a shadow and
+	# pass every other assertion in this file.
+	var base: Color = Brand.badge_tint(_belt.tools()[0].albedo)
+	var palette: PackedColorArray = ToolBeltHud.sprite_palette(base)
+	assert_eq(palette.size(), ToolBeltHud.ROLES.length(), "one colour per role, and no spares")
+	var deep: float = palette[ToolBeltHud.ROLES.find("D")].get_luminance()
+	var shade: float = palette[ToolBeltHud.ROLES.find("S")].get_luminance()
+	var lit: float = palette[ToolBeltHud.ROLES.find("H")].get_luminance()
+	assert_lt(deep, shade, "the deep tone must be under the shade")
+	assert_lt(shade, base.get_luminance(), "and the shade under the base it shades")
+	assert_lt(base.get_luminance(), lit, "and the highlight over it")
+	# The ink is a constant rather than a sixth tint of the tool, and it is the
+	# one role that has to be darker than the plate it outlines against.
+	assert_lt(
+		palette[ToolBeltHud.ROLES.find("#")].get_luminance(),
+		Brand.PANEL.get_luminance(),
+		"the outline has to be darker than the darkest plate it is drawn on"
+	)
+
+
+func test_the_water_in_a_badge_is_the_water_the_paint_flashes() -> void:
+	# The one thing in a sprite that is deliberately not the tool's colour. Water
+	# belongs to the pass rather than to the bottle — the jet is the same water
+	# whichever tool throws it — so it comes from the constant the shader and the
+	# score corner already read, and a badge drawn in a blue of its own would put
+	# the belt and the paint one repaint apart.
+	for tool_index: int in _belt.size():
+		var palette: PackedColorArray = ToolBeltHud.sprite_palette(
+			Brand.badge_tint(_belt.tools()[tool_index].albedo)
+		)
+		assert_eq(
+			palette[ToolBeltHud.ROLES.find("W")],
+			PatchFlash.WASH_TINT,
+			"tool %d must spray the same water the paint flashes" % tool_index
+		)
+	assert_eq(ScoreHud.WASH_TINT, PatchFlash.WASH_TINT, "and so must the score corner")
+
+
+func test_the_equipped_icon_is_a_red_plate_with_a_white_ring_and_no_other_is() -> void:
 	# The tool you are already holding is the one the eye should land on first —
-	# and it is the one icon you cannot usefully press, so the old treatment faded
-	# it, which is the universal look of a control that is broken. Red is what the
-	# site puts on the thing you have pressed and white is the only colour that
-	# goes on top of it; neither is a colour this belt did not already have.
-	# Asserted on the values [method ToolBeltHud.ToolIcon._draw] actually uses,
-	# not on a flag that is supposed to make it use them.
+	# and it is the one icon you cannot usefully press, so the first treatment
+	# faded it, which is the universal look of a control that is broken. Red is
+	# what the site puts on the thing you have pressed, and it stays.
+	#
+	# WHAT CHANGED, AND IT IS A DELIBERATE BREAK. This used to assert that the
+	# equipped badge is drawn in Brand.WHITE. A multi-tone sprite cannot go
+	# all-white without becoming a silhouette again, and doing that to the one
+	# badge the eye is meant to land on first would throw away exactly the
+	# readability this pass buys. So the picture keeps the tool's own tones —
+	# lifted against the red plate rather than against the panel, which the
+	# contrast test above covers — and the second channel red was carrying alone
+	# moves to a white hairline round the plate. A ring survives greyscale; a red
+	# plate on its own does not.
 	await _open()
 	var equipped: int = _belt.equipped_index()
 	for index: int in _hud.icon_count():
 		var icon: ToolBeltHud.ToolIcon = _hud.icon_at(index)
+		var box: StyleBoxFlat = icon.get_theme_stylebox("normal") as StyleBoxFlat
+		assert_not_null(box, "icon %d has no plate at all" % index)
+		if box == null:
+			continue
 		if index == equipped:
 			assert_eq(icon.plate_color(), Brand.RED, "the tool in your hands wears the accent")
+			assert_eq(box.border_color, Brand.WHITE, "and the ring that says so without colour")
 			assert_eq(
-				icon.fill_color(), Brand.WHITE, "and is drawn in the one colour that goes on it"
+				box.border_width_top, Brand.FOCUS_RING_WIDTH, "at the width the brand's ring is"
+			)
+			assert_eq(
+				icon.fill_color(),
+				Brand.badge_tint(_belt.tools()[index].albedo, Brand.RED),
+				"and keeps its own colour, lifted against the plate it is on"
 			)
 		else:
 			assert_eq(icon.plate_color(), Brand.PANEL, "icon %d is not the one being held" % index)
-			assert_ne(icon.fill_color(), Brand.WHITE, "icon %d keeps its own colour" % index)
+			assert_eq(
+				box.border_color, Brand.LINE, "icon %d wears the hairline, not the ring" % index
+			)
+
+
+func test_every_badge_is_still_the_tools_own_colour_on_the_red_plate() -> void:
+	# The other half of the break above. Lifting a tint against a brighter plate
+	# could clear the floor by going white, which would be the silhouette back
+	# under a different name — so the equipped badge is checked for still being
+	# the hue the catalogue gave it.
+	for carried: DetailingTool in DetailingTool.catalogue():
+		var on_red: Color = Brand.badge_tint(carried.albedo, Brand.RED)
+		assert_gte(
+			Brand.contrast_ratio(on_red, Brand.RED),
+			Brand.BADGE_CONTRAST,
+			"%s must be readable while it is the one you are holding" % carried.display_name
+		)
+		if carried.albedo.s > TINTABLE_SATURATION:
+			assert_almost_eq(
+				on_red.h,
+				carried.albedo.h,
+				0.02,
+				"%s must still be its own hue" % carried.display_name
+			)
+
+
+## Asserts one sprite is the shape a sprite has to be, and that no earlier one in
+## [param seen] already drew it. [param what] names it in the failure.
+func _assert_well_formed(rows: PackedStringArray, what: String, seen: Array[String]) -> void:
+	assert_eq(
+		rows.size(), ToolBeltHud.SPRITE_GRID, "%s is not %d rows" % [what, ToolBeltHud.SPRITE_GRID]
+	)
+	var ink: int = 0
+	for down: int in rows.size():
+		var row: String = rows[down]
+		assert_eq(
+			row.length(), ToolBeltHud.SPRITE_GRID, "%s row %d is the wrong width" % [what, down]
+		)
+		for across: int in row.length():
+			var cell: String = row[across]
+			if cell == TRANSPARENT:
+				continue
+			assert_gte(
+				ToolBeltHud.ROLES.find(cell),
+				0,
+				"%s row %d uses '%s', which is not a role" % [what, down, cell]
+			)
+			ink += 1
+	assert_gt(ink, 0, "%s is an empty plate" % what)
+	var picture: String = "|".join(rows)
+	assert_false(seen.has(picture), "%s draws the same picture as another mark" % what)
+	seen.append(picture)
 
 
 func test_the_red_plate_follows_the_belt() -> void:

@@ -284,14 +284,55 @@ func test_a_tint_is_still_the_tools_own_colour() -> void:
 	assert_almost_eq(tint.h, blue.h, 0.02, "and the same blue it always was")
 
 
-func test_white_is_readable_on_the_equipped_plate() -> void:
-	# The equipped badge swaps to a red plate with a white glyph. Red is the one
-	# fill in this palette bright enough to be worth checking white against, and
-	# it is checked rather than assumed.
+func test_a_tint_is_asked_against_the_plate_it_will_be_drawn_on() -> void:
+	# The equipped badge sits on --red, which is twenty-six times the luminance of
+	# --panel, so a tint that clears the floor on the dark plate can be well under
+	# it on the red one. The sponge is the case: its own yellow is 12:1 on the
+	# panel and 3.1:1 on the red, and the belt draws the tool it is holding on the
+	# red one.
+	var yellow: Color = _albedo_of(DetailingTool.Id.SPONGE)
+	assert_lt(
+		Brand.contrast_ratio(Brand.badge_tint(yellow), Brand.RED),
+		Brand.BADGE_CONTRAST,
+		"the premise: the panel's tint is not readable on the accent"
+	)
 	assert_gte(
-		Brand.contrast_ratio(Brand.WHITE, Brand.RED),
+		Brand.contrast_ratio(Brand.badge_tint(yellow, Brand.RED), Brand.RED),
 		Brand.BADGE_CONTRAST,
 		"the tool in your hands has to be the most readable badge on the belt"
+	)
+	assert_almost_eq(
+		Brand.badge_tint(yellow, Brand.RED).h, yellow.h, 0.02, "and still the sponge's own yellow"
+	)
+
+
+func test_a_tint_asked_against_the_dark_plate_is_what_it_always_was() -> void:
+	# The plate is a default rather than a new argument every caller has to pass,
+	# so the four badges that were already right must not have moved.
+	for carried: DetailingTool in DetailingTool.catalogue():
+		assert_eq(
+			Brand.badge_tint(carried.albedo),
+			Brand.badge_tint(carried.albedo, Brand.PANEL),
+			"%s: the default plate is the dark one" % carried.display_name
+		)
+
+
+func test_the_picked_badge_says_so_without_using_colour() -> void:
+	# Red is one channel, and it is the channel that fails in sunlight and for
+	# roughly one man in twelve — the same failure the badges' own pictures
+	# stopped relying on. A white ring is the second: it is still there in
+	# greyscale, and it does not touch the picture inside it.
+	var picked: StyleBoxFlat = Brand.picked_badge(Brand.RED, BADGE_SIDE)
+	var plain: StyleBoxFlat = Brand.badge(Brand.PANEL, BADGE_SIDE)
+	assert_eq(picked.border_color, Brand.WHITE, "the ring is full white, not the focus ring's 55%")
+	assert_eq(picked.border_width_top, Brand.FOCUS_RING_WIDTH, "at the width the brand's ring is")
+	assert_gt(
+		picked.border_width_top, plain.border_width_top, "and thicker than the hairline it replaces"
+	)
+	assert_eq(
+		picked.corner_radius_top_left,
+		plain.corner_radius_top_left,
+		"a picked badge is still the same disc"
 	)
 
 

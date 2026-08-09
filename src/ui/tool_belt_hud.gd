@@ -13,12 +13,13 @@
 ## classes a unit test can construct without a [SceneTree]. The belt is that
 ## tier; the thing that draws it is this one.
 ##
-## [b]The icons are drawn silhouettes on the brand's own plate.[/b] A round dark
+## [b]The icons are 16x16 pixel sprites on the brand's own plate.[/b] A round dark
 ## badge — [method Brand.badge], which is [method Brand.pill] at a square size,
 ## so a belt badge and the Start button are bent by the same arithmetic — with
-## that tool's outline stroked on top of it in a tint derived from its
-## [member DetailingTool.albedo]. See [ToolIcon] for the stroke table and for why
-## a tint rather than the raw albedo.
+## that tool drawn on top of it a pixel at a time, in tones derived from its
+## [member DetailingTool.albedo]. See [ToolIcon] for the sprite tables, and
+## [method sprite_palette] for why a character in one is a [i]role[/i] rather than
+## a colour.
 ##
 ## The alternative, a [SubViewport] per tool rendering the real mesh, was
 ## rejected on cost: that is five more render targets on a page that already has
@@ -64,10 +65,17 @@ const GAP: float = 10.0
 ## The picture on it is [BeltMark]; this is the word for it.
 const TOGGLE_TOOLTIP: String = "Tools"
 
-## The square every glyph in this file is laid out on, and the only unit the
-## stroke tables below are written in. Points are in [code]0..24[/code] with y
+## The square the [i]stroke[/i] glyphs in this project are laid out on, and the
+## only unit their tables are written in. Points are in [code]0..24[/code] with y
 ## running down, the way the screen does, so a table reads the same way it draws
 ## — no mental flip between writing a shape and looking at it.
+##
+## [b]The belt itself no longer uses this[/b] — its six marks are sprites, see
+## [constant SPRITE_GRID]. It stays here, with [method stroke_glyph] and
+## [method glyph_ring], because [CarArrow] and [SoundToggle] are still strokes and
+## are still drawn through it. Those two are single shapes on their own plates
+## where an outline is the whole picture; a tool badge is a picture of an object,
+## which is the thing an outline was failing at.
 const GLYPH_GRID: float = 24.0
 
 ## How far in from the plate's edge the picture is drawn, as a fraction of the
@@ -87,6 +95,58 @@ const GLYPH_WIDTH: float = 2.0
 ## How many segments a glyph circle is bent into. Enough that a tyre is round at
 ## 164 px, few enough that the table stays a table.
 const RING_SEGMENTS: int = 16
+
+## The pixel grid every sprite in this file is drawn on: rows of this many
+## characters, this many of them, one character per pixel, with y running down —
+## so a table in the source is a picture of the badge it draws.
+const SPRITE_GRID: int = 16
+
+## The roles a sprite character may be, in the order [method sprite_palette]
+## hands their colours back. Any other character — [code].[/code], which is what
+## the tables use — is transparent and draws nothing.
+##
+## A string of characters rather than a [Dictionary] keyed by them: a palette is
+## then a [PackedColorArray] indexed by [method String.find], which is a typed
+## array of the eight colours a sprite may contain and is checkable as one.
+const ROLES: String = "#BSHDWwO"
+
+## How far in from the plate's edge a sprite is drawn, as a fraction of the
+## smaller side — [constant GLYPH_INSET]'s job for the pixel grid, and the same
+## reasoning: the tap target is a fingertip's, and a 164 px sponge is not a
+## picture, it is a wall.
+##
+## The number is what leaves the sprite inside the [i]disc[/i] rather than inside
+## its bounding square. A square inscribed in a circle is 1/sqrt(2) — a hair over
+## 70% — of it across, and 0.15 in from both sides is exactly that 70%, so the
+## sprite's corners sit just inside a plate that is 100%.
+const SPRITE_INSET: float = 0.15
+
+## How much darker [code]S[/code] is than the base it is a shade of, and
+## [code]D[/code] — grips, triggers, the deep half of a thing — darker again.
+##
+## [b]Neither is checked against [constant Brand.BADGE_CONTRAST], on purpose.[/b]
+## Only the base is (see [method ToolIcon.fill_color]), because a shade is read
+## against the pixels it touches and not against the plate: it is always enclosed
+## by base and ink, never by plate. Holding every tone to 4.5:1 on a near-black
+## panel would mean a shade lighter than the thing it shades — the sprite would
+## have to go tonally flat to pass a test written to keep it readable.
+const SHADE_DROP: float = 0.26
+const DEEP_DROP: float = 0.5
+
+## How much lighter [code]H[/code] is — a lit top face, the side the strip lights
+## are on.
+const HIGHLIGHT_LIFT: float = 0.3
+
+## How much darker [code]w[/code] is than [code]W[/code]: the far end of a fan,
+## where the water has broken up and stopped catching the light. The same
+## reasoning [constant WashJet.SPRAY] is the far end of [constant WashJet.TIP] by.
+const WATER_DROP: float = 0.3
+
+## Suds, and the shine off a wet panel: [code]O[/code]. White-ish rather than
+## [constant Brand.WHITE], because a bubble is water and takes a little of the
+## sky with it — and because the one thing on the belt that is flat white should
+## go on being the ring round the badge you are holding.
+const SUDS: Color = Color(0.96, 0.98, 1.0)
 
 var _belt: ToolBelt = null
 var _icons: Array[ToolIcon] = []
@@ -391,10 +451,15 @@ func _hide_holder() -> void:
 ## [param on], centred inside a control [param within] pixels across, stroked in
 ## [param ink].
 ##
-## Shared by the badges and the corner mark because they are the same picture
+## Shared by [CarArrow] and [SoundToggle] because they are the same picture
 ## problem twice: a table of points on a square grid, scaled to whatever the
 ## layout ended up handing the control. Written once so a glyph cannot end up
-## drawn at one weight on the belt and another in the corner.
+## drawn at one weight on one corner of the screen and another on the other.
+##
+## [b]The belt's own six marks stopped coming through here[/b] — see
+## [method paint_sprite]. The short version is that a stroke carries a shape and
+## nothing else, and five tools told apart by outline alone at the ~50 px a phone
+## renders this design at is one channel doing the whole job again.
 ##
 ## Stroke width scales with the glyph rather than being a fixed pixel count. The
 ## design is rendered at about a third on a phone, so a 6 px line drawn at 1280
@@ -432,6 +497,88 @@ static func glyph_ring(centre: Vector2, radius: float) -> PackedVector2Array:
 	return points
 
 
+## The eight colours [param base] implies, in [constant ROLES] order — what a
+## sprite's characters mean.
+##
+## [b]This is the part of the pixel pass that must not be fudged.[/b]
+## [DetailingTool]'s class docs promise that a tool's colour lives in the
+## catalogue so "the icon in the roll-up and the mesh in the player's hands cannot
+## disagree", and a sprite carrying its own hex values would break that promise
+## quietly — five tables of literals that start out matching the catalogue and
+## drift the first time somebody repaints a bottle. So a character is a role and
+## the roles are computed: [code]B[/code] is the base it was handed,
+## [code]S[/code] and [code]D[/code] are that base darkened, [code]H[/code] is it
+## lightened. Change an albedo and all four move together.
+##
+## [b][code]W[/code] and [code]w[/code] are the deliberate exception, and
+## [code]O[/code] with them.[/b] Water and suds belong to the [i]pass[/i] rather
+## than to the bottle — the jet is the same water whichever tool throws it, so
+## tinting it per tool would say the power wash sprays something different from
+## the tyre cleaner. The blue comes from [constant PatchFlash.WASH_TINT], which is
+## the colour the paint itself flashes when a patch comes clean, so the belt and
+## the car cannot end up two different blues.
+##
+## [b][code]#[/code] is a constant and is shared by every sprite.[/b] An outline
+## tinted per tool would go on being one channel wearing a second coat: what
+## separates a sprite from its plate is that the edge is nearly black whatever the
+## thing inside it is made of.
+static func sprite_palette(base: Color) -> PackedColorArray:
+	return PackedColorArray(
+		[
+			Brand.INK,
+			base,
+			base.darkened(SHADE_DROP),
+			base.lightened(HIGHLIGHT_LIFT),
+			base.darkened(DEEP_DROP),
+			PatchFlash.WASH_TINT,
+			PatchFlash.WASH_TINT.darkened(WATER_DROP),
+			SUDS,
+		]
+	)
+
+
+## Draws [param rows] — a sprite on the [constant SPRITE_GRID] grid — onto
+## [param on], centred inside a control [param within] pixels across, with each
+## character coloured by [param palette] the way [constant ROLES] says.
+##
+## [b]Why a grid of rectangles and not a texture.[/b] Five authored PNGs would
+## bring an import step, five binaries nobody can diff in review, and a
+## texture-filter setting that will be wrong exactly once — and none of them could
+## derive a colour from the catalogue, which is the property [method
+## sprite_palette] exists to keep. A table of strings keeps everything the stroke
+## tables had: greppable, diffable, and constructible in a test with no
+## [SceneTree] behind it. The [SubViewport] this class's docs reject is rejected
+## for the same money it always was.
+##
+## Nearest-neighbour by construction, because there is no sampling anywhere in
+## here: a pixel is a [method CanvasItem.draw_rect] the size the layout worked
+## out, so the badge is crisp at 164 px, at the ~50 px a phone renders it at, and
+## at every size in between.
+##
+## An unknown character draws nothing rather than erroring, which is what makes
+## [code].[/code] transparent without being a role of its own — and what a
+## well-formedness test asserts from the other side, so a typo is a red suite
+## rather than a hole in a badge.
+static func paint_sprite(
+	on: CanvasItem, rows: PackedStringArray, within: Vector2, palette: PackedColorArray
+) -> void:
+	var side: float = minf(within.x, within.y)
+	if side <= 0.0:
+		return
+	var box: Rect2 = Rect2(Vector2.ZERO, within).grow(-side * SPRITE_INSET)
+	var pixel: float = minf(box.size.x, box.size.y) / float(SPRITE_GRID)
+	var origin: Vector2 = box.get_center() - Vector2.ONE * pixel * float(SPRITE_GRID) * 0.5
+	var square: Vector2 = Vector2(pixel, pixel)
+	for down: int in rows.size():
+		var row: String = rows[down]
+		for across: int in row.length():
+			var role: int = ROLES.find(row[across])
+			if role < 0 or role >= palette.size():
+				continue
+			var at: Vector2 = origin + Vector2(float(across), float(down)) * pixel
+			on.draw_rect(Rect2(at, square), palette[role])
+
+
 ## One tool's badge: the brand's round plate with that tool drawn on it.
 ##
 ## A [Button] rather than a [Control] with [method Control._gui_input], because
@@ -439,138 +586,192 @@ static func glyph_ring(centre: Vector2, radius: float) -> PackedVector2Array:
 ## [BaseButton] handling that — the same path the Start button takes, and the
 ## one the integration test exercises through [code]Input[/code].
 ##
-## [b]Why a drawn silhouette and not the shape the tool renders as.[/b] The badge
+## [b]Why a drawn picture and not the shape the tool renders as.[/b] The badge
 ## used to be [member DetailingTool.shape] — a circle for a cylinder, a square
 ## for a box, a bar for a plane — which made three of the five badges the same
 ## circle, told apart by colour alone. That is one channel carrying the whole
 ## job, and it is the channel that fails first: in sunlight, at a glance, and for
-## roughly one man in twelve. Five silhouettes put the same information in the
-## shape, where it survives all three. The table is points on a grid, drawn in
-## [method _draw] the way the primitives were, so it is still greppable, still
-## diffable, and still costs no asset pipeline.
+## roughly one man in twelve. Putting the information in the shape survives all
+## three.
 ##
-## [b]A tint rather than the albedo.[/b] What a tool is made of and what its
-## badge is drawn in stopped being the same number here — see
-## [method Brand.badge_tint] for the whole of that argument. The short version is
-## that the Tire & Engine bottle is near-black on purpose and was therefore
-## invisible on any dark plate, and lightening the badge is the fix that does not
-## touch the bottle in the player's hands.
+## [b]And why the shape then stopped being an outline.[/b] Five stroked
+## silhouettes were the first answer to that, and they did not read at the size
+## they are actually looked at. Weight was not the problem — a heavier stroke was
+## mocked up and gives a heavier version of the same picture. Shape was: the rag
+## was a rectangle with a wobble on its bottom edge and read as a table, the
+## sponge's three equal suds in a row read as a face, and the power wash was four
+## disconnected segments that resolved into a hockey stick with no nozzle and no
+## water in it. Only the tyre survived a glance, because a circle inside a circle
+## is the one shape a 2-unit stroke can still carry at 50 px.
 ##
-## [b]Equipped is a red plate, not a dimmed one.[/b] The old badge faded the tool
-## you were holding and drew a ring round it in a colour nothing else on the belt
-## used. Faded is the universal look of a control that is broken, and the ring
-## was a sixth colour on a five-colour belt. Red is what the site puts on the
-## thing you have pressed, white is the only colour that goes on top of it, and
-## neither is new.
+## A [constant ToolBeltHud.SPRITE_GRID] sprite fixes both halves at once: it gives
+## each tool [i]mass[/i] instead of an edge, and a second and third tone instead
+## of a single flat colour. It is still a table in the script, still diffable in
+## review, and still costs no asset pipeline — see
+## [method ToolBeltHud.paint_sprite] for what was weighed against it.
+##
+## [b]Tones derived from the albedo, not written down beside it.[/b] What a tool
+## is made of and what its badge is drawn in stopped being the same number when
+## the Tire & Engine bottle — near-black on purpose — turned out to be invisible
+## on any dark plate; [method Brand.badge_tint] has that whole argument, and
+## lightening the badge is the fix that does not touch the bottle in the player's
+## hands. Every other tone in the sprite is computed from that one, so the promise
+## [DetailingTool]'s docs make survives the format change. See
+## [method ToolBeltHud.sprite_palette].
+##
+## [b]Equipped is a red plate with a white ring, and the sprite keeps its own
+## colours.[/b] Two treatments have been thrown away here already: fading the tool
+## you are holding, which is the universal look of a control that is broken, and
+## then drawing it as a flat white silhouette on the red plate, which was right
+## while a badge was an outline and became the worst badge on the belt the moment
+## the others had three tones in them — the one icon the eye is meant to land on
+## first would have been the only one with no picture left in it. So the sprite is
+## drawn in the tool's own tones, lifted against the red rather than against the
+## panel ([method fill_color]), and the second channel the red plate needs comes
+## from [method Brand.picked_badge] instead: a white hairline round the plate,
+## which survives greyscale and does not touch the picture.
 class ToolIcon:
 	extends Button
 
 	var _tool: DetailingTool = null
 	var _equipped: bool = false
 
-	## The stroke table: [param id]'s silhouette, as paths on a
-	## [constant GLYPH_GRID]-unit square with y running down the way the screen
-	## does.
+	## The sprite table: [param id] as [constant ToolBeltHud.SPRITE_GRID] rows of
+	## [constant ToolBeltHud.SPRITE_GRID] characters, each one a role in
+	## [constant ToolBeltHud.ROLES] or [code].[/code] for nothing at all, with y
+	## running down the way the screen does — so the table below is a picture of the
+	## badge it draws.
 	##
-	## Static and public because it is geometry rather than state, which makes it
+	## Static and public because it is data rather than state, which makes it
 	## checkable without a badge to hang it on —
 	## [code]tests/integration/test_tool_belt_hud.gd[/code] asserts every tool has
-	## one and that none of them draw outside the grid they claim to be on.
-	static func glyph(id: DetailingTool.Id) -> Array[PackedVector2Array]:
-		var paths: Array[PackedVector2Array] = []
+	## one, that each is well formed, and that no two tools draw the same picture.
+	static func sprite(id: DetailingTool.Id) -> PackedStringArray:
 		match id:
 			DetailingTool.Id.POWER_WASH:
-				# A lance out of the bottom-left corner with a pistol grip under
-				# it, and the fan leaving the nozzle.
-				paths.append(PackedVector2Array([Vector2(4, 20), Vector2(16, 8)]))
-				paths.append(PackedVector2Array([Vector2(4, 20), Vector2(7, 23)]))
-				paths.append(PackedVector2Array([Vector2(17, 7), Vector2(22, 2)]))
-				paths.append(PackedVector2Array([Vector2(18, 8.5), Vector2(23, 7)]))
-				paths.append(PackedVector2Array([Vector2(17, 10), Vector2(21, 13)]))
+				# A spray gun in profile — body, barrel, pistol grip — with a fan
+				# leaving the nozzle. The old glyph had neither a nozzle nor any
+				# water in it, which is how it came to read as a hockey stick.
+				return PackedStringArray(
+					[
+						"................",
+						"................",
+						"..............WW",
+						"..#######....www",
+						".#BBBBBBB##.WWWW",
+						".#BBBBBBBBS#wwww",
+						".#BBBBBBBBS#WWWW",
+						".#BBBBBBBBS#wwww",
+						".#SSSBBBB##.WWWW",
+						".#DDD####....www",
+						".#DDD#........WW",
+						".#DDD#..........",
+						".#DDD#..........",
+						".#DDD#..........",
+						".#DDD#..........",
+						"..###...........",
+					]
+				)
 			DetailingTool.Id.SPONGE:
-				# A block, wider than it is thick — the thing that says "sponge"
-				# and not "dice" — with three suds rising off it.
-				(
-					paths
-					. append(
-						PackedVector2Array(
-							[
-								Vector2(3, 13),
-								Vector2(21, 13),
-								Vector2(21, 20),
-								Vector2(3, 20),
-								Vector2(3, 13),
-							]
-						)
-					)
+				# A block with a lit top face and pores in it, and two suds coming
+				# off it. The suds are deliberately different sizes and at different
+				# heights: two equal circles side by side is what made the old glyph
+				# read as a face.
+				return PackedStringArray(
+					[
+						"...OO...........",
+						"..O..O..........",
+						"..O..O....O.....",
+						"...OO....OO.....",
+						"................",
+						"................",
+						"..############..",
+						".#HHHHHHHHHHHH#.",
+						".#HHHHHHHHHHHH#.",
+						".#BBBBBBBBBBSB#.",
+						".#BBSBBBSBBBBB#.",
+						".#BBBBBBBBBSBB#.",
+						".#BBBSBBBSBBBB#.",
+						".#SSSSSSSSSSSS#.",
+						"..############..",
+						"................",
+					]
 				)
-				paths.append(ToolBeltHud.glyph_ring(Vector2(7, 8), 2.6))
-				paths.append(ToolBeltHud.glyph_ring(Vector2(12.5, 5), 3.0))
-				paths.append(ToolBeltHud.glyph_ring(Vector2(17.5, 8.5), 2.2))
 			DetailingTool.Id.DRYING_RAG:
-				# A cloth: square at the top where it is held, rippling at the
-				# bottom where it is not, with a hem stitched across it.
-				(
-					paths
-					. append(
-						PackedVector2Array(
-							[
-								Vector2(4, 5),
-								Vector2(20, 5),
-								Vector2(20, 14),
-								Vector2(16, 18),
-								Vector2(12, 14),
-								Vector2(8, 18),
-								Vector2(4, 14),
-								Vector2(4, 5),
-							]
-						)
-					)
+				# A cloth held along a straight top edge and hanging in two lobes,
+				# with a fold down it and a shine coming off it. The lobes are what
+				# stop it being a table; the shine is what says buff rather than
+				# wipe, which is the pass this tool actually is.
+				return PackedStringArray(
+					[
+						"......O.........",
+						".....OOO........",
+						"..####O#######..",
+						".#BBBBBBBBBBBB#.",
+						".#BBBBBBBBBBBB#.",
+						".#SSSSSSSSSSSS#.",
+						".#BBBBBBBBBBBB#.",
+						".#BBBBBBBSBBBB#.",
+						".#BBBBBBBSSBBB#.",
+						".#BBBBBBBBSSBBO.",
+						".#BBBBBBBBBSSOOO",
+						".#BBBBBBBBBBSSO.",
+						".#BBBB#BBBB#BS#.",
+						"..#BB#.#BB#.#B#.",
+						"...##...##...#..",
+						"................",
+					]
 				)
-				paths.append(PackedVector2Array([Vector2(4, 8.5), Vector2(20, 8.5)]))
 			DetailingTool.Id.WINDOW_CLEANER:
-				# A trigger bottle. The trigger is the half that matters: without
-				# it this is the same bottle as the tire cleaner.
-				(
-					paths
-					. append(
-						PackedVector2Array(
-							[
-								Vector2(7, 12),
-								Vector2(17, 12),
-								Vector2(17, 21),
-								Vector2(7, 21),
-								Vector2(7, 12),
-							]
-						)
-					)
+				# A trigger sprayer, nozzle right, with the cone coming out of it.
+				# The trigger is still the half that matters: without it this is the
+				# same bottle as the tyre cleaner.
+				return PackedStringArray(
+					[
+						"................",
+						".............ww.",
+						"....#####...WWWW",
+						"...#BBBBB##.wwww",
+						"...#BBBBBBB#WWWW",
+						"...#BBBBB##.wwww",
+						"...#DDDD#....WW.",
+						"...##BBB##......",
+						"..#BBBBBBB#.....",
+						"..#BBBBBBB#.....",
+						"..#HHHHHHH#.....",
+						"..#HHHHHHH#.....",
+						"..#BBBBBBB#.....",
+						"..#BBBBBBB#.....",
+						"..#SSSSSSS#.....",
+						"...#######......",
+					]
 				)
-				(
-					paths
-					. append(
-						PackedVector2Array(
-							[
-								Vector2(9, 12),
-								Vector2(9, 7),
-								Vector2(15, 7),
-								Vector2(15, 9.5),
-								Vector2(11, 9.5),
-							]
-						)
-					)
-				)
-				paths.append(PackedVector2Array([Vector2(15, 8), Vector2(19, 6)]))
-				paths.append(PackedVector2Array([Vector2(11, 9.5), Vector2(10, 12)]))
 			DetailingTool.Id.TIRE_ENGINE_CLEANER:
-				# A tyre, and the jets going at it. The wheel is what tells this
-				# one apart from the other bottle on the belt, which is why the
-				# bottle is not drawn at all.
-				paths.append(ToolBeltHud.glyph_ring(Vector2(10, 15), 7.0))
-				paths.append(ToolBeltHud.glyph_ring(Vector2(10, 15), 3.0))
-				paths.append(PackedVector2Array([Vector2(17, 4), Vector2(14, 7)]))
-				paths.append(PackedVector2Array([Vector2(21, 6), Vector2(17, 10)]))
-				paths.append(PackedVector2Array([Vector2(23, 11), Vector2(20, 14)]))
-		return paths
+				# A tyre with tread blocks round a rim, and the jet going at it. The
+				# wheel is still what tells this apart from the other bottle on the
+				# belt, which is why the bottle is not drawn at all — unchanged
+				# reasoning from the glyph this replaces.
+				return PackedStringArray(
+					[
+						".............WWW",
+						"............wwww",
+						"....SSSSS..WWWWW",
+						"...S#BBB#S..wwww",
+						"..SB#BBB#BS..WWW",
+						".SBB#####BBS....",
+						"S###SHHHS###S...",
+						"SBB#HHHHH#BBS...",
+						"SBB#HHHHH#BBS...",
+						"SBB#HHHHH#BBS...",
+						"S###SHHHS###S...",
+						".SBB#####BBS....",
+						"..SB#BBB#BS.....",
+						"...S#BBB#S......",
+						"....SSSSS.......",
+						"................",
+					]
+				)
+		return PackedStringArray()
 
 	func _ready() -> void:
 		# The plate is a stylebox and a stylebox is built at a size, so it has to
@@ -595,7 +796,7 @@ class ToolIcon:
 		_dress()
 		queue_redraw()
 
-	## The colour the plate under the glyph is filled with: [constant Brand.RED]
+	## The colour the plate under the sprite is filled with: [constant Brand.RED]
 	## for the tool in your hands, [constant Brand.PANEL] for the rest.
 	##
 	## Public because it is what the integration test asserts on. Asserting on the
@@ -605,15 +806,21 @@ class ToolIcon:
 	func plate_color() -> Color:
 		return Brand.RED if _equipped else Brand.PANEL
 
-	## The colour [method _draw] strokes the silhouette in: white on the equipped
-	## plate, and otherwise this tool's own colour lifted until it can be seen
-	## against the plate. Same reasoning as [method plate_color].
+	## The sprite's [code]B[/code]: this tool's own colour, lifted only as far as it
+	## takes to be seen on the plate it is actually being drawn on. Every other tone
+	## in the badge is derived from it — see [method ToolBeltHud.sprite_palette].
+	##
+	## [b]The base and not the whole palette, because the base is the one tone the
+	## plate has to be cleared against.[/b] A shade or a highlight is enclosed by
+	## base and ink and is read against those; only [code]B[/code] is what the badge
+	## reads as from across a phone screen. [constant ToolBeltHud.SHADE_DROP] has
+	## the rest of that argument, and the integration suite asserts this pair.
+	##
+	## Same reasoning as [method plate_color] for why it is public.
 	func fill_color() -> Color:
 		if _tool == null:
 			return Color(0.0, 0.0, 0.0, 0.0)
-		if _equipped:
-			return Brand.WHITE
-		return Brand.badge_tint(_tool.albedo)
+		return Brand.badge_tint(_tool.albedo, plate_color())
 
 	## Puts the round plate on, in all four of the states Godot will ask for. Any
 	## state left unstyled falls back to the engine's grey rectangle — which is
@@ -624,15 +831,26 @@ class ToolIcon:
 		if side <= 0.0:
 			return
 		var plate: Color = plate_color()
-		add_theme_stylebox_override("normal", Brand.badge(plate, side))
-		add_theme_stylebox_override("hover", Brand.badge(plate.lightened(Brand.HOVER_LIFT), side))
-		add_theme_stylebox_override("pressed", Brand.badge(Brand.RED_DARK, side))
+		add_theme_stylebox_override("normal", _plate(plate, side))
+		add_theme_stylebox_override("hover", _plate(plate.lightened(Brand.HOVER_LIFT), side))
+		add_theme_stylebox_override("pressed", _plate(Brand.RED_DARK, side))
 		add_theme_stylebox_override("focus", Brand.focus_ring(side))
+
+	## One state's plate: the brand's badge, wearing the white ring while this is
+	## the tool in the player's hands.
+	##
+	## The ring goes on every state rather than only on `normal`, or it would blink
+	## off under a thumb — which is the moment the belt is being read.
+	func _plate(fill: Color, side: float) -> StyleBoxFlat:
+		if _equipped:
+			return Brand.picked_badge(fill, side)
+		return Brand.badge(fill, side)
 
 	func _draw() -> void:
 		if _tool == null:
 			return
-		ToolBeltHud.stroke_glyph(self, glyph(_tool.id), size, fill_color())
+		var palette: PackedColorArray = ToolBeltHud.sprite_palette(fill_color())
+		ToolBeltHud.paint_sprite(self, sprite(_tool.id), size, palette)
 
 
 ## The picture on the corner button: three tool heads on a belt line, and an
@@ -650,37 +868,68 @@ class ToolIcon:
 ## have to be told where the button went. Anchored to it instead, and
 ## [constant Control.MOUSE_FILTER_IGNORE] so the thing a finger hits is still the
 ## button underneath.
+##
+## [b]It went pixel with the five badges, which makes six marks and not five.[/b]
+## The corner is drawn through the same helper the badges are and always has been,
+## and it sits on the same belt a thumb reads in one glance. Left as a stroke it
+## would have been the only thin thing on a belt of solid ones — which reads as a
+## mark that has not finished loading rather than as a deliberate difference.
 class BeltMark:
 	extends Control
 
 	var _open: bool = false
 
-	## The stroke table for both faces of the corner: the tools, or the [b]x[/b].
-	## Static and public for the reason [method ToolIcon.glyph] is.
-	static func glyph(open: bool) -> Array[PackedVector2Array]:
-		var paths: Array[PackedVector2Array] = []
+	## The sprite for both faces of the corner: three tool heads hanging on a belt,
+	## or the [b]x[/b]. Static and public for the reason [method ToolIcon.sprite] is.
+	##
+	## Only [code]B[/code] and [code]S[/code] appear in either. The corner is not a
+	## tool and has no albedo to derive anything from — it is drawn in
+	## [constant Brand.WHITE], which needs no lifting on either plate — so a
+	## highlight would have nowhere above it to go, and an ink outline would be a
+	## black edge round the one mark on this HUD that is meant to read as a symbol
+	## rather than as an object.
+	static func sprite(open: bool) -> PackedStringArray:
 		if open:
-			paths.append(PackedVector2Array([Vector2(7, 7), Vector2(17, 17)]))
-			paths.append(PackedVector2Array([Vector2(17, 7), Vector2(7, 17)]))
-			return paths
-		paths.append(PackedVector2Array([Vector2(3, 17), Vector2(21, 17)]))
-		paths.append(ToolBeltHud.glyph_ring(Vector2(6.5, 11), 2.7))
-		(
-			paths
-			. append(
-				PackedVector2Array(
-					[
-						Vector2(9.5, 8),
-						Vector2(14.5, 8),
-						Vector2(14.5, 14),
-						Vector2(9.5, 14),
-						Vector2(9.5, 8),
-					]
-				)
+			return PackedStringArray(
+				[
+					"................",
+					"................",
+					"................",
+					"................",
+					"...BB......BB...",
+					"....BB....BB....",
+					".....BB..BB.....",
+					"......BBBB......",
+					"......BBBB......",
+					"......BBBB......",
+					".....BB..BB.....",
+					"....BB....BB....",
+					"...BB......BB...",
+					"................",
+					"................",
+					"................",
+				]
 			)
+		return PackedStringArray(
+			[
+				"................",
+				"................",
+				"................",
+				"................",
+				"................",
+				"......BBBB......",
+				"..BB..BBBB..BB..",
+				".BBBB.BBBB.BBBB.",
+				".BBBB.BBBB.BBBB.",
+				"..SS..SSSS..SS..",
+				"................",
+				".BBBBBBBBBBBBBB.",
+				".SSSSSSSSSSSSSS.",
+				"................",
+				"................",
+				"................",
+			]
 		)
-		paths.append(ToolBeltHud.glyph_ring(Vector2(17.5, 11), 2.7))
-		return paths
 
 	func _ready() -> void:
 		resized.connect(queue_redraw)
@@ -701,4 +950,5 @@ class BeltMark:
 	func _draw() -> void:
 		# White on both plates: it is 15:1 on the dark one and the only colour the
 		# brand puts on top of the red one.
-		ToolBeltHud.stroke_glyph(self, glyph(_open), size, Brand.WHITE)
+		var palette: PackedColorArray = ToolBeltHud.sprite_palette(Brand.WHITE)
+		ToolBeltHud.paint_sprite(self, sprite(_open), size, palette)
