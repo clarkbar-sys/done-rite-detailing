@@ -77,6 +77,17 @@ static func holds(offset: Vector2, radius: float) -> bool:
 ## [code]0..1[/code] range means the first movement out of the middle asks for
 ## almost nothing, which is what "nudge it round a bit" needs.
 ##
+## [b]That rescaled travel is then squared, not handed over straight.[/b]
+## [OrbitDrive]'s top speed ([member OrbitDrive.turn_degrees_per_second] and
+## [member OrbitDrive.lift_metres_per_second]) is tuned for a thumb at the rim, and
+## raising that number to make the rim faster would, on a straight
+## [code]reach / radius[/code] line, make every partial deflection faster by the
+## same fraction — the fine end of "line up on a wing" getting less fine every time
+## the top end gets more urgent. Squaring the normalised strength instead means a
+## thumb halfway out asks for a quarter of full, not half, so raising the number at
+## the rim can raise the rim's speed without also speeding up the nudge that was
+## already fine at the old number.
+##
 ## [b]The direction is taken before the strength is clamped[/b], so a diagonal is
 ## a diagonal at full strength rather than at [code]1.41[/code]: the corner of the
 ## circle asks to walk and lift at once, both at full, and cannot ask for more
@@ -97,7 +108,8 @@ static func input_from(offset: Vector2, radius: float) -> Vector2:
 	var reach: float = offset.length()
 	if radius <= 0.0 or reach <= dead:
 		return Vector2.ZERO
-	var strength: float = minf((reach - dead) / (radius - dead), FULL_INPUT)
+	var linear: float = minf((reach - dead) / (radius - dead), FULL_INPUT)
+	var strength: float = linear * linear
 	var facing: Vector2 = offset / reach
 	return Vector2(facing.x, -facing.y) * strength
 
