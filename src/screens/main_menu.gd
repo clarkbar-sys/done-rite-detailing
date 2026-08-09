@@ -64,8 +64,19 @@
 ## a licence is not satisfied by a file in a repository the player never sees.
 ## This is the screen everybody passes through on the way to the bay, so this is
 ## where the lines go; [code]README.md[/code] and the [code]ATTRIBUTION.txt[/code]
-## beside each asset carry the same words for whoever clones the repo. The
-## wording lives in
+## beside each asset carry the same words for whoever clones the repo.
+##
+## [b]And the last of those lines says which of them were changed[/b], because
+## the licence asks for that on the same footing as the title and the author.
+## The cars, the bottles and the sponge are baked into the shapes this game wants
+## by the scripts under [code]scripts/[/code]; the driveway is the artist's file
+## as it was downloaded. [code]tests/integration/test_main_menu.gd[/code] holds
+## that sentence against the bake scripts themselves, and holds the whole credit
+## against the directories under [code]assets/models/[/code] — so a model that
+## arrives without a line here fails a test rather than shipping quietly, which
+## is the part a hand-kept credit could never promise.
+##
+## The wording lives in
 ## [code]src/screens/main_menu.tscn[/code] with the rest of what is on screen —
 ## what is done here is the colour, because grey type over a lit driveway needs
 ## the shadow [constant Brand.INK] gives it.

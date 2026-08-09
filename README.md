@@ -413,7 +413,9 @@ beside the assets, in
 [`assets/models/sponge/ATTRIBUTION.txt`](./assets/models/sponge/ATTRIBUTION.txt)
 and
 [`assets/models/driveway/ATTRIBUTION.txt`](./assets/models/driveway/ATTRIBUTION.txt);
-and here. The first three are processed derivatives — see
+and here. The menu's line also says which of the four were changed, because
+CC-BY 4.0 asks for that alongside the title and the author, and three of them
+were. The first three are processed derivatives — see
 `scripts/build-car-pack.py`, `scripts/build-tire-cleaner.py` (plus
 `scripts/build-window-cleaner.py`, which recolours its output into the second
 bottle) and `scripts/build-sponge.py` — and remain under CC-BY 4.0; the driveway
