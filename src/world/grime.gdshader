@@ -177,10 +177,14 @@ uniform float terrace_lip : hint_range(0.0, 1.0) = 0.45;
 // material built by anything that does not know to, would not degrade quietly.
 uniform sampler2D patch_flash : hint_default_black, filter_nearest, repeat_disable;
 
-// What a patch throws when the water finishes it. The rag's is below; the
+// What a patch throws when the water finishes it: the car's own paint, so the
+// flash reads as the colour underneath coming into view rather than as a
+// light switching on. Set by `Grime._overlay` from `Car.paint.albedo_color`,
+// which is why it needs no per-kind default the way `product_colour` does —
+// every panel of one car is lit by the same paint. The rag's is below; the
 // cleaner's is the panel's own `product_colour`, which is already here — see
 // `flash_tint`.
-uniform vec4 wash_flash_colour : source_color = vec4(0.55, 0.90, 1.0, 1.0);
+uniform vec4 paint_colour : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 
 // What a patch throws when the rag finishes it: the end of the job for that
 // square, and the only one of the three that is warm.
@@ -383,10 +387,12 @@ float travelling(vec3 at, float scale, float speed, float width) {
 // has to keep in order, and a pop that says *which* step just landed teaches that
 // order faster than a bell that does not. The middle one is the panel's own
 // `product_colour`, which is already a uniform here and is already white on
-// paint, blue on glass and green on tyres.
+// paint, blue on glass and green on tyres. The first is `paint_colour` rather
+// than a fixed colour of its own — the wash is the step that uncovers the car,
+// so what it throws is what it uncovers.
 vec3 flash_tint(float stage) {
 	if (stage < 0.25) {
-		return wash_flash_colour.rgb;
+		return paint_colour.rgb;
 	}
 	if (stage < 0.75) {
 		return product_colour.rgb;

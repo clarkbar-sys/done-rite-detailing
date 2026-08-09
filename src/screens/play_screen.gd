@@ -423,6 +423,10 @@ func _on_grimed() -> void:
 	# grime does not exist until this fires, so there is nothing to listen to
 	# before it.
 	grime.patch_finished.connect(_on_patch_finished)
+	# The corner's wash flash is the car's own paint — see
+	# [method ScoreHud.set_paint_colour] — and there is no car to ask before this
+	# fires either.
+	_scoreboard.set_paint_colour(_garage.car().paint.albedo_color)
 
 
 ## A bit of the car finished a step of the job, so the player hears about it,

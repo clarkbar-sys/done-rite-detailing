@@ -101,10 +101,12 @@ const POP_SECONDS: float = 0.75
 ## overlap than of the sound.
 const POPS: int = 8
 
-## What a patch coming clean under the jet flashes: [code]grime.gdshader[/code]'s
-## own [code]wash_flash_colour[/code], so the corner and the car throw the same
-## water.
-const WASH_TINT: Color = Color(0.55, 0.90, 1.0)
+## What a patch coming clean under the jet flashes before a car has told this
+## HUD what it is painted — see [method set_paint_colour]. Never seen in play,
+## where [code]_on_grimed[/code] sets the real colour before the first patch can
+## finish, but distinct from every other tint here so a test that never calls
+## it still exercises three different colours.
+const DEFAULT_WASH_TINT: Color = Color.WHITE
 
 ## What the rag's pass flashes: the shader's [code]buff_flash_colour[/code], and
 ## the only one of the three that is warm.
@@ -146,6 +148,9 @@ var _shown: float = 0.0
 var _roll: float = 0.0
 var _flash: float = 0.0
 var _tint: Color = Brand.MUTED
+## What a wash flashes: the car's own paint, kept here rather than read off
+## [Grime] on every award — see [method set_paint_colour].
+var _paint_colour: Color = DEFAULT_WASH_TINT
 var _pops: Array[Label] = []
 var _ages: PackedFloat32Array = PackedFloat32Array()
 var _next_pop: int = 0
@@ -218,7 +223,7 @@ func score(reached: int, award: int, stage: GrimeMap.Stage, multiplier: int) -> 
 	# decelerating forever into a total that keeps moving.
 	_roll = maxf(float(_total) - _shown, 1.0) / ROLL_SECONDS
 	_flash = 1.0
-	_tint = tint_for(stage)
+	_tint = tint_for(stage, _paint_colour)
 	_run_label.visible = multiplier > SHOW_RUN_ABOVE
 	_run_label.text = "×%d" % multiplier
 	_pop(award)
@@ -278,13 +283,28 @@ func done(fraction: float) -> void:
 	_print_done()
 
 
+## Tells the corner what the car is painted, so a wash flashes the same colour
+## the jet is uncovering rather than a fixed one of its own.
+##
+## Set once, from [code]src/screens/play_screen.gd[/code]'s
+## [code]_on_grimed[/code], the same moment the debug view binds to
+## [Grime] — there is no car to ask before then, and the colour cannot change
+## while somebody is washing it. Left at [constant DEFAULT_WASH_TINT] until
+## called, which nothing in play ever reaches but a test that never calls this
+## still gets a colour distinct from the other two.
+func set_paint_colour(colour: Color) -> void:
+	_paint_colour = colour
+
+
 ## What the done readout says, as a whole percent. What a test asserts instead of
 ## reading a label back.
 func done_shown() -> int:
 	return _done
 
 
-## The colour the score throws for a patch that finished [param stage].
+## The colour the score throws for a patch that finished [param stage], given
+## [param paint_colour] for the wash — [method set_paint_colour] is where that
+## comes from in play.
 ##
 ## The middle one is asked of [Surface] rather than written here, so the corner
 ## cannot drift from the paint. It is the bodywork's product and not the panel's
@@ -293,13 +313,18 @@ func done_shown() -> int:
 ## corner of the screen would be a change to the thing the whole game's scoring,
 ## sound and lighting hang off, to answer a question about glass that the player
 ## is not looking at while they are cleaning it.
-static func tint_for(stage: GrimeMap.Stage) -> Color:
+##
+## The first is [param paint_colour] rather than a colour of its own for the
+## same reason the shader's flash is: the wash uncovers the car, so what it
+## throws is what it uncovers, and a corner that threw a fixed colour instead
+## would be the one place left disagreeing with the panel that just rang.
+static func tint_for(stage: GrimeMap.Stage, paint_colour: Color) -> Color:
 	match stage:
 		GrimeMap.Stage.FOAMED:
 			return Surface.product_colour(Surface.Kind.BODY)
 		GrimeMap.Stage.BUFFED:
 			return BUFF_TINT
-	return WASH_TINT
+	return paint_colour
 
 
 ## What the digits currently read, which during a roll is behind the real total.

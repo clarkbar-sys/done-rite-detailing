@@ -360,6 +360,22 @@ func test_each_panel_is_told_what_its_cleaner_looks_like() -> void:
 		)
 
 
+## The wash flash under [code]#177[/code]: every panel is told the car's own
+## paint, so the flash reads as that colour coming into view rather than as a
+## fixed colour of its own. One colour for the whole car rather than one per
+## panel — unlike the product, a car is not painted differently panel to
+## panel — so every panel's overlay carries the same value [member Car.paint]
+## does.
+func test_each_panel_is_told_what_the_car_is_painted() -> void:
+	for panel: Node3D in _car.panels():
+		var paint: ShaderMaterial = _skin(panel).material_overlay as ShaderMaterial
+		assert_not_null(paint, "%s has no grime material" % panel.name)
+		if paint == null:
+			continue
+		var colour: Color = paint.get_shader_parameter("paint_colour")
+		assert_eq(colour, _car.paint.albedo_color, "%s got the wrong paint" % panel.name)
+
+
 func test_the_glass_and_the_wheels_get_their_own_products() -> void:
 	# And that a panel's group actually reached the shader, which is the one link
 	# in that chain nothing else here would notice breaking. That the *real* car

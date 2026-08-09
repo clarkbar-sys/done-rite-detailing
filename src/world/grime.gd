@@ -171,7 +171,9 @@ func lay_on(
 		var flash: PatchFlash = PatchFlash.new(map.patch_grid())
 		_maps.append(map)
 		_flashes.append(flash)
-		skin.material_overlay = _overlay(shader, map, flash, box, car.kind_of(_panels[index]))
+		skin.material_overlay = _overlay(
+			shader, map, flash, box, car.kind_of(_panels[index]), car.paint.albedo_color
+		)
 
 
 ## Where a tool can be got onto each panel of [param car], measured by looking at
@@ -477,20 +479,29 @@ func _work(
 
 
 ## The overlay material for one panel: the shader, its mask, its flashes, the box
-## the projection measures in, and what the cleaner for this kind of panel looks
-## like.
+## the projection measures in, what the cleaner for this kind of panel looks
+## like, and what the car itself is painted.
 ##
 ## The two textures are handed over once and never again — both are updated in
 ## place by whoever owns them, so a material that has been given them stays
 ## current without anything here watching.
 ##
-## The product colour is set once, here, and never again — which is how one
-## channel of the mask carries white suds on the paint, blue on the glass and
-## green on the tyres without the mask having anywhere to record which. A panel
-## does not change what it is made of. [method Surface.product_colour] has the
-## argument at length.
+## The product and paint colours are set once, here, and never again. The
+## product colour is how one channel of the mask carries white suds on the
+## paint, blue on the glass and green on the tyres without the mask having
+## anywhere to record which — a panel does not change what it is made of, and
+## [method Surface.product_colour] has the argument at length. The paint colour
+## is the same fact about the car rather than the panel: every panel of one car
+## is lit by the wash flash's own colour ([code]grime.gdshader[/code]'s
+## [code]paint_colour[/code]), and a car is not repainted while somebody is
+## washing it.
 func _overlay(
-	shader: Shader, map: GrimeMap, flash: PatchFlash, box: AABB, kind: Surface.Kind
+	shader: Shader,
+	map: GrimeMap,
+	flash: PatchFlash,
+	box: AABB,
+	kind: Surface.Kind,
+	paint_colour: Color
 ) -> ShaderMaterial:
 	var paint: ShaderMaterial = ShaderMaterial.new()
 	paint.shader = shader
@@ -499,4 +510,5 @@ func _overlay(
 	paint.set_shader_parameter("box_origin", box.position)
 	paint.set_shader_parameter("box_size", box.size)
 	paint.set_shader_parameter("product_colour", Surface.product_colour(kind))
+	paint.set_shader_parameter("paint_colour", paint_colour)
 	return paint

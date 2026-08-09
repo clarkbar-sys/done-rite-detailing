@@ -30,6 +30,10 @@ const HUD: String = "res://src/ui/score_hud.tscn"
 ## of the three is [constant ScoreHud.POP_SECONDS].
 const SETTLE_SECONDS: float = 1.0
 
+## A stand-in paint colour for the tests below — anything that is neither the
+## foam nor the buff tint, which is the whole of what a wash's colour has to be.
+const TEST_PAINT_COLOUR: Color = Color(0.2, 0.55, 0.35)
+
 var _hud: ScoreHud = null
 
 
@@ -138,12 +142,20 @@ func test_the_multiplier_is_hidden_at_one_and_shown_above_it() -> void:
 ## Three passes, three colours, and no two of them the same — the corner has to
 ## be able to say which pass paid.
 func test_each_stage_throws_its_own_colour() -> void:
-	var wash: Color = ScoreHud.tint_for(GrimeMap.Stage.WASHED)
-	var foam: Color = ScoreHud.tint_for(GrimeMap.Stage.FOAMED)
-	var buff: Color = ScoreHud.tint_for(GrimeMap.Stage.BUFFED)
+	var wash: Color = ScoreHud.tint_for(GrimeMap.Stage.WASHED, TEST_PAINT_COLOUR)
+	var foam: Color = ScoreHud.tint_for(GrimeMap.Stage.FOAMED, TEST_PAINT_COLOUR)
+	var buff: Color = ScoreHud.tint_for(GrimeMap.Stage.BUFFED, TEST_PAINT_COLOUR)
 	assert_ne(wash, foam, "a wash and a foam flash the same colour")
 	assert_ne(foam, buff, "a foam and a buff flash the same colour")
 	assert_ne(wash, buff, "a wash and a buff flash the same colour")
+
+
+## The wash's whole point under [code]#177[/code]: it throws the car's own paint
+## rather than a colour of its own, so the flash reads as the paint coming into
+## view.
+func test_the_wash_flashes_the_cars_own_paint() -> void:
+	var wash: Color = ScoreHud.tint_for(GrimeMap.Stage.WASHED, TEST_PAINT_COLOUR)
+	assert_eq(wash, TEST_PAINT_COLOUR, "the wash flash is not the paint it was given")
 
 
 ## The near-white product case the class docs are about: the resting colour has
@@ -151,7 +163,7 @@ func test_each_stage_throws_its_own_colour() -> void:
 ## a distance rather than as an exact pair of colours, so retuning either end
 ## stays free and closing the gap does not.
 func test_the_foam_flash_is_visible_against_the_resting_colour() -> void:
-	var foam: Color = ScoreHud.tint_for(GrimeMap.Stage.FOAMED)
+	var foam: Color = ScoreHud.tint_for(GrimeMap.Stage.FOAMED, TEST_PAINT_COLOUR)
 	var apart: float = absf(foam.get_luminance() - Brand.MUTED.get_luminance())
 	assert_gt(apart, 0.1, "the foam flash is too close to the resting colour to see")
 
