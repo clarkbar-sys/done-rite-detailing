@@ -9,9 +9,10 @@ a Sketchfab FBX conversion holding all ten body styles, their forty wheels and
 one display plinth in a single scene. src-models/ is READ-ONLY (see its
 AGENTS.md): this script only ever opens it for reading.
 
-Output is ten self-contained .glb files under assets/models/cars/ — one per
-style — plus ATTRIBUTION.txt carrying the pack's CC-BY notice. Each output is
-normalised so the game can treat every car identically:
+Output is ten .glb files under assets/models/cars/ — one per style — plus the
+handful of texture files several styles share (see "ONE COPY OF A TEXTURE TEN
+CARS SHARE" below) and ATTRIBUTION.txt carrying the pack's CC-BY notice. Each
+output is normalised so the game can treat every car identically:
 
   * seven nodes, named Body, Glass, Optics, Wheel1..Wheel4, and nothing else.
     Body, Glass and Optics are baked flat at the origin; the wheels keep a
@@ -156,11 +157,57 @@ The arithmetic runs through lookup tables — three 256-entry sRGB->linear table
 for the luminance sum, one 65k-entry table for shoulder + re-encode — so the
 per-pixel work is four list indexings and two adds, and a 1024x1024 texture
 bakes in well under a second without numpy (which this environment lacks).
+
+
+ONE COPY OF A TEXTURE TEN CARS SHARE
+-------------------------------------
+The source points all ten Optics materials at a single image — index 6, one
+1024x1024 JPEG holding every lamp lens in the set. Writing ten self-contained
+.glb files turned that one image into ten, and Godot compiled each copy into a
+.ctex of its own: ten times 1,622,358 bytes, 16.2 MB of a 35.6 MB web pack, for
+one picture (#204).
+
+So an image that several styles use is written once, beside the .glb files, and
+each .glb reaches it through a glTF image `uri` instead of a copy in its own
+buffer. Godot's importer resolves that URI inside the project and hands the
+material the texture already imported from it, so ten scenes end up holding one
+resource — which is also ten times less of it in memory at run time. The
+per-style copies its glTF importer used to extract (`<style>_2.jpg`) stop
+existing, because there is no longer an embedded image to extract.
+
+The rule is "share whatever several styles share", not "share the lens atlas",
+and the difference is four more maps: the artist modelled one wheel for the
+pickup and the SUV and another for the sedan and the wagon, so those base colour
+and metallic-roughness maps were being baked twice each too. Grouping is by
+image *bytes* and not by glTF image index, so a source that wrote the same
+picture under two indices would still ship it once.
+
+An image only one style uses stays in that style's buffer. Pulling those out as
+well would trade nothing for a directory of forty loose files.
+
+The names say who owns what — `pickup_suv_wheel_color.png` for a map two styles
+share, `shared_optics_color.jpg` when all ten do, because spelling ten style
+names into a filename helps nobody.
+
+MEASURED, exporting the web bundle before and after the change: index.pck
+35,615,884 -> 20,303,552 bytes. The compiled textures that went away are nine
+copies of the lens atlas at 1,622,358 bytes each plus one copy each of the four
+wheel maps (431,088 + 45,780 + 185,454 + 42,112). Those numbers were read out of
+the pack itself with scripts/list-pack.py, which also reports that no car
+texture is left in there twice.
+
+ONE THING GODOT WILL NOT DO FOR AN IMAGE THAT ARRIVES AS A FILE: its glTF
+importer sets mipmaps/generate=true on every image it extracts from a .glb,
+while the texture importer's default for a file that merely appears in the
+project is false. Moving an image out of the buffer would therefore have taken
+the mipmaps off it and nothing would have said so. IMPORT_SIDECAR below is the
+answer, and the reasoning sits with it.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import struct
@@ -209,6 +256,45 @@ HISTOGRAM_STRIDE = 4  # every 4th pixel: 262k samples is plenty, and exact
 # Front detection: the red mass must sit this far behind centre, as a fraction
 # of the car's length, before we believe it.
 FRONT_MARGIN = 0.05
+
+# The texture slots a material in this pack can carry, glTF name -> the word
+# that goes in a shared texture's filename. All five of glTF 2.0's core slots
+# are listed even though the pack only ever fills the first two, because the
+# cost of listing them is one line each and the cost of missing one is a
+# texture that quietly ships ten times.
+TEXTURE_SLOTS = (
+    ("baseColorTexture", "color", True),
+    ("metallicRoughnessTexture", "metal_rough", True),
+    ("normalTexture", "normal", False),
+    ("occlusionTexture", "occlusion", False),
+    ("emissiveTexture", "emissive", False),
+)
+
+# Shared textures are written out beside the .glb files, so their names have to
+# survive being read by a human in a directory listing.
+IMAGE_SUFFIX = {"image/jpeg": "jpg", "image/png": "png"}
+ALL_STYLES = "shared"
+
+# The .import sidecar a shared texture starts life with, written only when
+# there isn't one — Godot fills in the uid, the destination path and every
+# other parameter on the next import pass and keeps them from then on.
+#
+# It exists for one line of it. Godot's own glTF importer sets
+# mipmaps/generate=true on every image it extracts from a .glb, and the texture
+# importer's default for a file that merely appears in the project is false —
+# so moving an image out of the buffer and into a file of its own would have
+# silently taken the mipmaps off it. Every one of the pack's textures had them
+# before this change (read out of the committed sidecars), and a car is a thing
+# you walk away from, so this keeps them.
+IMPORT_SIDECAR = """[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+
+[params]
+
+mipmaps/generate=true
+"""
 
 # glTF component types we expect to meet in this file.
 COMPONENT = {5120: ("b", 1), 5121: ("B", 1), 5122: ("h", 2), 5123: ("H", 2), 5125: ("I", 4), 5126: ("f", 4)}
@@ -688,8 +774,9 @@ def bake_greyscale(png: bytes) -> tuple[bytes, float]:
 class Builder:
     """Accumulates one output glTF: buffers, accessors, materials, meshes."""
 
-    def __init__(self, src: Source) -> None:
+    def __init__(self, src: Source, shared: dict[int, str]) -> None:
         self.src = src
+        self.shared = shared
         self.blob = bytearray()
         self.views: list[dict] = []
         self.accessors: list[dict] = []
@@ -762,12 +849,22 @@ class Builder:
         self._body_png = png
 
     def _image(self, source_index: int) -> int:
+        """Add one image, as a URI to a shared file or as bytes in this file's buffer.
+
+        The glTF spec makes mimeType mandatory alongside bufferView and
+        optional alongside uri, and Godot's importer keys off the file
+        extension either way, so the URI form is written without one rather
+        than with a second copy of what ".jpg" already says.
+        """
         if source_index not in self._image_map:
-            if source_index == self._body_source:
-                data, mime = self._body_png, "image/png"
+            if source_index in self.shared:
+                self.images.append({"uri": self.shared[source_index]})
             else:
-                data, mime = self.src.image_bytes(source_index)
-            self.images.append({"bufferView": self._view(data), "mimeType": mime})
+                if source_index == self._body_source:
+                    data, mime = self._body_png, "image/png"
+                else:
+                    data, mime = self.src.image_bytes(source_index)
+                self.images.append({"bufferView": self._view(data), "mimeType": mime})
             self._image_map[source_index] = len(self.images) - 1
         return self._image_map[source_index]
 
@@ -849,15 +946,118 @@ def canonical_material_name(src: Source, material_index: int) -> str:
     return "Wheel" if base == "Wheek" else base
 
 
-def build_style(src: Source, style: Style, scale: float) -> tuple[bytes, dict, dict]:
+# --------------------------------------------------------------------------
+# Shared textures. See "ONE COPY OF A TEXTURE TEN CARS SHARE" in the docstring.
+# --------------------------------------------------------------------------
+
+
+def style_materials(src: Source, style: Style) -> list[int]:
+    """Every material index one style's seven meshes use, first-seen order."""
+    meshes = [style.parts[kind] for kind in ("Body", "Glass", "Optics")]
+    for group in style.wheel_meshes:
+        meshes += group
+    found: list[int] = []
+    for mesh in meshes:
+        for prim in src.meshes[mesh]["primitives"]:
+            if prim["material"] not in found:
+                found.append(prim["material"])
+    return found
+
+
+def texture_slots(src: Source, style: Style):
+    """Yield (image index, material name, slot word) for every texture a style uses."""
+    for material_index in style_materials(src, style):
+        material = src.materials[material_index]
+        pbr = material.get("pbrMetallicRoughness", {})
+        for key, word, in_pbr in TEXTURE_SLOTS:
+            entry = (pbr if in_pbr else material).get(key)
+            if entry is None:
+                continue
+            yield src.gltf["textures"][entry["index"]]["source"], canonical_material_name(src, material_index), word
+
+
+def body_image_of(src: Source, style: Style) -> int:
+    """The source image index of a style's painted livery — the one that gets baked."""
+    material = src.meshes[style.parts["Body"]]["primitives"][0]["material"]
+    texture = src.materials[material]["pbrMetallicRoughness"]["baseColorTexture"]["index"]
+    return src.gltf["textures"][texture]["source"]
+
+
+def plan_shared_images(src: Source, styles: dict[str, Style]) -> tuple[dict[int, str], dict[str, tuple[bytes, list[str]]]]:
+    """Decide which textures leave the .glb files, and what each one is called.
+
+    Returns the source-image-index -> filename map the writer needs, and the
+    filename -> (bytes, styles) map the caller writes to disk and prints.
+
+    Keyed on the image *bytes* and not on the glTF image index: two indices
+    holding the same picture would be two files on disk and two compiled
+    textures in the pack, and nothing upstream promises the source never does
+    that. Grouping by content makes the answer "how many distinct pictures are
+    there" instead of "how many did the exporter happen to write".
+
+    A style's own livery is left out. It is the one image this script replaces
+    (bake_greyscale), so it is an output rather than a passenger — and it is
+    per style by construction. The assertion below is what keeps that true: if
+    a re-export ever pointed two styles at one livery, sharing it would be
+    correct and this function would be the wrong place to find that out.
+    """
+    liveries = {key: body_image_of(src, style) for key, style in styles.items()}
+    for key, image in liveries.items():
+        others = sorted(other for other, index in liveries.items() if index == image and other != key)
+        if others:
+            raise AssertionError(f"{key} shares its livery image with {others}; the greyscale bake assumes it does not")
+
+    groups: dict[bytes, dict] = {}
+    for key in sorted(styles):
+        for index, role, slot in texture_slots(src, styles[key]):
+            if index == liveries[key]:
+                continue
+            data, mime = src.image_bytes(index)
+            group = groups.setdefault(
+                hashlib.sha256(data).digest(),
+                {"data": data, "mime": mime, "indices": [], "styles": [], "roles": []},
+            )
+            # Lists with a membership test rather than sets, for the reason the
+            # module docstring gives: a re-run has to produce the same bytes,
+            # and set order is not something to build a filename out of.
+            for bucket, value in (("indices", index), ("styles", key), ("roles", (role, slot))):
+                if value not in group[bucket]:
+                    group[bucket].append(value)
+
+    plan: dict[int, str] = {}
+    files: dict[str, tuple[bytes, list[str]]] = {}
+    for group in groups.values():
+        if len(group["styles"]) < 2:
+            continue  # one user, one copy: embedding it costs nothing extra
+        if len(group["roles"]) != 1:
+            raise AssertionError(f"one image fills several slots {group['roles']}; it needs a name of its own")
+        role, slot = group["roles"][0]
+        users = sorted(group["styles"])
+        # Named after the styles that share it, which makes the listing in
+        # assets/models/cars/ say who owns what — except when all ten do, where
+        # spelling out all ten would be a filename nobody reads.
+        owner = ALL_STYLES if len(users) == len(styles) else "_".join(users)
+        suffix = IMAGE_SUFFIX.get(group["mime"])
+        if suffix is None:
+            raise AssertionError(f"no filename suffix known for {group['mime']}")
+        name = f"{owner}_{role.lower()}_{slot}.{suffix}"
+        if name in files:
+            raise AssertionError(f"two different images both want to be called {name}")
+        files[name] = (group["data"], users)
+        for index in group["indices"]:
+            plan[index] = name
+    return plan, files
+
+
+def build_style(
+    src: Source, style: Style, scale: float, shared: dict[int, str]
+) -> tuple[bytes, dict, dict]:
     """Emit one normalised .glb for one body style."""
-    builder = Builder(src)
+    builder = Builder(src, shared)
 
     # The greyscale livery replaces the body's base colour image everywhere it
     # is referenced — including the SUV's body-coloured hub caps.
-    body_material = src.meshes[style.parts["Body"]]["primitives"][0]["material"]
-    body_texture = src.materials[body_material]["pbrMetallicRoughness"]["baseColorTexture"]["index"]
-    body_image = src.gltf["textures"][body_texture]["source"]
+    body_image = body_image_of(src, style)
     png, paint = bake_greyscale(src.image_bytes(body_image)[0])
     builder.set_body_texture(body_image, png)
 
@@ -966,6 +1166,13 @@ def verify(path: Path, expected_nodes: list[str]) -> tuple[list[float], list[flo
     names = [node["name"] for node in gltf["nodes"]]
     if names != expected_nodes:
         raise AssertionError(f"{path.name}: nodes are {names}, expected {expected_nodes}")
+    # A URI that resolves to nothing is a car with no headlight texture, and
+    # neither the writer nor Godot's importer says a word about it — the glTF
+    # is still valid and the material simply loses its map. So the file it
+    # names is opened here, from the directory the .glb was written to.
+    for image in gltf.get("images", []):
+        if "uri" in image and not (path.parent / image["uri"]).is_file():
+            raise AssertionError(f"{path.name}: references {image['uri']}, which is not beside it")
     low = [math.inf] * 3
     high = [-math.inf] * 3
     floor: dict[str, float] = {}
@@ -1010,12 +1217,24 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "ATTRIBUTION.txt").write_bytes(LICENSE_TXT.read_bytes())
 
+    # Shared textures go down before the first .glb that names one, so verify()
+    # can open them rather than take the URI on trust.
+    shared, shared_files = plan_shared_images(src, styles)
+    for name in sorted(shared_files):
+        (args.out / name).write_bytes(shared_files[name][0])
+        sidecar = args.out / f"{name}.import"
+        if not sidecar.exists():
+            sidecar.write_text(IMPORT_SIDECAR, encoding="utf-8")
+
     expected_nodes = ["Body", "Glass", "Optics", "Wheel1", "Wheel2", "Wheel3", "Wheel4"]
     print(f"source root scale {root_scale:g} (ignored); pack scale {scale:.6g} units->m")
     print(f"sedan fit: length {ratios[0]:.6g}  width {ratios[1]:.6g}  height {ratios[2]:.6g}")
+    for name in sorted(shared_files):
+        data, users = shared_files[name]
+        print(f"shared {name:34s} {len(data) / 1024:6.0f} KiB  x{len(users):<2d} {', '.join(users)}")
     print(f"{'style':10s} {'length':>7s} {'width':>7s} {'height':>7s} {'wheelbase':>9s} {'track':>6s} {'clear':>6s} {'paint':>7s}  size")
     for key, style in styles.items():
-        blob, gltf, stats = build_style(src, style, scale)
+        blob, gltf, stats = build_style(src, style, scale, shared)
         path = args.out / f"{key}.glb"
         write_glb(path, gltf, blob)
         low, high = PLAUSIBLE_LENGTH_M[key]

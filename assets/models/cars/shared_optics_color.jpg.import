@@ -2,19 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dqo7fd0s1h0bm"
-path="res://.godot/imported/wagon_3.png-f84dc9b9dcfc6aba984ed6821a298f00.ctex"
+uid="uid://t8n46jm1e57a"
+path="res://.godot/imported/shared_optics_color.jpg-3f47d4472817169bd3e6f07afde400a0.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "c424352f52353c5d6c908f4cf80f97b4"
 }
 
 [deps]
 
-source_file="res://assets/models/cars/wagon_3.png"
-dest_files=["res://.godot/imported/wagon_3.png-f84dc9b9dcfc6aba984ed6821a298f00.ctex"]
+source_file="res://assets/models/cars/shared_optics_color.jpg"
+dest_files=["res://.godot/imported/shared_optics_color.jpg-3f47d4472817169bd3e6f07afde400a0.ctex"]
 
 [params]
 

@@ -2,19 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b7udhghg5pndk"
-path="res://.godot/imported/compact_2.jpg-5fdbc83a4ee5ef227df590ce8c4e7d90.ctex"
+uid="uid://dekapkdojlj0w"
+path="res://.godot/imported/sedan_wagon_wheel_metal_rough.png-11bc0d47f4a0ca12fc288ea025b6a0cc.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "ad4096d54d7fd9c4312e0ae1215416fd"
 }
 
 [deps]
 
-source_file="res://assets/models/cars/compact_2.jpg"
-dest_files=["res://.godot/imported/compact_2.jpg-5fdbc83a4ee5ef227df590ce8c4e7d90.ctex"]
+source_file="res://assets/models/cars/sedan_wagon_wheel_metal_rough.png"
+dest_files=["res://.godot/imported/sedan_wagon_wheel_metal_rough.png-11bc0d47f4a0ca12fc288ea025b6a0cc.ctex"]
 
 [params]
 
