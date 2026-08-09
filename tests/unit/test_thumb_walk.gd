@@ -102,16 +102,18 @@ func test_a_drag_past_the_band_becomes_a_walk() -> void:
 	assert_true(walk.update(_right(ThumbWalk.WALK_ENTER), HALF, OFF_PANEL))
 
 
-func test_the_veto_keeps_a_scrub_an_aim_at_any_length() -> void:
+func test_the_veto_keeps_a_scrub_an_aim_short_of_the_bezel() -> void:
 	# The hard case the boundary alone cannot tell apart: a long stroke across a
-	# door panel can cross any band. While the aim is landing on the car, the
-	# walk may not start, however far the finger travels.
+	# door panel can cross the band. While the aim is landing on the car, the
+	# walk may not start anywhere short of [constant ThumbWalk.VETO_END] — the
+	# bezel's own override is the next test down.
+	var protected: Vector2 = _right((ThumbWalk.WALK_ENTER + ThumbWalk.VETO_END) * 0.5)
 	var walk: ThumbWalk = _walk()
 	walk.begin(Vector2.ZERO, HALF)
-	assert_false(walk.update(_right(1.0), HALF, ON_PANEL), "still scrubbing, not walking")
+	assert_false(walk.update(protected, HALF, ON_PANEL), "still scrubbing, not walking")
 	assert_false(walk.walking())
 	# And the moment the stroke runs off the paint, the same position walks.
-	assert_true(walk.update(_right(1.0), HALF, OFF_PANEL))
+	assert_true(walk.update(protected, HALF, OFF_PANEL))
 
 
 func test_the_veto_does_not_pull_a_walk_back() -> void:
@@ -119,6 +121,24 @@ func test_the_veto_does_not_pull_a_walk_back() -> void:
 	# the way back in is rho, not the veto.
 	var walk: ThumbWalk = _walking()
 	assert_true(walk.update(_right(ThumbWalk.WALK_ENTER), HALF, ON_PANEL), "a walk stays a walk")
+
+
+func test_the_veto_ends_at_the_bezel() -> void:
+	# In portrait the paint runs all the way to the screen edge, so a veto that
+	# ran all the way out made a direct sideways walk impossible — the finding a
+	# hand on a phone returned within the hour of the gesture shipping. Out past
+	# VETO_END the bezel outranks the paint; a hair inside it the scrub is still
+	# protected.
+	var walk: ThumbWalk = _walk()
+	walk.begin(Vector2.ZERO, HALF)
+	assert_false(
+		walk.update(_right(ThumbWalk.VETO_END - 0.01), HALF, ON_PANEL),
+		"just inside the bezel band the scrub is still a scrub"
+	)
+	assert_true(
+		walk.update(_right(ThumbWalk.VETO_END), HALF, ON_PANEL),
+		"at the bezel the walk starts whatever is under the aim"
+	)
 
 
 # ---- hysteresis --------------------------------------------------------------
@@ -220,7 +240,11 @@ func test_the_direction_is_the_fingers_own_not_the_ellipses() -> void:
 func test_the_exported_thresholds_are_honoured() -> void:
 	# The thresholds are exports on the play screen for #179's tuning pass, so
 	# the constructor's numbers have to be the ones that answer.
-	var walk: ThumbWalk = ThumbWalk.new(0.5, 0.3, 0.9)
+	var walk: ThumbWalk = ThumbWalk.new(0.5, 0.3, 0.9, 0.8)
+	walk.begin(Vector2.ZERO, HALF)
+	assert_false(walk.update(_right(0.79), HALF, ON_PANEL), "a retuned veto holds to its own end")
+	assert_true(walk.update(_right(0.8), HALF, ON_PANEL), "and gives way at it")
+	walk.release()
 	walk.begin(Vector2.ZERO, HALF)
 	assert_true(walk.update(_right(0.5), HALF, OFF_PANEL), "a retuned band enters where it was put")
 	assert_true(walk.update(_right(0.31), HALF, OFF_PANEL), "and holds above its own exit")

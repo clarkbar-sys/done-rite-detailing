@@ -39,6 +39,16 @@
 ## veto only guards the way in. A walk in progress is left alone, because there
 ## is no aim to protect once the tool is down.
 ##
+## [b]And the veto ends at the bezel.[/b] Past [constant VETO_END] the walk
+## starts whatever the aim is landing on, because a thumb pressed out to the
+## last stretch of glass is plainly asking to move — and because in portrait
+## the car's flank runs all the way to the screen edge ([LensFit] fills the
+## width with car), so a veto that ran all the way out made a direct sideways
+## walk impossible: every horizontal drag stayed on paint forever and the
+## player had to detour through a corner. Found by a hand on a phone within the
+## hour (#196); no scrub stroke lives in the last millimetres before the bezel,
+## which is what makes the override safe where it is.
+##
 ## [b]Node-free on purpose[/b] — the STANDARDS.md "Coverage" R3 rule, the same
 ## one [ThumbLift] and [TouchTarget] are here for. Every rule above is
 ## arithmetic on two vectors and a flag, so it is a unit test rather than sixty
@@ -63,6 +73,12 @@ const WALK_EXIT: float = 0.55
 ## stick it replaces.
 const FULL_SPEED: float = 0.95
 
+## Where the veto stops holding the walk back — see the class docs. Under
+## [constant FULL_SPEED] so the override still has analog travel left in it,
+## and far enough past [constant WALK_ENTER] that the whole scrub-protected
+## band stays wider than the hysteresis under it.
+const VETO_END: float = 0.90
+
 ## The strongest a single axis can ask for — [constant OrbitDrive.FULL_INPUT]
 ## at the other end of the chain, which is what keeps a thumb at the screen
 ## edge and a held arrow key exactly as fast as each other.
@@ -74,6 +90,7 @@ const FULL_INPUT: float = 1.0
 var _enter: float = WALK_ENTER
 var _exit: float = WALK_EXIT
 var _full: float = FULL_SPEED
+var _veto_end: float = VETO_END
 
 ## Whether the finger is currently read as a walk. The one piece of state, and
 ## it is state on purpose: hysteresis is the property that the answer depends
@@ -84,10 +101,16 @@ var _walking: bool = false
 ## The thresholds belong to the screen's exports, for the reason [OrbitDrive]
 ## takes its speeds from the scene: one set of answers, where somebody can see
 ## and change them. The defaults are this class's own constants.
-func _init(enter: float = WALK_ENTER, exit_at: float = WALK_EXIT, full: float = FULL_SPEED) -> void:
+func _init(
+	enter: float = WALK_ENTER,
+	exit_at: float = WALK_EXIT,
+	full: float = FULL_SPEED,
+	veto_end: float = VETO_END
+) -> void:
 	_enter = enter
 	_exit = exit_at
 	_full = full
+	_veto_end = veto_end
 
 
 ## How far toward the edge a finger [param offset] from the screen centre is,
@@ -127,17 +150,19 @@ func begin(offset: Vector2, half: Vector2) -> bool:
 ## whether the aim is currently landing on the car ([method Garage.aim_on_panel]).
 ##
 ## The three rules of the state diagram on #179, in their entirety: an aim
-## becomes a walk past [constant WALK_ENTER] [i]unless the aim is on a
-## panel[/i]; a walk becomes an aim again inside [constant WALK_EXIT], whatever
-## the veto says — there is no aim in a walk, so [param on_panel] can only be
-## stale there; and between the two thresholds the finger keeps whichever
-## reading it had. Returns what [method walking] now says.
+## becomes a walk past [constant WALK_ENTER] [i]unless the aim is on a panel[/i]
+## — and unconditionally past [constant VETO_END], where the bezel outranks the
+## paint (see the class docs); a walk becomes an aim again inside
+## [constant WALK_EXIT], whatever the veto says — there is no aim in a walk, so
+## [param on_panel] can only be stale there; and between the two thresholds the
+## finger keeps whichever reading it had. Returns what [method walking] now
+## says.
 func update(offset: Vector2, half: Vector2, on_panel: bool) -> bool:
 	var at: float = rho(offset, half)
 	if _walking:
 		if at <= _exit:
 			_walking = false
-	elif at >= _enter and not on_panel:
+	elif at >= _enter and (not on_panel or at >= _veto_end):
 		_walking = true
 	return _walking
 

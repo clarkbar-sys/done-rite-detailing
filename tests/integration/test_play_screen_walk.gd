@@ -512,11 +512,23 @@ func test_a_stroke_that_stays_on_the_car_never_walks() -> void:
 	)
 	var stretch: float = get_tree().root.get_final_transform().get_scale().y
 	var lift: float = ThumbLift.design_lift(stretch, DisplayServer.screen_get_scale())
-	var finger: Vector2 = _camera().unproject_position(over_the_end) + Vector2(0.0, lift)
-	assert_gte(
-		ThumbWalk.rho(finger - _half(), _half()),
-		ThumbWalk.WALK_ENTER,
-		"the test needs the end of the car out past the band — re-aim it if the shot moved"
+	# The outermost point along the car that keeps the finger inside the
+	# protected band — past WALK_ENTER, but short of VETO_END, where the bezel
+	# rightly outranks the paint and the veto under test here gives way. Walked
+	# in from the end of the car rather than written down, because where the
+	# ends project depends on which of the ten styles the bay drew.
+	var finger: Vector2 = Vector2.ZERO
+	var on_the_stroke: bool = false
+	for step: int in range(20, -1, -1):
+		var along: Vector3 = box.get_center().lerp(over_the_end, float(step) / 20.0)
+		finger = _camera().unproject_position(along) + Vector2(0.0, lift)
+		var out: float = ThumbWalk.rho(finger - _half(), _half())
+		if out >= ThumbWalk.WALK_ENTER and out < ThumbWalk.VETO_END - 0.02:
+			on_the_stroke = true
+			break
+	assert_true(
+		on_the_stroke,
+		"no point on the car sits inside the protected band — reframe the test if the shot moved"
 	)
 	_touch(_at_the_car(), true)
 	await wait_physics_frames(4)
@@ -578,6 +590,29 @@ func test_the_walk_works_in_portrait_too() -> void:
 	var walked: float = _walked(before)
 	_touch(at, false)
 	assert_gt(walked, 0.0, "the same fraction of the way out walks in portrait too")
+
+
+func test_a_portrait_drag_straight_to_the_side_bezel_walks() -> void:
+	# The finding a hand on a phone returned within the hour of the gesture
+	# first shipping (#196): in portrait the flank runs to the screen edge, so a
+	# drag straight left or right never leaves the paint and the veto held the
+	# walk back forever — the player had to detour through a corner to move
+	# sideways at all. Past [constant ThumbWalk.VETO_END] the bezel outranks the
+	# paint, and this is that rule end to end: the same drag, straight across
+	# whatever the aim lands on, walks.
+	get_tree().root.size = Vector2i(
+		get_tree().root.content_scale_size.y, get_tree().root.content_scale_size.x
+	)
+	await wait_process_frames(2)
+	await _settle()
+	_touch(_at_the_car(), true)
+	await wait_physics_frames(4)
+	var before: float = _bearing()
+	_drag(_rightward(ThumbWalk.FULL_SPEED))
+	await wait_physics_frames(30)
+	var walked: float = _walked(before)
+	_touch(_rightward(ThumbWalk.FULL_SPEED), false)
+	assert_gt(walked, 0.0, "a drag straight to the side bezel walks, paint or no paint")
 
 
 func test_the_eye_keeps_looking_at_the_car_as_it_walks() -> void:

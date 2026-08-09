@@ -265,6 +265,11 @@ const FINISHED: float = 0.9999
 @export var walk_exit: float = ThumbWalk.WALK_EXIT
 @export var walk_full_speed: float = ThumbWalk.FULL_SPEED
 
+## Where the scrub veto stops holding the walk back — past this, a thumb walks
+## whatever the aim is landing on. [constant ThumbWalk.VETO_END] has the
+## portrait measurement that made it necessary.
+@export var walk_veto_end: float = ThumbWalk.VETO_END
+
 var _belt: ToolBelt = null
 var _finger: int = NO_FINGER
 
@@ -335,7 +340,7 @@ func _ready() -> void:
 	_clock = RunClock.new(run_seconds)
 	_meter.show_time(_clock.left())
 	# The gesture, for the same reason: the band's thresholds are exports.
-	_walk = ThumbWalk.new(walk_enter, walk_exit, walk_full_speed)
+	_walk = ThumbWalk.new(walk_enter, walk_exit, walk_full_speed, walk_veto_end)
 	# A screen that changed shape under a held finger has moved the band out from
 	# under it — a rotation, a browser window dragged narrower — and the offset
 	# that was measured against the old centre is not a direction anybody is
