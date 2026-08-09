@@ -14,6 +14,8 @@
 #   make format    gdformat every script in place
 #   make build     export the Linux release binary -> build/linux/
 #   make build-web export the web bundle            -> build/web/
+#   make export-linux / export-web  the same two exports without re-running
+#                  `check` first — for CI, where `check` is already its own job
 #   make editor    open the project in the Godot editor
 #
 # There is deliberately no `make coverage`. GDScript has no line-coverage
@@ -60,7 +62,7 @@ SOURCES := $(shell find . -name '*.gd' \
              -not -path './.godot/*' -not -path './.godot-sdk/*' \
              -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-.PHONY: all sdk editor-sdk gut-sdk import check smoke gut tested lint format test build build-web stamp run editor clean distclean
+.PHONY: all sdk editor-sdk gut-sdk import check smoke gut tested lint format test build build-web export-linux export-web stamp run editor clean distclean
 
 all: check build
 
@@ -143,19 +145,31 @@ import: $(GODOT) $(GUT_PLUGIN) $(GDIGNORE)
 # The quality gate. `--check-only` parses and type-checks a script and exits
 # non-zero on any error, and project.godot promotes the typing warnings to
 # errors — so untyped or unsafe GDScript fails here instead of at runtime.
+# How many scripts are checked at once. One short-lived Godot process per
+# script, each one parsing a file and writing nothing, so they do not interact
+# and the only shared resource is the CPU. Measured on a 4-core box — the same
+# shape as CI's runner — over the 167 scripts in the tree: 55s serial, 14s at
+# -P4. Overridable because the number is the machine's, not the project's.
+CHECK_JOBS ?= $(shell nproc 2>/dev/null || echo 4)
+
+# Each worker keeps its own stderr in its own temp file rather than the single
+# shared check.log the serial loop used: with several checks in flight at once
+# one log is a race, and the failure it loses is the one you needed. A worker
+# that fails prints its own diagnostics and exits 1, which xargs turns into a
+# 123 for the whole pipeline *after* running the rest — so a broken script
+# still reports every other broken script alongside it, exactly as before.
 check: import
-	@mkdir -p $(LOG_DIR); fail=0; \
-	for f in $(SOURCES); do \
-	  printf '  check %s ... ' "$$f"; \
+	@mkdir -p $(LOG_DIR)
+	@printf '%s\n' $(SOURCES) | xargs -P $(CHECK_JOBS) -n 1 bash -c '\
+	  f="$$0"; err=$$(mktemp); \
 	  if $(GODOT) --headless --path . --check-only --script "res://$$f" \
-	       >/dev/null 2>$(LOG_DIR)/check.log; then \
-	    echo ok; \
+	       >/dev/null 2>"$$err"; then \
+	    echo "  check $$f ... ok"; rm -f "$$err"; \
 	  else \
-	    echo FAIL; cat $(LOG_DIR)/check.log; fail=1; \
-	  fi; \
-	done; \
-	[ $$fail -eq 0 ] || { echo "Type check failed."; exit 1; }; \
-	echo "All scripts type-check."
+	    echo "  check $$f ... FAIL"; cat "$$err"; rm -f "$$err"; exit 1; \
+	  fi' \
+	  || { echo "Type check failed."; exit 1; }
+	@echo "All scripts type-check."
 
 # Proof of life: boot the real project headless. Catches what `check` cannot —
 # broken scenes, missing autoloads, node paths that don't resolve.
@@ -210,9 +224,36 @@ smoke: import
 #
 # `-gdisable_colors` so the log greps cleanly and CI's plain-text view is
 # readable; without it the ANSI escapes sit between the ^ and the word.
+#
+# `--fixed-fps 60` IS THE RUNTIME OF THIS SUITE, AND IT IS ALSO A CORRECTNESS
+# FIX. A headless run has no vsync, so the main loop free-wheels: process frames
+# come as fast as the CPU can make them while *physics* ticks stay pinned to the
+# wall clock at 60 a second. Every `await wait_physics_frames(n)` in tests/ is
+# therefore n/60 real seconds of the runner sitting idle, and the integration
+# suites are built out of them — `_settle()` alone is 90 ticks, a second and a
+# half, and there are 99 calls to it. Measured on CI's runner: the suite took
+# 737s wall for 18s of CPU in one job and 730s of that was tests/integration/,
+# where tests/unit/ was 8s.
+#
+# `--fixed-fps` disables that real-time synchronisation and hands every frame a
+# fixed 1/60 delta instead, so the loop runs flat out and a frame's worth of
+# waiting costs a frame's worth of work. Measured over the whole suite, same
+# box, same 1229 tests: 737s -> 348s, and `real` now equals `user` — the idle is
+# gone rather than moved. 60 because project.godot leaves
+# physics_ticks_per_second at its default 60, so one physics tick per frame and
+# every delta in the run is exactly the 1/60 the game itself sees.
+#
+# THE CORRECTNESS HALF. Pinning the delta also makes the run deterministic
+# instead of a function of how loaded the runner was, and the first thing that
+# bought was a real bug: ScoreHud's digits stopped 0.01 short of their target
+# and truncated to a permanently-wrong score at 1/60 deltas, which is what the
+# shipped game runs at. It passed for as long as it did because free-wheeling
+# frames are tiny and the last step happened to land square. See the note on
+# `ScoreHud._process`. A suite that only passes at thousands of frames a second
+# is not testing the game anyone plays.
 gut: import
 	@mkdir -p $(LOG_DIR)
-	@$(GODOT) --headless --path . -s res://$(GUT)/gut_cmdln.gd \
+	@$(GODOT) --headless --fixed-fps 60 --path . -s res://$(GUT)/gut_cmdln.gd \
 	  -gdir=res://tests -ginclude_subdirs -gdisable_colors -gexit \
 	  2>&1 | tee $(LOG_DIR)/gut.log
 	@if ! grep -qE '^Scripts +[1-9]' $(LOG_DIR)/gut.log; then \
@@ -288,7 +329,23 @@ format: $(GDFORMAT)
 stamp:
 	scripts/stamp-build.sh .
 
-build: check stamp sdk
+# `build` is the local default and keeps the gate in front of the export: you
+# asked for a binary, so you get told about a type error before you get one.
+#
+# `export-linux` IS THAT EXPORT WITHOUT THE GATE, AND IT EXISTS FOR CI. Over
+# there `check` is already a job of its own that `build` and `build-web` both
+# `need:`, so `make build` in those jobs re-ran a check that had already passed
+# on the same commit — three type checks per run, two of them for nothing.
+# Measured on the runner: the Linux job spent 65s of its 76s on it and the
+# export itself was 3.4s. It still depends on `import`, which `check` was
+# quietly providing and the exporter genuinely needs.
+#
+# The gate is not being dropped, only stated once: nothing reaches `export-*`
+# in CI without `check` and `test` having gone green first, and the local
+# targets below are unchanged.
+build: check export-linux
+
+export-linux: import stamp sdk
 	@mkdir -p $(BUILD_DIR)
 	$(GODOT) --headless --path . --export-release "$(PRESET)" $(abspath $(TARGET))
 	@echo ">> $(TARGET) ($$(du -h $(TARGET) | cut -f1))"
@@ -316,7 +373,10 @@ build: check stamp sdk
 # the check then says that export was complete. index.pck is in the list on its
 # own account: a bundle whose pack is missing still has a perfectly good
 # index.html that boots to a blank canvas.
-build-web: check stamp sdk
+# Split from the export for the reason `build` is — see the note there.
+build-web: check export-web
+
+export-web: import stamp sdk
 	@rm -rf $(WEB_DIR)
 	@mkdir -p $(WEB_DIR)
 	$(GODOT) --headless --path . --export-release "$(WEB_PRESET)" $(abspath $(WEB_TARGET))

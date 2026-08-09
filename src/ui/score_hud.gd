@@ -194,8 +194,21 @@ func _ready() -> void:
 ## walking round the car with the trigger up costs one comparison a frame rather
 ## than a string built and three controls moved. The same early-out
 ## [method PatchFlash.fade] takes, for the same reason.
+##
+## [b]The arrival test is exact, and [method is_equal_approx] here was a bug.[/b]
+## [method shown] truncates, and that tolerance scales with the number:
+## [code]CMP_EPSILON * 1200[/code] is 0.012, so a roll that had reached 1199.99
+## read as arrived, the digits stopped, and the readout sat on 1199 for the rest
+## of the game. [method move_toward] clamps to its target exactly, so the exact
+## comparison is the one that is always eventually true — it just costs the one
+## further frame the approximate one was skipping. Measured at 1/60 deltas,
+## which is both what the game runs at and what CI's [code]--fixed-fps[/code]
+## run pins: a 30-frame trickle to 1200 landed on 1199 before this and 1200
+## after. Not caught sooner because a headless test run used to free-wheel at
+## thousands of tiny frames a second, where the last step happened to land on
+## the target rather than a hundredth short of it.
 func _process(delta: float) -> void:
-	if _flying <= 0 and _flash <= 0.0 and is_equal_approx(_shown, float(_total)):
+	if _flying <= 0 and _flash <= 0.0 and _shown == float(_total):
 		return
 	_roll_digits(delta)
 	_fade_flash(delta)

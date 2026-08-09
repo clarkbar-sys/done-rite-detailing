@@ -179,9 +179,11 @@ jobs:
           path: .godot-sdk
           key: godot-sdk-${{ hashFiles('scripts/fetch-godot.sh') }}
 
-      # `make build` runs `check` first, which type-checks tests/ too. The addon
-      # is excluded from the export itself (export_presets.cfg) — it is here to
-      # make the type check possible, not to ship.
+      # `make export-linux` runs the import pass, and the import pass scans
+      # tests/, every file of which extends GutTest — so the addon has to be on
+      # disk here even though this job neither type-checks nor runs a test. It
+      # is excluded from the export itself (export_presets.cfg): it is here to
+      # make the import possible, not to ship.
       - name: Cache GUT
         uses: actions/cache@v6
         with:
@@ -191,10 +193,14 @@ jobs:
       # Stamp the branch head, not the synthetic refs/pull/N/merge commit a PR
       # build checks out — the merge commit isn't a SHA anyone can find in the
       # branch's history. On push/dispatch there's no PR, so github.sha is right.
+      #
+      # `export-linux` rather than `build`: `build` type-checks first, and this
+      # job already `need:`s the `check` job that did exactly that on exactly
+      # this commit. See the Makefile's note — it was 65s of this job's 76s.
       - name: Export
         env:
           BUILD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: make build
+        run: make export-linux
 
       # The export succeeding is not the same as the game working. Boot the
       # actual artifact — this is the "I can see the build run" gate.
@@ -261,7 +267,7 @@ jobs:
           path: .godot-sdk
           key: godot-sdk-${{ hashFiles('scripts/fetch-godot.sh') }}
 
-      # `make build-web` runs `check` first, and `check` type-checks tests/,
+      # `make export-web` runs the import pass, and that pass scans tests/,
       # which extends GutTest. The addon is excluded from the bundle itself
       # (export_presets.cfg) — see the identical note on `build`.
       - name: Cache GUT
@@ -275,10 +281,14 @@ jobs:
       # the same `v<version> (<sha>)` line to the browser console that the
       # Linux binary prints to stdout, so the stamp is how you tell which
       # commit the page you are looking at was built from.
+      #
+      # `export-web` rather than `build-web`, for the reason `build` uses
+      # `export-linux` — the `check` job it `need:`s already type-checked this
+      # commit. See the Makefile's note.
       - name: Export
         env:
           BUILD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: make build-web
+        run: make export-web
 
       # The web pack is a separate preset with its own exclude_filter, and
       # nothing makes the two presets agree — so check the bundle rather than
