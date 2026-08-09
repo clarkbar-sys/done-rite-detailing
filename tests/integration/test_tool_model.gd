@@ -61,6 +61,66 @@ const LOPSIDED: Vector3 = Vector3(0.1, 1.0, 0.1)
 ## not sit near enough to either to be tuning.
 const LOPSIDED_ENOUGH: float = 1.01
 
+## The most triangles a modelled tool may arrive on the belt with.
+##
+## Ten thousand, and it is a size on disk rather than a frame budget. Measured on
+## the pinned Godot, importing the same [code].glb[/code] with the sidecar's mesh
+## switches flipped: this project's import settings turn a triangle into about
+## 28.5 bytes of [code].scn[/code] once the LOD chain and the shadow mesh are
+## counted — and both of those shrink with the source, which is why the triangle
+## count is the only lever worth pulling. So this is roughly "an imported model
+## may not cost more than 0.29 MB". What the belt actually carries: 8,496
+## triangles for each bottle, 348 for the pressure washer, 276 for the sponge.
+##
+## [b]It guards a re-bake, not a refactor.[/b] The two bottles were 68,096
+## triangles each — 1.94 MB of [code].scn[/code] apiece, 3.9 MB of the exported
+## [code].pck[/code] for two props held in the corner of the frame — until
+## [code]scripts/build-tire-cleaner.py[/code] grew a mesh simplifier. A bake that
+## quietly stopped simplifying would put every byte of that back, and nothing
+## else in this suite would notice: the box, the centre, the materials and the
+## normals all come out identical either way.
+const TRIANGLE_CEILING: int = 10000
+
+## How far off its own axis the top face of a bottle may sit, in metres.
+##
+## [code]#189[/code] measured this when it moved the water to the end of the
+## wand: the [code]Muzzle[/code] marker is at the top of the catalogue's box on
+## the box's own axis, and both bottles' top faces sat 9 mm from it — "a bottle
+## cap, not a 120 mm miss", which is why [SprayMist] was left alone. That 9 mm is
+## the shoulder of a moulded cap and it is a fact about the asset, so this is it
+## with half again for room: measured on the bottles the bake writes today, 9.2
+## mm for the tyre cleaner and 9.2 mm for the window cleaner, against 9.2 mm and
+## 8.9 mm for the full-resolution meshes they replaced.
+##
+## Here rather than in [code]test_play_screen_jet.gd[/code] because it is a
+## property of the model: a simplifier is free to notice that a cap is nearly
+## flat and spend its triangles elsewhere, and the first thing that would say so
+## is the product leaving the bottle beside its own nozzle.
+const CAP_OFF_AXIS: float = 0.015
+
+## How wide the top of a bottle may be, in metres. A trigger sprayer's cap is
+## 25 x 30 mm on this model and the shoulder below it is the full 100 mm of the
+## body, so this separates "the cap survived" from "the cap was collapsed into
+## the shoulder" without sitting near either.
+const CAP_WIDE: float = 0.05
+
+## How out of step with its own surface a single triangle's texturing may be —
+## see [method _thinnest_texturing] for what the ratio is.
+##
+## A hundredth, which is where the artist put it: measured on the full-resolution
+## download the bottles are baked from, its own worst triangle is at 0.0094, on
+## the trigger. So this is not a tolerance chosen to let the current bake through
+## — it is the floor the source itself sits on, and the bake clears it by nearly
+## five times over at 0.048.
+##
+## What it catches is the one thing a mesh simplifier can do to this asset that
+## no measurement of its size or its shape would notice. Both bottles are one
+## printed label and five moulded parts wrapped in 256 px maps, and a collapse
+## that pulled two corners of a triangle onto a straight line in UV space would
+## smear a stripe of that label across the plastic while leaving the silhouette,
+## the box and the triangle count all exactly as expected.
+const UV_THINNEST: float = 0.01
+
 ## A path with nothing behind it, for the one test that asks what a missing model
 ## does. Under [code]assets/models/[/code] rather than somewhere obviously fake so
 ## that it is the same kind of path a typo in the catalogue would produce.
@@ -209,6 +269,65 @@ func _cross_section(mesh: Mesh, at_top: bool) -> float:
 			across = across.expand(vertex) if found else AABB(vertex, Vector3.ZERO)
 			found = true
 	return across.size.x * across.size.z
+
+
+## How many triangles [param mesh] draws, over every surface it has.
+func _triangles(mesh: Mesh) -> int:
+	var drawn: int = 0
+	for surface: int in mesh.get_surface_count():
+		var arrays: Array = mesh.surface_get_arrays(surface)
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		@warning_ignore("integer_division")
+		drawn += indices.size() / 3
+	return drawn
+
+
+## The two bottles, which are the only tools a mesh simplifier has ever touched.
+func _bottles() -> Array[DetailingTool]:
+	var catalogue: Array[DetailingTool] = DetailingTool.catalogue()
+	return [
+		catalogue[DetailingTool.Id.WINDOW_CLEANER],
+		catalogue[DetailingTool.Id.TIRE_ENGINE_CLEANER],
+	]
+
+
+## The smallest patch of texture any one triangle of [param mesh] is drawn from,
+## as a share of the patch that triangle would get at the surface's own average
+## density — so 1.0 is a triangle mapped exactly as evenly as its surface is, and
+## 0.0 is one whose three corners landed on a straight line in the texture.
+##
+## Scale free on purpose. The six parts of a bottle are mapped at wildly
+## different densities — the nozzle spreads about 640 UV units² over a square
+## metre where the body spreads 11 — so an absolute floor would be six different
+## amounts of nothing, and the only question worth asking is whether a triangle
+## is out of step with the surface it belongs to.
+func _thinnest_texturing(mesh: Mesh) -> float:
+	var thinnest: float = 1.0
+	for surface: int in mesh.get_surface_count():
+		var arrays: Array = mesh.surface_get_arrays(surface)
+		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		var densities: PackedFloat32Array = PackedFloat32Array()
+		var total: float = 0.0
+		for at: int in range(0, indices.size(), 3):
+			var first: int = indices[at]
+			var second: int = indices[at + 1]
+			var third: int = indices[at + 2]
+			var area: float = (
+				(points[second] - points[first]).cross(points[third] - points[first]).length()
+			)
+			if area <= 0.0:
+				continue
+			var mapped: float = absf((uvs[second] - uvs[first]).cross(uvs[third] - uvs[first]))
+			densities.append(mapped / area)
+			total += mapped / area
+		if densities.is_empty():
+			continue
+		var average: float = total / densities.size()
+		for density: float in densities:
+			thinnest = minf(thinnest, density / average)
+	return thinnest
 
 
 ## The box around the topmost [constant END_FACE] of [param mesh] — the face the
@@ -449,6 +568,77 @@ func test_no_two_modelled_tools_share_one_texture() -> void:
 		)
 		assert_false(textures.has(surface.albedo_texture), "%s reuses a skin" % tool.display_name)
 		textures.append(surface.albedo_texture)
+
+
+# ---- what a model is allowed to cost, and what it may not spend to get there -
+
+
+func test_no_modelled_tool_brings_more_triangles_than_the_belt_can_afford() -> void:
+	# The load-time guard. See [constant TRIANGLE_CEILING]: an imported mesh costs
+	# about 28.5 bytes a triangle in the exported [code].pck[/code], the two
+	# bottles were 68,096 triangles apiece, and that was 3.9 MB of the download
+	# spent on two props that occupy a corner of the frame. Asserted here because
+	# this is the file that already loads every modelled asset, and because
+	# nothing else in the suite would fail on a bake that stopped simplifying.
+	#
+	# Every modelled tool and not just the bottles: the ceiling is what a tool on
+	# this belt is worth, and the next borrowed model arrives with whatever the
+	# artist happened to save.
+	for tool: DetailingTool in _modelled():
+		var triangles: int = _triangles(_built(tool, tool.extent).mesh)
+		assert_gt(triangles, 0, "%s: the fit drew no triangles at all" % tool.display_name)
+		assert_lt(
+			triangles,
+			TRIANGLE_CEILING,
+			"%s: %d triangles — has the bake stopped simplifying?" % [tool.display_name, triangles]
+		)
+
+
+func test_the_top_of_each_bottle_is_still_the_cap_the_marker_stands_on() -> void:
+	# What [code]#189[/code] left behind. [ViewModel] hangs the [code]Muzzle[/code]
+	# marker at the top of the catalogue's box on the box's own axis and [ToolSight]
+	# sprays from it, so "the product leaves the can where the can is" is a claim
+	# about where the top of the mesh is — and that issue measured it at 9 mm for
+	# both bottles and left [SprayMist] alone on the strength of it.
+	#
+	# A simplifier is exactly the thing that could quietly spend that: a cap is a
+	# nearly-flat disc and the cheapest triangles on the whole bottle to collapse.
+	# So the same measurement, pinned. Measured on the bake this repository ships:
+	# 9.2 mm off the axis for both, against 9.2 mm and 8.9 mm for the
+	# full-resolution meshes they replaced.
+	for tool: DetailingTool in _bottles():
+		var face: AABB = _nozzle_face(_built(tool, tool.extent).mesh)
+		var centre: Vector3 = face.get_center()
+		assert_lt(
+			Vector2(centre.x, centre.z).length(),
+			CAP_OFF_AXIS,
+			"%s: the top of the bottle has wandered off the marker" % tool.display_name
+		)
+		# And it is still a cap rather than the shoulder the cap used to sit on.
+		assert_lt(
+			maxf(face.size.x, face.size.z),
+			CAP_WIDE,
+			"%s: the top of the bottle is no longer cap-sized" % tool.display_name
+		)
+
+
+func test_no_triangle_on_a_bottle_has_had_its_texturing_pulled_flat() -> void:
+	# The guard on the one cost a mesh simplifier can pay in the texture rather
+	# than in the geometry — see [constant UV_THINNEST]. Asked of the imported
+	# asset rather than of the fitted proxy on purpose: the fit is a non-uniform
+	# scale, so it changes each triangle's area by an amount that depends on which
+	# way the triangle faces, and the property under test is a fact about the
+	# [code].glb[/code].
+	#
+	# The two bottles and not every modelled tool, because they are the only
+	# assets in this project that a simplifier has ever run over: the wand and the
+	# sponge are written out triangle by triangle by their own build scripts.
+	for tool: DetailingTool in _bottles():
+		assert_gt(
+			_thinnest_texturing(_source_mesh(tool.model)),
+			UV_THINNEST,
+			"%s: a triangle samples the texture along a line" % tool.display_name
+		)
 
 
 # ---- the arithmetic the fit has to get right --------------------------------
