@@ -132,7 +132,7 @@ func worked(toward: Vector3, outward: Vector3) -> Transform3D:
 	var off: Vector3 = outward.normalized()
 	if off.is_zero_approx():
 		# No measured normal: face the tool back at the hand, which is the same
-		# answer [method Garage._nearest_on_the_car] invents for a mark it could not
+		# answer [method AimProbe._nearest_on_the_car] invents for a mark it could not
 		# measure one for, and is right for a press that landed on nothing.
 		off = (-toward).normalized()
 	if off.is_zero_approx():

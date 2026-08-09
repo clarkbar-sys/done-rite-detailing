@@ -327,7 +327,7 @@ func test_a_press_in_the_middle_of_every_extreme_lands_on_real_bodywork() -> voi
 	# that must always land is the interesting one at both ends of this list, and
 	# the sport car at 1.04 m is the case that made it interesting.
 	#
-	# `surface` is the key that matters. Every tier of `Garage._under_the_finger`
+	# `surface` is the key that matters. Every tier of `AimProbe.under_the_finger`
 	# answers something, and the bottom one answers with a point clamped onto a
 	# bounding box whose normal was invented facing the player — a mark a player
 	# can see and no tool may write to. So "the press landed on the car" is not the

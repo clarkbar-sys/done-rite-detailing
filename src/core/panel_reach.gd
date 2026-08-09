@@ -20,7 +20,7 @@
 ## question. What a player can clean is not "is there geometry here"; it is "can
 ## the eye get somewhere that a ray from it lands here", and there is already a
 ## piece of code that decides that: [method PhysicsDirectSpaceState3D.intersect_ray],
-## cast from the eye, exactly as [method Garage._under_the_finger] casts it to spend
+## cast from the eye, exactly as [method AimProbe.under_the_finger] casts it to spend
 ## the trigger. So the mask is built by standing in the places the player is
 ## allowed to stand and looking at the car through the same query. Reachability and
 ## the trigger then cannot disagree, because they are the same call.
