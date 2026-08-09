@@ -87,17 +87,18 @@
 ## diagonal matrix is the reciprocal of its diagonal, so that is a component-wise
 ## divide; tangents are directions [i]along[/i] the surface and take the fit
 ## itself. Neither is expensive per vertex and both are paid once, while the
-## screen is loading: measured in [method ViewModel._build], each bottle's 37,286
-## vertices take about 40 ms, so the pair costs a little under 80 ms of the bay's
-## load. That is a real number rather than a rounding error, and it is roughly
-## double what it was — the window bottle used to be a 2,352-vertex cylinder at
-## 5 ms, and is now the tyre bottle in a blue livery (see
-## [code]scripts/build-window-cleaner.py[/code]). It is the price of a model this
-## class deliberately does not decimate — see
-## [code]scripts/build-tire-cleaner.py[/code], which says the same thing about
-## the triangle count. The sponge is at the other end of that range: 224
-## vertices, two orders of magnitude under the bottles, because everything that
-## makes it look like a sponge is in its normal map rather than in its geometry.
+## screen is loading: measured here on the pinned Godot, one build of each
+## bottle, each bottle's 5,982 vertices take about 18 ms, so the pair costs about
+## 36 ms of the bay's load. That is a real number rather than a rounding error,
+## and it is roughly half what it was — the bottles were 37,286 vertices and
+## 33 ms each until [code]scripts/build-tire-cleaner.py[/code] grew a mesh
+## simplifier, and that script is where the whole argument for the triangle
+## budget is written down. Not a sixth of what it was, note, which is what a
+## sixth of the vertices might have promised: a good part of the cost is loading
+## the imported scene and rebuilding six surfaces, and neither of those got
+## smaller. The sponge is the other end of that range: 224 vertices at about
+## 9 ms, nearly all of it that same fixed cost, because everything that makes it
+## look like a sponge is in its normal map rather than in its geometry.
 ##
 ## [b]Which is what makes the sponge the one to look at if this arithmetic is
 ## ever wrong.[/b] Its fit is a genuinely lopsided (1.47, 2.46, 1.56): a 16 cm
