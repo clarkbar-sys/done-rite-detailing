@@ -242,7 +242,7 @@ func toggle_button() -> Button:
 	return _toggle
 
 
-## The picture on the corner button — three tool heads on a belt line, or an
+## The picture on the corner button — the three bars of a menu mark, or an
 ## [b]x[/b] while the roll-up is out. Public for the same reason
 ## [method ToolIcon.fill_color] is: what the corner is saying is a thing a test
 ## can read, and a corner that went on saying "tools" while the tools were
@@ -853,7 +853,7 @@ class ToolIcon:
 		ToolBeltHud.paint_sprite(self, sprite(_tool.id), size, palette)
 
 
-## The picture on the corner button: three tool heads on a belt line, and an
+## The picture on the corner button: the three bars of a menu mark, and an
 ## [b]x[/b] while the roll-up is out.
 ##
 ## [b]Why the corner stopped being a letter.[/b] It was a [b]T[/b], chosen
@@ -862,6 +862,22 @@ class ToolIcon:
 ## and it said the same thing whether the tools were out or not. The mark says
 ## what the corner is for while it is closed and what pressing it will do while
 ## it is open, which is the one job a toggle has.
+##
+## [b]And why it then stopped being a picture of the tools.[/b] The first answer
+## to that was three tool heads hanging on a belt line — literally what is inside
+## the corner. It is the right idea one level too literal: a 16x16 grid gives each
+## head about four pixels across, so at the ~50 px a phone renders this badge at
+## the heads are three blobs over a rule, and what a player reads is a shape they
+## have to learn rather than one they already know. Three bars are the mark every
+## surface on a phone already uses for [i]this opens[/i], they need no colour and
+## no second tone to be read, and they are the one picture that cannot lose detail
+## as it shrinks because it has none to lose. The corner is a menu; it now looks
+## like one.
+##
+## [b]The bars are this game's only menu mark, and that is what makes them
+## unambiguous.[/b] Nothing else here opens from a corner, so they can mean the
+## tool belt and nothing else. The day a second one wants them, that stops being
+## true and the corner needs its picture back — which is what this note is for.
 ##
 ## A [Control] rather than more drawing inside [ToolBeltHud] because the corner
 ## button moves, and a picture that lived in the HUD's own [method _draw] would
@@ -879,8 +895,8 @@ class BeltMark:
 
 	var _open: bool = false
 
-	## The sprite for both faces of the corner: three tool heads hanging on a belt,
-	## or the [b]x[/b]. Static and public for the reason [method ToolIcon.sprite] is.
+	## The sprite for both faces of the corner: the menu mark's three bars, or the
+	## [b]x[/b]. Static and public for the reason [method ToolIcon.sprite] is.
 	##
 	## Only [code]B[/code] and [code]S[/code] appear in either. The corner is not a
 	## tool and has no albedo to derive anything from — it is drawn in
@@ -910,23 +926,31 @@ class BeltMark:
 					"................",
 				]
 			)
+		# Three bars, each two pixels of white over one of shade, with two clear
+		# pixels between them — and the gap is the measured half. Drawn first at one
+		# pixel of gap, which is the spacing the bars want at 164 px and the spacing
+		# that closes up at 50: the sprite grid is 70% of the plate, so a phone
+		# renders a sprite pixel at about two device pixels and a one-pixel gap is a
+		# seam rather than a space. At two it is still three bars in a thumbnail.
+		# The white rows sit at 2-3, 7-8 and 12-13, which centres their mass on the
+		# grid exactly; the shade rows hang below as depth, not as mass.
 		return PackedStringArray(
 			[
 				"................",
 				"................",
+				"..BBBBBBBBBBBB..",
+				"..BBBBBBBBBBBB..",
+				"..SSSSSSSSSSSS..",
 				"................",
 				"................",
-				"................",
-				"......BBBB......",
-				"..BB..BBBB..BB..",
-				".BBBB.BBBB.BBBB.",
-				".BBBB.BBBB.BBBB.",
-				"..SS..SSSS..SS..",
-				"................",
-				".BBBBBBBBBBBBBB.",
-				".SSSSSSSSSSSSSS.",
+				"..BBBBBBBBBBBB..",
+				"..BBBBBBBBBBBB..",
+				"..SSSSSSSSSSSS..",
 				"................",
 				"................",
+				"..BBBBBBBBBBBB..",
+				"..BBBBBBBBBBBB..",
+				"..SSSSSSSSSSSS..",
 				"................",
 			]
 		)
