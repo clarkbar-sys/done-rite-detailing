@@ -27,6 +27,13 @@
 ## so it lives on the clock — see there — and the day the music or the bell wants
 ## to know, it asks the same question instead of inventing a second threshold.
 ##
+## [b]And a simulation run reads [constant RunClock.FOREVER_SIGN][/b], which is
+## the same split again: the clock says what a run with no limit on it reads and
+## this puts it up in the same face, the same size and the same resting colour as
+## a number. Nothing here branches on the mode — an untimed clock hands this
+## [constant RunClock.UNTIMED] every frame and the readout draws whatever
+## [method RunClock.spell] makes of it, exactly as it does at 0:04.
+##
 ## [b]It cannot be pressed.[/b] [constant Control.MOUSE_FILTER_IGNORE] is set
 ## explicitly and is load-bearing rather than tidy: [code]src/screens/play_screen.gd[/code]
 ## reads aims out of [method Control._gui_input], so a readout that stopped a
@@ -73,7 +80,13 @@ const WARNING: Color = Brand.RED
 
 ## No time has been printed yet. Not a reading [method RunClock.whole_seconds]
 ## can produce, which is what makes the first call always draw.
-const NOTHING_YET: int = -1
+##
+## [b]-2 rather than the -1 it was[/b], because -1 is now a reading that method
+## does produce: [constant RunClock.FOREVER], the untimed run's answer. Two
+## sentinels that were distinct until one of them was given a meaning is exactly
+## the sort of collision that shows up as a readout which draws once and then
+## never again, so the two are held apart here rather than hoped about.
+const NOTHING_YET: int = -2
 
 ## What is currently printed, in whole seconds, or [constant NOTHING_YET] before
 ## anything has been. Kept so [method show_time] can be called every frame

@@ -42,11 +42,16 @@ var _style_before: String = ""
 var _score_before: int = 0
 var _patches_before: int = 0
 var _finished_before: bool = false
+var _mode_before: GameMode.Kind = GameMode.Kind.ARCADE
 
 
 func before_each() -> void:
 	_requested = []
 	_music_asked = 0
+	# The mode decides whether this screen offers a place on the board at all, and
+	# it is process-wide — snapshotted and put back for [RunResult]'s reason.
+	_mode_before = GameMode.chosen
+	GameMode.forget()
 	_style_before = RunResult.style
 	_score_before = RunResult.score
 	_patches_before = RunResult.patches
@@ -63,6 +68,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	get_tree().root.size = _window_size_before
+	GameMode.choose(_mode_before)
 	RunResult.remember(_style_before, _score_before, _patches_before, _finished_before)
 	_clear_the_save()
 
@@ -230,6 +236,75 @@ func test_a_finished_car_is_not_reported_as_a_timeout() -> void:
 	assert_true(
 		_label("Heading").text.begins_with("Car Finished"),
 		"finishing the car read as running out of time: %s" % _label("Heading").text
+	)
+
+
+# ---- the simulation, which had no clock to run out ------------------------------
+#
+# What a run in [constant GameMode.Kind.SIMULATION] gets here: the same score in
+# the same digits, the same board for the same car, a heading that does not talk
+# about a clock — and no place on the table. src/screens/job_done.gd has the
+# argument for the last of those, and it is that a run with all the time it wants
+# is not answering the question the board asks.
+
+
+func test_a_job_handed_in_is_not_reported_as_a_timeout() -> void:
+	GameMode.choose(GameMode.Kind.SIMULATION)
+	await _open(SEDAN, SCORE)
+	assert_true(
+		_label("Heading").text.begins_with("Job Handed In"),
+		"an untimed run was reported against a clock: %s" % _label("Heading").text
+	)
+
+
+func test_a_car_finished_in_the_simulation_is_still_a_car_finished() -> void:
+	# Finishing the car is the same achievement whether or not anything was
+	# counting down, so it outranks the mode in the heading.
+	GameMode.choose(GameMode.Kind.SIMULATION)
+	await _open(SEDAN, SCORE, true)
+	assert_true(
+		_label("Heading").text.begins_with("Car Finished"),
+		"finishing the car went unremarked: %s" % _label("Heading").text
+	)
+
+
+func test_the_simulation_still_names_the_car() -> void:
+	GameMode.choose(GameMode.Kind.SIMULATION)
+	await _open(SEDAN, SCORE)
+	assert_true(
+		_label("Heading").text.ends_with(CarChoice.label_for(SEDAN)),
+		"the board did not say which car it is: %s" % _label("Heading").text
+	)
+
+
+func test_a_simulation_run_is_never_asked_to_sign_the_board() -> void:
+	# The same run that is asked for initials in the arcade — an empty board has
+	# ten places going spare, so this is the case that would place if any did.
+	GameMode.choose(GameMode.Kind.SIMULATION)
+	await _open(SEDAN, SCORE)
+	assert_false(_node("Letters").visible, "an untimed run must not take a place")
+	assert_true(_node("Table").visible, "and must still be shown the board")
+	assert_true(_node("Exits").visible)
+
+
+func test_a_simulation_run_is_still_shown_what_it_scored() -> void:
+	# Not on the board is not the same as not counted: the number the player just
+	# earned is on the screen in the digits the corner printed it in.
+	GameMode.choose(GameMode.Kind.SIMULATION)
+	await _open(SEDAN, SCORE)
+	assert_eq(_label("Score").text, str(SCORE).pad_zeros(ScoreHud.DIGITS))
+
+
+func test_a_simulation_run_leaves_the_board_as_it_found_it() -> void:
+	# The failure this is really about: a table that fills up with runs nobody can
+	# be outdone at. Read back off the file rather than off the screen, because
+	# the file is the thing the next player opens.
+	GameMode.choose(GameMode.Kind.SIMULATION)
+	await _open(SEDAN, SCORE)
+	assert_eq(
+		HighScores.read_table(SEDAN, TEMP_SCORES).size(),
+		0,
+		"an untimed run wrote itself onto the arcade's board"
 	)
 
 

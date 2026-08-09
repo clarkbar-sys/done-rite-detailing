@@ -15,8 +15,9 @@ buffed by nobody, in the bay you are about to stand in. Start opens a menu over
 that same bay, still working away behind it — and that bay is the showroom: an
 arrow either side of the screen steps through the ten cars in the pack, the one
 you land on is parked behind the menu, and it is the one you drive off with.
-**Play** drops you into the room,
-standing beside the car with a tool in your hand, and **How to Play** is one
+**Arcade** and **Simulation** both drop you into the room,
+standing beside the car with a tool in your hand — the first against a
+five-minute clock, the second against nothing at all — and **How to Play** is one
 screen of rules — four things you can do and the three passes a panel goes
 through — with its own way straight into the game, so reading first costs you
 nothing. The theme carries across all of it and fades as the bay opens.
@@ -159,7 +160,7 @@ other's half. There is deliberately no target and no percentage: the car still
 has spots a tool cannot reach, and a completion figure nobody can close is a
 worse thing to print on screen all game than a number that only goes up.
 
-And a run is now three minutes long, which is what makes the score mean
+And an arcade run is five minutes long, which is what makes the score mean
 something. The clock along the top starts the instant the mud is on the car —
 not when the screen opens, because laying it on is the longest frame the room
 will ever have and a meter counting through a load is charging you for it — and
@@ -168,6 +169,17 @@ early and is the win; on a thousand-patch car that is a real thing to chase
 rather than the only way out. Either ending asks the same question the cabinet
 did, which is how much you got done and not whether you got it done, and that is
 the question a score can answer and two people can compare.
+
+The other pill on the menu takes the clock off. **Simulation** is the same bay,
+the same car and the same five tools, built with a run length of infinity
+instead of five minutes — so the meter reads `∞`, the run ends when the car is
+finished or when you press **Finish**, and nothing is hurrying you through the
+three passes a panel takes. The whole difference between the two games is that
+one number: there is no simulation-only code in the room, no second rule set and
+no second play screen. What it does not get is a place on the high score table —
+a run with all the time it wants would eventually reach the same score any other
+one would, which is the number the car is worth rather than the number you are.
+The score is still shown, and the board is still there to look at.
 
 Then the score outlives the tab it was earned in. When a run ends it asks for
 three letters the way a cabinet does: a wheel of
@@ -181,7 +193,8 @@ wagon has more paint on it than a coupe does and a single board would be a
 ranking of which car is biggest with somebody's name beside it. A mangled save
 degrades to an empty board rather than a crash, which is the same rule the
 settings file follows and for the same reason.
-[`RunClock`](./src/core/run_clock.gd) is the three minutes,
+[`GameMode`](./src/core/game_mode.gd) is which of the two games it is,
+[`RunClock`](./src/core/run_clock.gd) is the five minutes or the lack of them,
 [`HighScores`](./src/core/high_scores.gd) is the board and the file,
 [`Initials`](./src/core/initials.gd) is the three-letter wheel, and
 [`job_done.tscn`](./src/screens/job_done.tscn) is the screen that draws the last

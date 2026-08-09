@@ -1,5 +1,13 @@
-## The menu: the same lockup the title card shows, with two things to press
+## The menu: the same lockup the title card shows, with three things to press
 ## under it instead of none.
+##
+## [b]Two of the three are the same door, and what they choose is the clock.[/b]
+## Play used to be one pill; #214 split it into Arcade and Simulation, which lead
+## to the same [PlayGameState] and the same bay and differ by one number —
+## [method GameMode.seconds_for], five minutes or none at all. That is why this
+## screen sets a mode and then makes the identical request either way, rather
+## than there being two play states or two play screens: a mode is not a place
+## the game can be in, it is a length the clock is built with.
 ##
 ## [b]It is the title screen with one more pill, and that is on purpose.[/b]
 ## Same card, same logo, same build label in the same corner, and the same bay
@@ -11,21 +19,29 @@
 ## moves between the two screens is the logo card, which gives up a little height
 ## so a second button fits under it.
 ##
-## [b]One of the two buttons is red and the other is not.[/b] [constant Brand.RED]
-## is the site's one accent — the thing you are meant to press — so Play wears it
-## and How to Play wears [method Brand.quiet_pill], the card's colour in the
-## pill's shape. Two red pills would be defensible, and the site itself does it,
-## but on a screen whose whole job is to be chosen from it leaves the eye with
-## nowhere to land.
+## [b]One of the three buttons is red and the other two are not.[/b]
+## [constant Brand.RED] is the site's one accent — the thing you are meant to
+## press — so Arcade wears it, and Simulation and How to Play wear
+## [method Brand.quiet_pill], the card's colour in the pill's shape. Two red
+## pills would be defensible, and the site itself does it, but on a screen whose
+## whole job is to be chosen from it leaves the eye with nowhere to land.
+##
+## [b]And it is Arcade that is red rather than the newer of the two.[/b] The
+## accent means "this is the answer", and the answer to "how do I play this" is
+## still the timed run: it is the one with a score worth putting on a board, it
+## is what every other screen in the game is written around, and it is what a
+## player who presses the obvious thing should get. Simulation is a deliberate
+## choice to take the clock off, and a deliberate choice is a quiet pill.
 ##
 ## [b]The music carries and the bell does not.[/b] The theme is started by the
 ## title screen's first gesture and is [i]not[/i] faded on the way in here — the
 ## [Bandstand] hangs off the host, so it plays straight through the swap, and
-## this screen never asks it for anything until Play. That is the whole reason
-## the fade moved off the title card's Start: a menu the music stops for is a
-## menu that sounds like the end of something. The counter bell moved with it,
-## and for the plainer reason: [constant Bell.Voice.START] means the job starts,
-## and the job now starts here.
+## this screen never asks it for anything until one of the two games. That is the
+## whole reason the fade moved off the title card's Start: a menu the music stops
+## for is a menu that sounds like the end of something. The counter bell moved
+## with it, and for the plainer reason: [constant Bell.Voice.START] means the job
+## starts, and the job now starts here — in either mode, because in either mode a
+## job is what starts.
 ##
 ## [b]What this screen does not have to do is unlock the audio.[/b] The title
 ## card's [method Node._input] already spent the browser's first gesture — see
@@ -96,7 +112,8 @@ const SHADOW_ALPHA: float = 0.7
 const OUTLINE_PX: int = 6
 
 @onready var _build: Label = %Build
-@onready var _play: Button = %Play
+@onready var _arcade: Button = %Arcade
+@onready var _simulation: Button = %Simulation
 @onready var _how_to_play: Button = %HowToPlay
 @onready var _logo_card: PanelContainer = %LogoCard
 @onready var _credits: Label = %Credits
@@ -122,9 +139,14 @@ func _ready() -> void:
 	# characters of licence text to a line, which is the one thing on this
 	# screen the chunky face would be actively wrong for.
 	_car_name.add_theme_font_override("font", Brand.DISPLAY_FACE)
-	dress_loud(_play)
+	dress_loud(_arcade)
+	dress_quiet(_simulation)
 	dress_quiet(_how_to_play)
-	_play.pressed.connect(_on_play_pressed)
+	# Bound with the mode each one means, so the two pills are one function with
+	# one argument rather than two handlers that have to be kept saying the same
+	# three things — see `_on_mode_pressed`.
+	_arcade.pressed.connect(_on_mode_pressed.bind(GameMode.Kind.ARCADE))
+	_simulation.pressed.connect(_on_mode_pressed.bind(GameMode.Kind.SIMULATION))
 	_how_to_play.pressed.connect(_on_how_to_play_pressed)
 	for arrow: CarArrow in [_previous_car, _next_car]:
 		dress_quiet(arrow)
@@ -135,18 +157,30 @@ func _ready() -> void:
 	# So the menu is playable from the keyboard or a pad the moment it opens,
 	# rather than only by whoever brought a mouse — and on the button that is
 	# already drawn as the answer, so the focus ring agrees with the colour.
-	_play.grab_focus()
+	_arcade.grab_focus()
 
 
-## The bell, the theme stepping aside, then the game — the three things Start
-## used to do, doing them one screen later.
+## The mode, the bell, the theme stepping aside, then the game — the three things
+## Start used to do, doing them one screen later, with [param kind] written down
+## first.
 ##
-## The fade is asked for [i]before[/i] the transition, and that ordering is worth
-## not moving: [method request_transition] frees this screen synchronously, so a
-## fade requested after it would be emitted from a node on its way out. It
-## survives either way, because the host is already connected to the signal, but
-## the version that reads correctly is the one that does not rely on that.
-func _on_play_pressed() -> void:
+## [b]One handler for both pills.[/b] What Arcade and Simulation do differently is
+## the argument and nothing else; two handlers would be two copies of the bell,
+## the fade and the transition, free to disagree about any of the three the day
+## one of them is edited.
+##
+## The mode is remembered [i]before[/i] the transition for the plain reason that
+## [method request_transition] frees this screen synchronously and the play
+## screen reads [member GameMode.chosen] in its own [method Node._ready] — which
+## has already run by the time the line after a transition would execute.
+##
+## The fade is asked for before the transition too, and that ordering is worth
+## not moving for a subtler reason: a fade requested after it would be emitted
+## from a node on its way out. It survives either way, because the host is
+## already connected to the signal, but the version that reads correctly is the
+## one that does not rely on that.
+func _on_mode_pressed(kind: GameMode.Kind) -> void:
+	GameMode.choose(kind)
 	ring_bell(Bell.Voice.START)
 	stop_music()
 	request_transition(PlayGameState.new())

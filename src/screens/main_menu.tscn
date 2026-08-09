@@ -160,15 +160,53 @@ text = "Sedan"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-; The size Start wears on the title card, unchanged: this is the same press,
-; one screen later.
-[node name="Play" type="Button" parent="Center/Column"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(440, 176)
+; The two games, side by side, where the one Play pill used to be — #214 split
+; it. See src/core/game_mode.gd for what the difference actually is (one number)
+; and src/screens/main_menu.gd for which of them is red.
+;
+; A ROW AND NOT TWO MORE ROWS, AND THAT IS ARITHMETIC RATHER THAN TASTE. This
+; column is 625 px of the 676 the Center container gives it: the lockup's card is
+; 209 (185 of logo inside Brand.CARD_INSET twice), the car's name is 36, the pills
+; are 176 and 168, and the three gaps are 12 each. A third pill stacked under the
+; other two is 168 + 12 more, which is 805 in a 676-tall box — the lockup would be
+; 64 px off the top of the screen and the credit would be under the last pill.
+; Nothing on this screen has 180 px to give: both pills are already within a dozen
+; of the TouchTarget.min_design_size() floor, and the lockup has given up height
+; twice already. Side by side, the row is one 176-tall child exactly where the one
+; pill was, and every number above is unchanged.
+;
+; 824 WIDE, AND IT IS THE ARROWS THAT DECIDE. PreviousCar and NextCar own
+; x = 12..188 and x = 1092..1268, so the middle of the 1280 design is 904 px of
+; free floor. Two 400 px pills 24 apart is 824 of it, centred at x = 228..1052,
+; which clears each arrow by 40 px. The design width is a floor rather than a
+; target (window/stretch/aspect is "expand"), so 1280 is the narrowest this is
+; ever laid out at and 40 px is the worst case.
+;
+; 32 px type, which is How to Play's rather than Play's 64, and again it is the
+; width: Brand.DISPLAY_FACE advances a whole em per character, so "Simulation" is
+; ten characters and 320 px at 32, 400 at 40 — exactly the pill, with nothing in
+; hand — and a Button grows to fit its own text rather than clipping it. So 32,
+; where "Simulation" sits in 320 of 400 and "Arcade" in 192. What says which one
+; is the answer is colour, which is Brand.RED against Brand.quiet_pill and is the
+; same thing that already separated Play from How to Play.
+[node name="Modes" type="HBoxContainer" parent="Center/Column"]
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 64
-text = "Play"
+theme_override_constants/separation = 24
+
+[node name="Arcade" type="Button" parent="Center/Column/Modes"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 176)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Arcade"
+
+[node name="Simulation" type="Button" parent="Center/Column/Modes"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 176)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Simulation"
 
 ; Smaller than Play, and only just: 168 is a few pixels above
 ; TouchTarget.min_design_size() (164 for this design on a 375 px screen), which
@@ -182,9 +220,11 @@ text = "Play"
 ; a caption is exactly `length x size` px wide: "How to Play" is eleven
 ; characters, which is 352 px at 32 and 484 at 44 — wider than the 440 px pill it
 ; is printed on, and a Button grows to fit its own text rather than clipping it.
-; So the second pill would have come out wider than the first. Play is four
+; So the second pill would have come out wider than the first. Play was four
 ; characters and 256 px at 64, which is why the loud one kept its size while the
-; quiet one gave up twelve.
+; quiet one gave up twelve. Play itself is gone since #214 — the row above is the
+; two games it split into, and they set at this size for the same reason this one
+; does.
 [node name="HowToPlay" type="Button" parent="Center/Column"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(440, 168)
