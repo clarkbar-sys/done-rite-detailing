@@ -32,6 +32,22 @@ const PARTS: Array[String] = ["Body", "Glass", "Optics", "Wheel1", "Wheel2", "Wh
 
 const WHEELS: Array[String] = ["Wheel1", "Wheel2", "Wheel3", "Wheel4"]
 
+## The one lens atlas all ten styles are lit from, emitted once by
+## [code]scripts/build-car-pack.py[/code] and reached from each [code].glb[/code]
+## by a glTF URI rather than baked into ten of them — [code]#204[/code].
+const SHARED_OPTICS: String = "res://assets/models/cars/shared_optics_color.jpg"
+
+## The two wheels the pack models once and hangs on two cars each, and the file
+## each pair's base colour now lives in. Only the four styles that share are
+## listed: the other six have a wheel of their own and it stays inside the
+## [code].glb[/code], because a texture with one user costs nothing to embed.
+const SHARED_WHEEL_COLOR: Dictionary[String, String] = {
+	"pickup": "res://assets/models/cars/pickup_suv_wheel_color.png",
+	"suv": "res://assets/models/cars/pickup_suv_wheel_color.png",
+	"sedan": "res://assets/models/cars/sedan_wagon_wheel_color.png",
+	"wagon": "res://assets/models/cars/sedan_wagon_wheel_color.png",
+}
+
 ## The look this game settled on for glass in #58, and the numbers
 ## [code]tests/fixtures/blockout_car.tscn[/code] gives the blockout's windows.
 const GLASS_COLOR: Color = Color(0.35, 0.62, 0.58, 1.0)
@@ -503,6 +519,54 @@ func test_the_lamps_keep_their_own_lenses() -> void:
 		assert_null(lamps.get_surface_override_material(0), "%s: the lamps were repainted" % style)
 		var lens: StandardMaterial3D = lamps.mesh.surface_get_material(0) as StandardMaterial3D
 		assert_not_null(lens.albedo_texture, "%s: the lamps lost their texture" % style)
+
+
+# ---- one texture where there were ten -----------------------------------------
+
+
+func test_the_ten_styles_are_lit_from_one_lens_texture() -> void:
+	# #204. Every style's Optics material points at the same 1024x1024 atlas, and
+	# every style's .glb used to carry its own copy of it — so the exporter
+	# compiled ten identical textures, 1.62 MB each, into a 35.6 MB pack.
+	#
+	# Two assertions and they are not the same one. The path says the pack was
+	# built to share; the identity says Godot actually loaded one resource, which
+	# is what the pack size depends on and what a URI that quietly failed to
+	# resolve would break — the importer's fallback for an unreachable URI is to
+	# embed the image in the material, per style, silently.
+	var first: Texture2D = null
+	for style: String in MeshCar.STYLES:
+		var car: MeshCar = _car_of(style)
+		var lamps: MeshInstance3D = car.skin_of(_panel(car, "Optics")) as MeshInstance3D
+		var lens: StandardMaterial3D = lamps.mesh.surface_get_material(0) as StandardMaterial3D
+		var texture: Texture2D = lens.albedo_texture
+		assert_not_null(texture, "%s: the lamps lost their texture" % style)
+		if texture == null:
+			continue
+		assert_eq(texture.resource_path, SHARED_OPTICS, "%s: lit from a copy of its own" % style)
+		if first == null:
+			first = texture
+		assert_eq(texture, first, "%s: a second copy of the one lens texture" % style)
+
+
+func test_the_styles_that_share_a_wheel_share_the_map_on_it() -> void:
+	# The same saving one step down, and the reason the rule in
+	# scripts/build-car-pack.py is "share whatever is shared" rather than "share
+	# the lens atlas": the artist modelled one wheel for the pickup and the SUV
+	# and another for the sedan and the wagon, so those maps were baked twice
+	# each. Asserted through the tyre's own material, which is the pack's — the
+	# hub cap on surface 1 of an SUV wheel is body-coloured and is a different
+	# test.
+	for style: String in SHARED_WHEEL_COLOR:
+		var car: MeshCar = _car_of(style)
+		var wheel: MeshInstance3D = car.skin_of(_panel(car, "Wheel1")) as MeshInstance3D
+		var tyre: StandardMaterial3D = wheel.mesh.surface_get_material(0) as StandardMaterial3D
+		var texture: Texture2D = tyre.albedo_texture
+		assert_not_null(texture, "%s: the wheel lost its texture" % style)
+		if texture == null:
+			continue
+		var want: String = SHARED_WHEEL_COLOR[style]
+		assert_eq(texture.resource_path, want, "%s: its wheel is not on the shared map" % style)
 
 
 # ---- which car turns up -------------------------------------------------------
