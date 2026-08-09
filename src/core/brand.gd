@@ -242,9 +242,42 @@ static func badge(fill: Color, side: float) -> StyleBoxFlat:
 	return quiet_pill(fill, side)
 
 
+## The same plate for the badge the player has [i]already[/i] picked: [method
+## badge] with [method focus_ring]'s hairline around it, in full [constant WHITE].
+##
+## [b]A second channel, because the first one is colour.[/b] The equipped badge
+## is a red plate, and red against dark is a colour difference and nothing else —
+## which is the channel that fails in sunlight, at a glance, and for roughly one
+## man in twelve, and is exactly the failure the badges themselves stopped relying
+## on. A ring survives all three: greyscale the screen and the equipped badge is
+## still the only one with a bright edge drawn round it.
+##
+## [constant FOCUS_RING_WIDTH] and the ring's own geometry rather than a new
+## number, for [method badge]'s reason — a second definition of the same edge is
+## free to drift from the first. Full [constant WHITE] rather than
+## [constant FOCUS_RING_ALPHA] because this one is not marking where the keyboard
+## is, it is marking what you are holding, and a keyboard focused on some other
+## badge still has to be able to say so over the top of it.
+static func picked_badge(fill: Color, side: float) -> StyleBoxFlat:
+	var box: StyleBoxFlat = badge(fill, side)
+	box.set_border_width_all(FOCUS_RING_WIDTH)
+	box.border_color = WHITE
+	return box
+
+
 ## [param albedo] as it should be [i]drawn on a badge[/i]: the tool's own colour,
 ## lightened only as far as it takes to clear [constant BADGE_CONTRAST] against
-## [constant PANEL].
+## the plate it is being drawn on — [constant PANEL] unless [param against] says
+## otherwise.
+##
+## [b]The plate is a parameter because there are two of them.[/b] Four badges sit
+## on [constant PANEL] and the one in the player's hands sits on [constant RED],
+## which is the brighter of the two by a factor of twenty-six — so a tint that
+## clears the floor on the dark plate can be well under it on the red one, and the
+## belt used to dodge that by drawing the equipped tool as a flat white
+## silhouette. A multi-tone sprite cannot go all-white without throwing away the
+## readability it exists for, so the lift is asked the same question against
+## whichever plate is actually behind it instead.
 ##
 ## [b]The distinction this function exists to make.[/b] A tool's albedo is what
 ## it is made of — the near-black plastic of a bottle, which is correct in a lit
@@ -257,15 +290,16 @@ static func badge(fill: Color, side: float) -> StyleBoxFlat:
 ## A no-op for a colour that already clears the floor — three of the five tools —
 ## because lightening a silver wand that is already 11:1 would be inventing a
 ## colour the tool does not have, in the name of a problem it does not have.
-static func badge_tint(albedo: Color) -> Color:
+static func badge_tint(albedo: Color, against: Color = PANEL) -> Color:
 	var tint: Color = albedo
 	for step: int in TINT_STEPS:
-		if contrast_ratio(tint, PANEL) >= BADGE_CONTRAST:
+		if contrast_ratio(tint, against) >= BADGE_CONTRAST:
 			return tint
 		tint = albedo.lightened(float(step + 1) / float(TINT_STEPS))
 	# The last step above is `lightened(1.0)`, which is white: 15:1 on the panel
-	# and 21:1 on anything darker, so this line is reached only by a floor nobody
-	# could satisfy, and returning white is the closest to satisfying it there is.
+	# and 4.8:1 on the red one, so this line is reached only by a plate no colour
+	# in this palette could be seen on, and returning white is the closest to
+	# satisfying it there is.
 	return tint
 
 

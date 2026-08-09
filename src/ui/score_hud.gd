@@ -101,14 +101,18 @@ const POP_SECONDS: float = 0.75
 ## overlap than of the sound.
 const POPS: int = 8
 
-## What a patch coming clean under the jet flashes: [code]grime.gdshader[/code]'s
-## own [code]wash_flash_colour[/code], so the corner and the car throw the same
-## water.
-const WASH_TINT: Color = Color(0.55, 0.90, 1.0)
+## What a patch coming clean under the jet flashes, so the corner and the car
+## throw the same water.
+##
+## Read off [constant PatchFlash.WASH_TINT] rather than transcribed again here.
+## It used to be the literal, and the belt's sprites made that a third copy of
+## the same blue — three places one shader uniform has to reach, which is two
+## more than can be kept in step by hand.
+const WASH_TINT: Color = PatchFlash.WASH_TINT
 
 ## What the rag's pass flashes: the shader's [code]buff_flash_colour[/code], and
-## the only one of the three that is warm.
-const BUFF_TINT: Color = Color(1.0, 0.86, 0.42)
+## the only one of the three that is warm. Same source as above.
+const BUFF_TINT: Color = PatchFlash.BUFF_TINT
 
 ## Point size of the total at the design width.
 const TOTAL_FONT: int = 76
