@@ -388,8 +388,8 @@ this repository — a web export cannot fetch a font at runtime, so a typeface
 named rather than shipped is a typeface that can fail to arrive:
 
 - **"Press Start 2P"** (https://fonts.google.com/specimen/Press+Start+2P) by
-  **CodeMan38** — the display face. Headings, buttons, the car's name and the
-  score.
+  **CodeMan38** — the display face. Headings, buttons, the car's name, the score
+  and the clock, and every word of the high score table.
 - **"Silkscreen"** (https://fonts.google.com/specimen/Silkscreen) by
   **Jason Kottke** — the reading face, and the project's default. Body copy,
   captions, the build stamp and the credit line above.

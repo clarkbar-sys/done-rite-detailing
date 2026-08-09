@@ -1,6 +1,6 @@
 # Screenshots
 
-Reference renders of the four screens, at the 1280x720 design size, used in pull
+Reference renders of the five screens, at the 1280x720 design size, used in pull
 request descriptions and issue threads.
 
 They live under `.github/` on purpose. Godot's filesystem scan skips directories
