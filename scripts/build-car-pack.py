@@ -279,13 +279,22 @@ ALL_STYLES = "shared"
 # there isn't one — Godot fills in the uid, the destination path and every
 # other parameter on the next import pass and keeps them from then on.
 #
-# It exists for one line of it. Godot's own glTF importer sets
-# mipmaps/generate=true on every image it extracts from a .glb, and the texture
-# importer's default for a file that merely appears in the project is false —
-# so moving an image out of the buffer and into a file of its own would have
-# silently taken the mipmaps off it. Every one of the pack's textures had them
-# before this change (read out of the committed sidecars), and a car is a thing
-# you walk away from, so this keeps them.
+# It exists for three lines of it, each one a default that is wrong for this
+# pack and that nothing would tell you about.
+#
+# mipmaps/generate=true: Godot's own glTF importer sets it on every image it
+# extracts from a .glb, and the texture importer's default for a file that
+# merely appears in the project is false — so moving an image out of the buffer
+# and into a file of its own would have silently taken the mipmaps off it. Every
+# one of the pack's textures had them before that change (read out of the
+# committed sidecars), and a car is a thing you walk away from, so this keeps
+# them.
+#
+# compress/mode=1 (Lossy) and process/size_limit=512: what #205 measured every
+# committed sidecar in assets/models/ onto, so a texture regenerated into an
+# empty directory arrives the way the shipped ones are imported rather than
+# quietly re-inflating the pack to the lossless default. That commit's message
+# is where the per-texture reasoning is.
 IMPORT_SIDECAR = """[remap]
 
 importer="texture"
@@ -293,7 +302,9 @@ type="CompressedTexture2D"
 
 [params]
 
+compress/mode=1
 mipmaps/generate=true
+process/size_limit=512
 """
 
 # glTF component types we expect to meet in this file.

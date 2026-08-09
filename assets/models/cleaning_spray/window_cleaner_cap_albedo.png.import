@@ -18,7 +18,7 @@ dest_files=["res://.godot/imported/window_cleaner_cap_albedo.png-da04d5e2ed189ea
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

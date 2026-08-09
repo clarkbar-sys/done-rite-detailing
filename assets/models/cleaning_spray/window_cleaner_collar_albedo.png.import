@@ -18,7 +18,7 @@ dest_files=["res://.godot/imported/window_cleaner_collar_albedo.png-5eb50cbd3041
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
