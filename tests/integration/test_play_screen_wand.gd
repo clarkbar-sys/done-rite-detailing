@@ -66,6 +66,12 @@ const HELD_REACH: float = 0.45
 ## sky the moment the shot changes.
 const SKY_MARGIN: float = 60.0
 
+## How far out toward the edge the sky press may sit, as a
+## [method ThumbWalk.rho] fraction — a margin inside
+## [constant ThumbWalk.WALK_ENTER], because a press past the band is a walk
+## rather than an aim, and this suite's subject is the wand under an aim.
+const INSIDE_THE_BAND: float = 0.65
+
 var _screen: GameScreen = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
@@ -167,9 +173,20 @@ func _at_the_sky() -> Vector2:
 		_car().global_position.x, _car().bounds().end.y, _car().global_position.z
 	)
 	var sky: Vector2 = _on_screen(roof) - Vector2(0.0, SKY_MARGIN)
+	# No higher than just inside the walk band: since #179 a finger out past it
+	# walks instead of aiming, and on the tallest styles the roofline projects
+	# out past it. The clamp only ever moves the finger down the glass, and the
+	# aim it lifts — a thumb-width above — still clears every roof in the pack.
+	var half: Vector2 = Vector2(_view().size) * 0.5
+	sky.y = maxf(sky.y, half.y * (1.0 - INSIDE_THE_BAND))
 	assert_true(
 		Rect2(Vector2.ZERO, Vector2(_view().size)).has_point(sky),
 		"the sky press at %v is off the picture and would not be a press at all" % sky
+	)
+	assert_lt(
+		ThumbWalk.rho(sky - half, half),
+		ThumbWalk.WALK_ENTER,
+		"the sky press at %v is out past the walk band and would walk, not aim" % sky
 	)
 	return sky
 
