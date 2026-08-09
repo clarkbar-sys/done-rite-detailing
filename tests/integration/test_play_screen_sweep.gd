@@ -86,13 +86,16 @@ const NEAR_MISS_METRES: float = 0.25
 ## is then a box corner out in open air, and the probe misses on all ten with the
 ## aim passing 1.88 m (compact) to 2.32 m (wagon) from the middle of the car.
 ##
-## A fifth across and a seventh down, so the press is well inside the picture
-## rather than hugging an edge a letterbox could crop. Measured there on all ten:
-## the exact ray misses, a 0.4 m sweep misses, a 0.6 m sweep misses, the probe
-## misses — and a 1.2 m sphere does reach, which is what says this is a bounded
-## margin and not an aim pointed at nothing.
-const WELL_CLEAR_ACROSS: float = 0.2
-const WELL_CLEAR_DOWN: float = 0.15
+## Far enough up and across to be plainly not the car, and near enough in that
+## the [i]finger[/i] — a thumb-lift below the aim — stays inside the walk band:
+## since #179 a press out past [constant ThumbWalk.WALK_ENTER] is a walk, not
+## an aim, so a "well clear" point that hugged a corner would never cast a ray
+## at all. It used to be a fifth across and a seventh down for exactly that
+## cropped-letterbox reason; the fractions moved inboard when the band arrived,
+## and [method _the_sweep_missed] / [method _the_post_missed] go on asserting
+## on every use that the point still misses by every tier.
+const WELL_CLEAR_ACROSS: float = 0.3
+const WELL_CLEAR_DOWN: float = 0.2
 
 ## A sphere far too small to bridge [constant NEAR_MISS_METRES], and one
 ## comfortably wide enough. Neither is any tool's real radius on purpose: what is
