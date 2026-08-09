@@ -82,6 +82,15 @@ const ROLL_SECONDS: float = 0.25
 ## How much larger the total is punched on an award, as a fraction of its resting
 ## size. Small on purpose: this is the corner of the screen, not the middle of
 ## it, and a readout that doubles is a readout that is now in the way of the sky.
+##
+## [b]It arrives as one step rather than as a ramp, and that is the pixel face
+## paying for itself.[/b] [method Brand.crisp] rounds the punched size to the
+## grid, so 56 becomes 64 at the top of the flash and nothing in between exists:
+## the digits are one size or the other, and the fade back down is a single
+## snap rather than nine frames at sizes the face cannot draw evenly. That is
+## also what an arcade cabinet did with the same problem, because a sprite sheet
+## has no in-between sizes either — so the constraint and the look are the same
+## thing here, which is the whole argument for the face.
 const PUNCH: float = 0.18
 
 ## How far a [code]+250[/code] lifts before it is gone, in design pixels.
@@ -111,16 +120,32 @@ const WASH_TINT: Color = Color(0.55, 0.90, 1.0)
 const BUFF_TINT: Color = Color(1.0, 0.86, 0.42)
 
 ## Point size of the total at the design width.
-const TOTAL_FONT: int = 76
+##
+## [b]Every size on this HUD is a multiple of [constant Brand.TYPE_GRID], and
+## this is the readout that made that a rule.[/b] [constant Brand.DISPLAY_FACE]
+## is a bitmap face drawn on an eight-unit grid, so a size off that grid gives
+## some of a digit's strokes three screen pixels and others four — on a six-digit
+## number in the corner of the screen, at rest, on every frame of the game. A
+## slightly uneven [code]000000[/code] is the most-looked-at broken thing this
+## project could ship.
+##
+## 56 and not the 76 this was, because the face changed underneath it. The
+## display face advances a full em per character (see
+## [constant Brand.DISPLAY_FACE]), so six digits are exactly [code]6 x size[/code]
+## wide — 456 px at the old number, against the 426 px
+## [method _row_width] gives the column. It did not fit, and 56 is the largest
+## multiple of the grid that does with the punch on top: 336 at rest, 384
+## punched.
+const TOTAL_FONT: int = 56
 
 ## Point size of the multiplier under it.
-const RUN_FONT: int = 40
+const RUN_FONT: int = 32
 
 ## Point size of the done percentage under that. Between the multiplier and a
 ## pop: it is the one number on this HUD that is true all the time rather than
 ## for a moment, so it should be readable at a glance and never be the thing the
 ## eye goes to first.
-const DONE_FONT: int = 34
+const DONE_FONT: int = 24
 
 ## What the done percentage rests at. [constant Brand.MUTED] like the total, and
 ## for the same reason — it never flashes, so it never needs a colour to fall back
@@ -128,7 +153,7 @@ const DONE_FONT: int = 34
 const DONE_TINT: Color = Brand.MUTED
 
 ## Point size of a pop.
-const POP_FONT: int = 36
+const POP_FONT: int = 24
 
 ## How thick the outline under every number is. The same treatment the panel
 ## readout gets and for the same reason: what is behind this corner is sometimes
@@ -172,6 +197,7 @@ func _ready() -> void:
 		pop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		pop.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		pop.add_theme_font_size_override("font_size", POP_FONT)
+		pop.add_theme_font_override("font", Brand.DISPLAY_FACE)
 		pop.add_theme_color_override("font_outline_color", Color(Brand.INK, 0.7))
 		pop.add_theme_constant_override("outline_size", OUTLINE)
 		pop.visible = false
@@ -183,6 +209,12 @@ func _ready() -> void:
 	_run_label.visible = false
 	_done_label.add_theme_font_size_override("font_size", DONE_FONT)
 	_done_label.add_theme_color_override("font_color", DONE_TINT)
+	# The whole column, including the pops built above: this is the money, and the
+	# money is the one thing on the screen that has to look like a cabinet. The
+	# project's default face is the readable one — see project.godot — so the
+	# digits would otherwise come out in the caption face.
+	for row: Label in [_total_label, _run_label, _done_label]:
+		row.add_theme_font_override("font", Brand.DISPLAY_FACE)
 	_print_done()
 	_paint()
 	_relayout()
@@ -420,7 +452,8 @@ func _paint() -> void:
 	var lit: Color = Brand.MUTED.lerp(_tint, _flash)
 	_total_label.add_theme_color_override("font_color", lit)
 	_run_label.add_theme_color_override("font_color", _tint)
-	var punched: int = roundi(float(TOTAL_FONT) * (1.0 + PUNCH * _flash))
+	# Snapped to the face's own grid rather than eased through it. See PUNCH.
+	var punched: int = Brand.crisp(roundi(float(TOTAL_FONT) * (1.0 + PUNCH * _flash)))
 	_total_label.add_theme_font_size_override("font_size", punched)
 
 

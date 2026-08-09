@@ -1,0 +1,25 @@
+The two typefaces the game is set in. Both are under the SIL Open Font Licence
+1.1, and the licence text for each is in this folder beside the font it covers.
+
+"Press Start 2P" (https://fonts.google.com/specimen/Press+Start+2P) by CodeMan38
+(cody@zone38.net), with Reserved Font Name "Press Start 2P". Copyright 2012 The
+Press Start 2P Project Authors. Licence: PressStart2P-OFL.txt.
+
+    Used as Brand.DISPLAY_FACE — headings, buttons, the car's name, the score.
+
+"Silkscreen" (https://fonts.google.com/specimen/Silkscreen) by Jason Kottke.
+Copyright 2001 The Silkscreen Project Authors
+(https://github.com/googlefonts/silkscreen). Licence: Silkscreen-OFL.txt.
+
+    Used as Brand.BODY_FACE, and named in project.godot as the project's default
+    theme font — body copy, captions, the build stamp, the credit line.
+
+Both files are the unmodified Google Fonts releases, committed rather than
+fetched: the game ships as a web export, and a typeface that has to arrive over
+the network before the first frame is a typeface that can fail to arrive.
+
+Neither licence asks for attribution in the running game, which is why these two
+are not on the menu's credit line — that line exists for the CC-BY 4.0 models,
+where attribution is a condition of the licence rather than a courtesy. What the
+OFL does require is that the licence travel with the font, which is what the two
+.txt files here are. The same credit is repeated in README.md.

@@ -84,6 +84,6 @@ offset_left = -320.0
 offset_top = 16.0
 offset_right = -16.0
 grow_horizontal = 0
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 20
 text = "v0.0.0 (local)"
 horizontal_alignment = 2

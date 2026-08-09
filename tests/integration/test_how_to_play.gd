@@ -19,10 +19,13 @@
 ##
 ## [b]The other two are here because they were found in a browser, on a phone,
 ## after this screen had already shipped once.[/b]
-## [method test_the_font_can_draw_every_word] pins the glyphs: this project
-## ships no font of its own, so everything is drawn in Godot's built-in Open
-## Sans, and a character it does not have is not an error — it is a tofu box on
-## a released build. [method test_the_sheet_fits_a_phone_held_upright] pins the
+## [method test_the_font_can_draw_every_word] pins the glyphs: a character the
+## face does not have is not an error — it is a tofu box on a released build.
+## It was written when everything was drawn in Godot's built-in Open Sans and it
+## is worth more since #174, not less: the game now ships two faces of its own,
+## both of them pixel faces with far thinner glyph sets than a Google-scale web
+## sans, and this screen carries the guillemets and the em dashes.
+## [method test_the_sheet_fits_a_phone_held_upright] pins the
 ## shape: the design is 16:9 and stretched "expand", so a portrait handset hands
 ## this screen nearly four times the height it was laid out against, and every
 ## other assertion in this file was made at exactly 1280x720, where that cannot
@@ -213,10 +216,16 @@ func test_the_buttons_are_the_last_thing_and_are_on_it() -> void:
 
 func test_the_font_can_draw_every_word() -> void:
 	# The bug this pins, measured rather than imagined: the bottom two buttons
-	# shipped reading "◀ Main Menu" and "Play ▶", and Godot's built-in Open Sans
-	# has no geometric shapes block, so both arrows drew as tofu boxes on a real
-	# phone. A missing glyph is not an error and not a warning — it is a rectangle
-	# in a released build, and nothing else in this project would ever mention it.
+	# shipped reading "◀ Main Menu" and "Play ▶", and Godot's built-in Open Sans —
+	# what the whole game was drawn in then — has no geometric shapes block, so
+	# both arrows drew as tofu boxes on a real phone. A missing glyph is not an
+	# error and not a warning — it is a rectangle in a released build, and nothing
+	# else in this project would ever mention it.
+	#
+	# `get_theme_font` and not Brand.DISPLAY_FACE/BODY_FACE by name, which is the
+	# point of asking the control: this screen sets a face per role, so what is
+	# under test is the face the label will actually be drawn in rather than the
+	# one this test assumed it would be.
 	#
 	# The buttons *and* the labels, and the buttons are the reason this comment
 	# says so: the first version of this test walked the labels only, which is
@@ -414,6 +423,32 @@ func test_the_headings_are_red_and_the_body_is_not() -> void:
 			whites += 1
 	assert_eq(reds, 7, "four rules and three passes, each with a heading")
 	assert_eq(whites, 7, "and each with a body")
+
+
+func test_a_heading_is_chunky_and_a_sentence_is_readable() -> void:
+	# The same walk-by-node-name that colours this screen also sets its face, and
+	# for the same reason: on a rules sheet "heading" and "paragraph" are one
+	# decision made twice, and a row that came out red and readable is a heading
+	# that has stopped looking like one. This is also the screen where getting it
+	# backwards is worst — seven hundred characters of body copy in a face that
+	# advances a whole em per character does not wrap, it overflows, and
+	# `test_every_word_of_the_rules_is_visible` would report it as clipping with
+	# no hint as to why.
+	var headings: int = 0
+	var bodies: int = 0
+	for label: Label in _labels(_screen):
+		if label.name == "Heading":
+			assert_eq(label.get_theme_font("font"), Brand.DISPLAY_FACE, "%s" % label.get_path())
+			headings += 1
+		elif label.name == "Body":
+			assert_eq(label.get_theme_font("font"), Brand.BODY_FACE, "%s" % label.get_path())
+			bodies += 1
+	assert_eq(headings, 7, "four rules and three passes, each with a heading")
+	assert_eq(bodies, 7, "and each with a body")
+	var title: Label = _screen.get_node("%Title") as Label
+	assert_eq(title.get_theme_font("font"), Brand.DISPLAY_FACE, "the title of the sheet")
+	var subtitle: Label = _screen.get_node("%Subtitle") as Label
+	assert_eq(subtitle.get_theme_font("font"), Brand.BODY_FACE, "the caption beside it")
 
 
 func test_the_rule_under_the_title_is_the_accent() -> void:
