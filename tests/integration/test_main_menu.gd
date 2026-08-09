@@ -1,5 +1,5 @@
-## Integration test for the main menu: the lockup, the two pills, and which
-## transition each of them asks for.
+## Integration test for the main menu: the lockup, the three pills, and which
+## transition — and which mode — each of them asks for.
 ##
 ## Under tests/integration/ for [code]test_title_screen.gd[/code]'s reason —
 ## every fact here is established in `_ready()`, so nothing below can be
@@ -11,8 +11,9 @@
 ## touch-target arithmetic and the tap-versus-click behaviour are all
 ## [code]test_title_screen.gd[/code]'s, and the mechanism is shared —
 ## [method GameScreen.dress_loud] and one Button. What is tested here is what is
-## different: that there are two of them, that they are dressed differently, and
-## that they lead to different places.
+## different: that there are three of them, that they are dressed differently,
+## that they lead to different places — and, for the two that lead to the same
+## place, that they get there with a different clock.
 extends GutTest
 
 const MAIN_MENU: String = "res://src/screens/main_menu.tscn"
@@ -72,6 +73,7 @@ var _faded: Array[float] = []
 var _window_size_before: Vector2i = Vector2i.ZERO
 var _muted_before: bool = false
 var _chosen_before: String = ""
+var _mode_before: GameMode.Kind = GameMode.Kind.ARCADE
 
 
 func before_each() -> void:
@@ -92,6 +94,11 @@ func before_each() -> void:
 	# one. Put back in after_each, like the window size below.
 	_muted_before = Sound.muted
 	Sound.set_muted(false)
+	# And the mode, for CarChoice's reason word for word: pressing either of the
+	# two mode pills writes a process-wide field that every later suite's play
+	# screen would then read.
+	_mode_before = GameMode.chosen
+	GameMode.forget()
 	# A headless window is 64x64 — smaller than either button, small enough that
 	# a tap at a button's own coordinates lands outside the layout entirely.
 	# `content_scale_size` is the design resolution from project.godot, so this
@@ -122,6 +129,7 @@ func after_each() -> void:
 	get_tree().root.size = _window_size_before
 	Sound.set_muted(_muted_before)
 	CarChoice.choose(_chosen_before)
+	GameMode.choose(_mode_before)
 
 
 func _record(state: GameState) -> void:
@@ -136,12 +144,29 @@ func _record_fade(seconds: float) -> void:
 	_faded.append(seconds)
 
 
-func _play_button() -> Button:
-	return _screen.get_node("%Play") as Button
+func _arcade_button() -> Button:
+	return _screen.get_node("%Arcade") as Button
+
+
+func _simulation_button() -> Button:
+	return _screen.get_node("%Simulation") as Button
 
 
 func _how_to_play_button() -> Button:
 	return _screen.get_node("%HowToPlay") as Button
+
+
+## The two pills that lead into the bay, in the order they are drawn.
+func _mode_buttons() -> Array[Button]:
+	return [_arcade_button(), _simulation_button()]
+
+
+## Every pill on the screen. The car arrows are buttons too and are deliberately
+## not in here — they are an icon on a round plate, which is
+## [code]src/ui/car_arrow.gd[/code]'s shape and
+## [code]tests/integration/test_main_menu_cars.gd[/code]'s suite.
+func _pills() -> Array[Button]:
+	return [_arcade_button(), _simulation_button(), _how_to_play_button()]
 
 
 ## The box [param credits] actually draws its lines in.
@@ -423,7 +448,7 @@ func test_the_two_faces_are_used_for_the_two_jobs_they_are_for() -> void:
 	# and is not. Set the credit in the display face and it wraps to a wall over
 	# the buttons — which is what `test_the_credit_does_not_cross_the_button`
 	# would then catch, one failure later than this.
-	for pill: Button in [_play_button(), _how_to_play_button()]:
+	for pill: Button in _pills():
 		assert_eq(pill.get_theme_font("font"), Brand.DISPLAY_FACE, "%s must be chunky" % pill.name)
 	assert_eq(
 		(_screen.get_node("%CarName") as Label).get_theme_font("font"),
@@ -447,39 +472,46 @@ func test_the_credit_is_legible_over_a_lit_driveway() -> void:
 	assert_gt(credits.get_theme_constant("outline_size"), 0, "grey type needs a shadow here")
 
 
-# ---- two buttons, and only one of them is the answer -------------------------
+# ---- three buttons, and only one of them is the answer -----------------------
 
 
-func test_it_offers_both_ways_on() -> void:
-	assert_not_null(_play_button(), "the menu must offer Play")
+func test_it_offers_all_three_ways_on() -> void:
+	assert_not_null(_arcade_button(), "the menu must offer the arcade run")
+	assert_not_null(_simulation_button(), "and the simulation")
 	assert_not_null(_how_to_play_button(), "and How to Play")
 
 
-func test_play_is_the_one_red_thing_on_the_screen() -> void:
-	# The whole reason the second pill is dark. [constant Brand.RED] is the
+func test_the_arcade_is_the_one_red_thing_on_the_screen() -> void:
+	# The whole reason the other two pills are dark. [constant Brand.RED] is the
 	# site's one accent — worn by the thing you are meant to press and by
 	# nothing else — and a menu with two of them leaves the eye nowhere to land.
-	var loud: StyleBoxFlat = _play_button().get_theme_stylebox("normal") as StyleBoxFlat
-	var quiet: StyleBoxFlat = _how_to_play_button().get_theme_stylebox("normal") as StyleBoxFlat
-	assert_not_null(loud, "Play must be a brand pill, not the theme's button")
-	assert_not_null(quiet, "How to Play must be a brand pill, not the theme's button")
-	if loud == null or quiet == null:
+	# Which of the three wears it is the arcade, because the answer to "how do I
+	# play this" is still the timed run — src/screens/main_menu.gd has that.
+	var loud: StyleBoxFlat = _arcade_button().get_theme_stylebox("normal") as StyleBoxFlat
+	assert_not_null(loud, "Arcade must be a brand pill, not the theme's button")
+	if loud == null:
 		return
-	assert_eq(loud.bg_color, Brand.RED, "Play is the answer, so Play is red")
-	assert_eq(quiet.bg_color, Brand.PANEL, "How to Play is the card's colour, not a second accent")
+	assert_eq(loud.bg_color, Brand.RED, "Arcade is the answer, so Arcade is red")
+	for button: Button in [_simulation_button(), _how_to_play_button()]:
+		var quiet: StyleBoxFlat = button.get_theme_stylebox("normal") as StyleBoxFlat
+		assert_not_null(quiet, "%s must be a brand pill, not the theme's button" % button.name)
+		if quiet == null:
+			continue
+		assert_eq(quiet.bg_color, Brand.PANEL, "%s must not be a second accent" % button.name)
 
 
-func test_the_quiet_pill_still_has_an_edge() -> void:
+func test_the_quiet_pills_still_have_an_edge() -> void:
 	# A dark shape over a lit garage with no lit edge is a hole cut in the room
 	# rather than a button sitting on it — [method Brand.quiet_pill]'s argument,
 	# and the one thing that separates it from a rectangle of panel colour.
-	var quiet: StyleBoxFlat = _how_to_play_button().get_theme_stylebox("normal") as StyleBoxFlat
-	assert_eq(quiet.border_width_top, 1, "How to Play must carry the card's hairline")
-	assert_eq(quiet.border_color, Brand.LINE)
+	for button: Button in [_simulation_button(), _how_to_play_button()]:
+		var quiet: StyleBoxFlat = button.get_theme_stylebox("normal") as StyleBoxFlat
+		assert_eq(quiet.border_width_top, 1, "%s must carry the card's hairline" % button.name)
+		assert_eq(quiet.border_color, Brand.LINE)
 
 
-func test_both_pills_are_round_ended_at_the_size_they_are_drawn() -> void:
-	for button: Button in [_play_button(), _how_to_play_button()]:
+func test_every_pill_is_round_ended_at_the_size_it_is_drawn() -> void:
+	for button: Button in _pills():
 		var box: StyleBoxFlat = button.get_theme_stylebox("normal") as StyleBoxFlat
 		assert_eq(
 			box.corner_radius_top_left,
@@ -491,7 +523,7 @@ func test_both_pills_are_round_ended_at_the_size_they_are_drawn() -> void:
 func test_every_face_of_every_button_is_dressed() -> void:
 	# Hover and pressed fall back to the theme's grey if they are not overridden,
 	# which would strand a default button at the one moment it is being used.
-	for button: Button in [_play_button(), _how_to_play_button()]:
+	for button: Button in _pills():
 		for state: String in ["normal", "hover", "pressed", "focus"]:
 			assert_true(
 				button.has_theme_stylebox_override(state),
@@ -499,25 +531,42 @@ func test_every_face_of_every_button_is_dressed() -> void:
 			)
 
 
-func test_both_buttons_are_big_enough_for_a_finger() -> void:
+func test_every_button_is_big_enough_for_a_finger() -> void:
 	# The bug this pins is the one the title card already shipped: a button below
 	# this floor is ~18 CSS px on a phone, and most taps miss it. [TouchTarget]
 	# has the arithmetic and the sources.
 	var minimum: float = TouchTarget.min_design_size()
-	for button: Button in [_play_button(), _how_to_play_button()]:
+	for button: Button in _pills():
 		assert_gte(button.size.x, minimum, "%s is too narrow to hit on a phone" % button.name)
 		assert_gte(button.size.y, minimum, "%s is too short to hit on a phone" % button.name)
 
 
-func test_play_holds_the_focus_when_the_menu_opens() -> void:
+func test_the_arcade_holds_the_focus_when_the_menu_opens() -> void:
 	# So the flow is drivable from a keyboard or a pad without a mouse, and on
-	# the button that is already drawn as the answer — a focus ring round the
-	# quiet pill would disagree with the colour.
+	# the button that is already drawn as the answer — a focus ring round one of
+	# the quiet pills would disagree with the colour.
 	assert_eq(
 		_screen.get_viewport().gui_get_focus_owner(),
-		_play_button(),
-		"the menu must open with Play under the keyboard"
+		_arcade_button(),
+		"the menu must open with Arcade under the keyboard"
 	)
+
+
+func test_the_two_modes_do_not_run_into_the_car_arrows() -> void:
+	# The arithmetic src/screens/main_menu.tscn does out loud, measured rather
+	# than trusted: the two mode pills are a row across the middle of a screen
+	# whose edges belong to the arrows, and a row that grew — a longer word, a
+	# bigger face — would be a pill drawn over a control a player is expected to
+	# press several times in a row. Measured in the viewport this suite runs in,
+	# which before_each has set to the design size.
+	for arrow: Button in [
+		_screen.get_node("%PreviousCar") as Button, _screen.get_node("%NextCar") as Button
+	]:
+		for pill: Button in _mode_buttons():
+			assert_false(
+				pill.get_global_rect().intersects(arrow.get_global_rect()),
+				"%s is drawn over %s" % [pill.name, arrow.name]
+			)
 
 
 # ---- where each of them leads ------------------------------------------------
@@ -529,14 +578,40 @@ func test_it_asks_for_nothing_on_its_own() -> void:
 	assert_eq(_faded.size(), 0, "and must not touch the music it was handed")
 
 
-func test_play_asks_for_the_play_state() -> void:
+func test_both_modes_ask_for_the_play_state() -> void:
 	# Through the button's own signal rather than by calling the handler, so a
 	# connection dropped in `_ready()` fails here rather than in the browser.
-	_play_button().pressed.emit()
-	assert_eq(_requested.size(), 1, "Play must request exactly one transition")
-	if _requested.size() != 1:
-		return
-	assert_true(_requested[0] is PlayGameState, "Play must open the game")
+	#
+	# One state for both pills, and that is the design rather than an oversight:
+	# a mode is a length the clock is built with, not a place the game can be in,
+	# so there is one play screen and it reads the mode on the way up.
+	for pill: Button in _mode_buttons():
+		_requested = []
+		pill.pressed.emit()
+		assert_eq(_requested.size(), 1, "%s must request exactly one transition" % pill.name)
+		if _requested.size() != 1:
+			return
+		assert_true(_requested[0] is PlayGameState, "%s must open the game" % pill.name)
+
+
+func test_each_pill_chooses_its_own_mode() -> void:
+	_arcade_button().pressed.emit()
+	assert_eq(GameMode.chosen, GameMode.Kind.ARCADE, "Arcade must ask for the clock")
+	_simulation_button().pressed.emit()
+	assert_eq(GameMode.chosen, GameMode.Kind.SIMULATION, "Simulation must take it off")
+
+
+func test_the_mode_is_chosen_before_the_screen_is_asked_to_leave() -> void:
+	# `request_transition` frees this screen synchronously and the play screen
+	# reads the mode in its own `_ready`, which has already run by the time the
+	# line after a transition would execute. So the order is load-bearing rather
+	# than tidy: a mode written afterwards is a mode the run never saw.
+	var seen: Array[GameMode.Kind] = []
+	_screen.transition_requested.connect(
+		func(_state: GameState) -> void: seen.append(GameMode.chosen)
+	)
+	_simulation_button().pressed.emit()
+	assert_eq(seen, [GameMode.Kind.SIMULATION] as Array[GameMode.Kind])
 
 
 func test_how_to_play_asks_for_the_rules() -> void:
@@ -547,21 +622,30 @@ func test_how_to_play_asks_for_the_rules() -> void:
 	assert_true(_requested[0] is HowToPlayGameState, "How to Play must open the rules")
 
 
-func test_play_rings_the_counter_bell() -> void:
+func test_either_mode_rings_the_counter_bell() -> void:
 	# The ding moved here from the title card's Start when Start stopped opening
 	# the game: [constant Bell.Voice.START] means the job starts, and this is
-	# where the job starts.
-	_play_button().pressed.emit()
-	assert_eq(_rung, [Bell.Voice.START] as Array[Bell.Voice], "Play must ding once")
+	# where the job starts — in either mode, because in either mode a job is what
+	# starts.
+	for pill: Button in _mode_buttons():
+		_rung = []
+		pill.pressed.emit()
+		assert_eq(_rung, [Bell.Voice.START] as Array[Bell.Voice], "%s must ding once" % pill.name)
 
 
-func test_play_asks_for_a_fade_rather_than_a_stop() -> void:
-	_play_button().pressed.emit()
-	assert_eq(_faded.size(), 1, "Play did not ask for the music to go")
-	assert_almost_eq(_faded[0], Bandstand.FADE_SECONDS, 0.001, "Play cut the music dead")
+func test_either_mode_asks_for_a_fade_rather_than_a_stop() -> void:
+	for pill: Button in _mode_buttons():
+		_faded = []
+		pill.pressed.emit()
+		assert_eq(_faded.size(), 1, "%s did not ask for the music to go" % pill.name)
+		if _faded.size() != 1:
+			return
+		assert_almost_eq(
+			_faded[0], Bandstand.FADE_SECONDS, 0.001, "%s cut the music dead" % pill.name
+		)
 
 
-func test_play_asks_for_the_fade_before_it_asks_to_leave() -> void:
+func test_a_mode_asks_for_the_fade_before_it_asks_to_leave() -> void:
 	# `request_transition` frees this screen synchronously, so a fade asked for
 	# afterwards would be emitted from a node on its way out. It survives either
 	# way, because the host is already connected, but the version that does not
@@ -569,7 +653,7 @@ func test_play_asks_for_the_fade_before_it_asks_to_leave() -> void:
 	var order: Array[String] = []
 	_screen.music_stop_requested.connect(func(_seconds: float) -> void: order.append("fade"))
 	_screen.transition_requested.connect(func(_state: GameState) -> void: order.append("leave"))
-	_play_button().pressed.emit()
+	_arcade_button().pressed.emit()
 	assert_eq(order, ["fade", "leave"] as Array[String])
 
 
@@ -596,7 +680,7 @@ func test_the_menu_offers_the_sound_toggle_too() -> void:
 
 func test_pressing_it_opens_neither_door() -> void:
 	_sound_toggle().pressed.emit()
-	assert_eq(_requested.size(), 0, "muting is not Play and it is not How to Play")
+	assert_eq(_requested.size(), 0, "muting is not a game and it is not How to Play")
 	assert_eq(_rung.size(), 0, "and it must not ring the bell that means the job started")
 	assert_eq(_faded.size(), 0, "and it must not touch the theme it is about to silence")
 
@@ -630,18 +714,35 @@ func _tap(at: Vector2) -> void:
 	Input.flush_buffered_events()
 
 
-func test_a_tap_on_play_opens_the_game() -> void:
-	_tap(_play_button().get_global_rect().get_center())
+func test_a_tap_on_the_arcade_opens_the_game() -> void:
+	_tap(_arcade_button().get_global_rect().get_center())
 	await wait_process_frames(1)
-	assert_eq(_requested.size(), 1, "a tap on Play must ask for the game")
+	assert_eq(_requested.size(), 1, "a tap on Arcade must ask for the game")
 	if _requested.size() != 1:
 		return
 	assert_true(_requested[0] is PlayGameState)
+	assert_eq(GameMode.chosen, GameMode.Kind.ARCADE)
+
+
+## [b]There is no tap test for Simulation, and the reason is the harness rather
+## than the pill.[/b] GUT's own runner draws its output panel over the right of
+## the viewport — measured at x = 643 and rightwards in this project, against a
+## 1280 px design — and it is a live [Control] at
+## [constant Control.MOUSE_FILTER_STOP], so a touch delivered at the right-hand
+## pill's centre (x = 852) is eaten by the runner before the menu is asked. What
+## it would be asserting is where GUT put a text box.
+##
+## Nothing is lost that the tap above does not already cover: the two pills are
+## siblings in the same row, inside the same [CenterContainer] whose
+## [member Control.mouse_filter] is the thing these tests exist to catch, and
+## [method test_each_pill_chooses_its_own_mode] drives Simulation through its own
+## signal. The pills' geometry — that neither is drawn under an arrow — is
+## measured in [method test_the_two_modes_do_not_run_into_the_car_arrows].
 
 
 func test_a_tap_on_how_to_play_opens_the_rules() -> void:
-	# The two pills are stacked and adjacent, so this is also the assertion that
-	# a tap lands on the one under the finger rather than on the bigger one
+	# The pills are stacked and adjacent, so this is also the assertion that
+	# a tap lands on the one under the finger rather than on the row
 	# above it.
 	_tap(_how_to_play_button().get_global_rect().get_center())
 	await wait_process_frames(1)

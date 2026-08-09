@@ -61,6 +61,56 @@ func test_a_frame_that_does_not_change_the_second_does_not_redraw() -> void:
 	assert_eq(_hud.shown(), 64)
 
 
+func test_a_run_with_no_clock_on_it_reads_as_the_sign() -> void:
+	# The simulation's readout. Nothing in TimeHud knows the mode exists — it is
+	# handed RunClock.UNTIMED like any other float and prints whatever the clock
+	# spells it as.
+	_hud.show_time(RunClock.UNTIMED)
+	assert_eq(_hud.text, RunClock.FOREVER_SIGN)
+	assert_eq(_hud.shown(), RunClock.FOREVER)
+
+
+func test_the_sign_is_not_a_warning() -> void:
+	# A clock that never runs out is never nearly out, so it rests in the muted
+	# ink for the whole run rather than sitting red on a screen with no red on it.
+	_hud.show_time(RunClock.UNTIMED)
+	assert_eq(_hud.get_theme_color("font_color"), TimeHud.RESTING)
+
+
+func test_the_sign_draws_once_rather_than_once_a_frame() -> void:
+	# The early-out below, at the one reading that is handed over every frame of
+	# an untimed run and never changes. It is also the collision the sentinel
+	# moved for: FOREVER is -1 and "nothing printed yet" used to be too, so a
+	# readout that compared them would have drawn the sign never rather than once.
+	_hud.show_time(RunClock.UNTIMED)
+	assert_eq(_hud.shown(), RunClock.FOREVER)
+	assert_ne(TimeHud.NOTHING_YET, RunClock.FOREVER, "the two sentinels must differ")
+
+
+func test_the_readout_can_go_from_the_sign_back_to_a_number() -> void:
+	# Unreachable in the game — a run does not change mode halfway — and asserted
+	# because the early-out is a cache and a cache that cannot be invalidated in
+	# one direction is a bug waiting for the first caller that tries.
+	_hud.show_time(RunClock.UNTIMED)
+	_hud.show_time(65.0)
+	assert_eq(_hud.text, "1:05")
+
+
+func test_the_face_can_actually_draw_the_sign() -> void:
+	# The same bug tests/integration/test_main_menu.gd pins about the credit's
+	# curly quotes: a glyph the face does not have is a tofu box in a released
+	# build rather than an error anybody would see. This is the one character in
+	# the game's own copy that is not ASCII, and it is on screen for every frame
+	# of every simulation run.
+	var font: Font = _hud.get_theme_font("font")
+	for index: int in RunClock.FOREVER_SIGN.length():
+		var glyph: int = RunClock.FOREVER_SIGN.unicode_at(index)
+		assert_true(
+			font.has_char(glyph),
+			"the clock wants U+%04X, which %s cannot draw" % [glyph, font.get_font_name()]
+		)
+
+
 func test_nothing_under_it_can_be_pressed_through() -> void:
 	# Load-bearing rather than tidy: the play screen reads aims out of _gui_input,
 	# so a readout that stopped a press would be a rectangle of the windscreen the

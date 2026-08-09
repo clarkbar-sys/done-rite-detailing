@@ -110,7 +110,7 @@ func _car_name() -> Label:
 
 
 func _play_button() -> Button:
-	return _screen.get_node("%Play") as Button
+	return _screen.get_node("%Arcade") as Button
 
 
 func _how_to_play_button() -> Button:

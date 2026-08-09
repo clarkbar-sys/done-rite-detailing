@@ -1,7 +1,8 @@
-## Unit test for [RunClock] — the three minutes a run gets, and how they read.
+## Unit test for [RunClock] — the five minutes a run gets, how they read, and
+## the run that gets no minutes at all.
 ##
 ## Under [code]tests/unit/[/code] because the clock is driven by [param delta]
-## rather than by a timestamp, which is exactly what makes a whole three-minute
+## rather than by a timestamp, which is exactly what makes a whole five-minute
 ## run one call and no waiting. What the screen does with it — starting it once
 ## the mud is on, and ending the run when it is out — is
 ## [code]tests/integration/test_play_screen_clock.gd[/code]'s.
@@ -29,7 +30,7 @@ func test_a_fresh_clock_is_not_up() -> void:
 
 
 func test_a_fresh_clock_is_not_warning() -> void:
-	assert_false(RunClock.new().is_warning(), "three minutes is not nearly out of time")
+	assert_false(RunClock.new().is_warning(), "a whole run is not nearly out of time")
 
 
 func test_a_clock_can_be_built_shorter_for_a_test() -> void:
@@ -66,8 +67,8 @@ func test_starting_a_running_clock_does_not_put_the_time_back() -> void:
 
 
 func test_a_whole_run_spent_a_frame_at_a_time_runs_out() -> void:
-	# The claim the delta-driven design is for: a three-minute run is a loop in a
-	# unit test rather than three minutes of CI.
+	# The claim the delta-driven design is for: a five-minute run is a loop in a
+	# unit test rather than five minutes of CI.
 	var clock: RunClock = RunClock.new()
 	clock.start()
 	for _frame: int in ceili(RunClock.SECONDS / FRAME):
@@ -88,6 +89,61 @@ func test_a_clock_that_has_run_out_is_up() -> void:
 	assert_false(clock.is_up())
 	clock.tick(1.0)
 	assert_true(clock.is_up())
+
+
+# ---- the clock with nothing on it ---------------------------------------------------
+
+
+func test_a_clock_can_be_built_with_no_limit_at_all() -> void:
+	assert_eq(RunClock.new(RunClock.UNTIMED).left(), RunClock.UNTIMED)
+
+
+func test_the_ordinary_clock_is_timed_and_that_one_is_not() -> void:
+	assert_true(RunClock.new().is_timed(), "five minutes is a limit")
+	assert_false(RunClock.new(RunClock.UNTIMED).is_timed())
+
+
+func test_an_untimed_clock_is_never_up() -> void:
+	# The whole design: no branch anywhere says "if simulation, do not end the
+	# run". Infinity minus a delta is infinity, and infinity is not zero.
+	var clock: RunClock = RunClock.new(RunClock.UNTIMED)
+	clock.start()
+	for _hour: int in 24:
+		clock.tick(3600.0)
+	assert_false(clock.is_up(), "a run with no clock on it ended")
+	assert_eq(clock.left(), RunClock.UNTIMED, "and the meter did not move")
+
+
+func test_an_untimed_clock_never_warns() -> void:
+	var clock: RunClock = RunClock.new(RunClock.UNTIMED)
+	clock.start()
+	clock.tick(RunClock.SECONDS * 100.0)
+	assert_false(clock.is_warning(), "there is nothing to warn about")
+
+
+func test_an_untimed_clock_still_starts_and_stops_like_the_other_one() -> void:
+	# It is the same object with a different number in it, and the parts that are
+	# about the run rather than about the time still have to work.
+	var clock: RunClock = RunClock.new(RunClock.UNTIMED)
+	assert_false(clock.is_running(), "the mud has not landed yet")
+	clock.start()
+	assert_true(clock.is_running())
+
+
+func test_an_untimed_run_has_no_reading_in_seconds() -> void:
+	assert_eq(RunClock.whole_seconds(RunClock.UNTIMED), RunClock.FOREVER)
+
+
+func test_an_untimed_run_reads_as_the_sign() -> void:
+	assert_eq(RunClock.spell(RunClock.UNTIMED), RunClock.FOREVER_SIGN)
+
+
+func test_the_untimed_reading_is_not_a_second_count() -> void:
+	# What TimeHud's early-out depends on: FOREVER has to be a value
+	# `whole_seconds` cannot produce for a real number of seconds, or a readout
+	# comparing the two would stop drawing.
+	for seconds: float in [0.0, 0.001, 1.0, RunClock.SECONDS, RunClock.SECONDS * 1000.0]:
+		assert_ne(RunClock.whole_seconds(seconds), RunClock.FOREVER)
 
 
 # ---- the warning ------------------------------------------------------------------
@@ -113,7 +169,7 @@ func test_the_warning_stays_on_once_the_time_is_up() -> void:
 
 
 func test_a_full_clock_reads_as_the_whole_run() -> void:
-	assert_eq(RunClock.spell(RunClock.SECONDS), "3:00")
+	assert_eq(RunClock.spell(RunClock.SECONDS), "5:00")
 
 
 func test_the_seconds_are_zero_padded_and_the_minutes_are_not() -> void:
@@ -123,9 +179,9 @@ func test_the_seconds_are_zero_padded_and_the_minutes_are_not() -> void:
 
 func test_the_reading_rounds_up() -> void:
 	# The arcade convention, and the reason: a clock counting down shows the time
-	# you have left, so 3:00 is on screen for the whole of the first second and
+	# you have left, so 5:00 is on screen for the whole of the first second and
 	# 0:00 arrives exactly when there is nothing left rather than a second early.
-	assert_eq(RunClock.spell(RunClock.SECONDS - 0.001), "3:00")
+	assert_eq(RunClock.spell(RunClock.SECONDS - 0.001), "5:00")
 	assert_eq(RunClock.spell(0.001), "0:01")
 
 

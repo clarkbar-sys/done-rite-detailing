@@ -142,11 +142,11 @@
 ## screen asks to be replaced by [JobDoneGameState]. See
 ## [method _hand_in_the_job].
 ##
-## [b]A run ends two ways, and the clock is the one that actually fires.[/b]
-## [RunClock] gives the player three minutes, and [method Grime.shine] reaching
-## one ends it early — finishing the whole car is about a thousand patches, so
-## that is the win condition rather than the usual one. Both land in the same
-## place and the only difference downstream is a heading:
+## [b]A run ends two ways, and in the arcade the clock is the one that actually
+## fires.[/b] [RunClock] gives the player five minutes, and [method Grime.shine]
+## reaching one ends it early — finishing the whole car is about a thousand
+## patches, so that is the win condition rather than the usual one. Both land in
+## the same place and the only difference downstream is a heading:
 ## [method RunResult.remember] carries which it was.
 ##
 ## The clock is the reason there is a run at all rather than an afternoon. It
@@ -154,6 +154,22 @@
 ## done", which is the question a score answers and the one two players can
 ## compare — [RunClock] has the rest of that argument, and the number is on it
 ## rather than here.
+##
+## [b]Which leaves the third ending, and it is the one the simulation needs.[/b]
+## A run at [constant RunClock.UNTIMED] has no clock to fire, so without
+## something else the only way out of the bay is a thousand patches or the
+## browser's reload button — a room the player cannot leave. So an untimed run
+## gets one control the timed one does not: a pill that hands the job in where it
+## stands. It is the same exit through the same function; what it is not is a
+## pause, and the paragraph at the bottom of these docs about a Back button still
+## stands, because handing the job in is a run [i]ending[/i] rather than a run
+## being suspended.
+##
+## [b]The pill is only there when there is no clock[/b], and that is not tidiness
+## either. An arcade run already ends on its own, so a button that ended it early
+## would be a way to throw a run away by fumbling the glass — and this screen
+## reads a tap anywhere as an aim, which makes every control on it a hole in the
+## car. One hole, in the mode that cannot do without it.
 ##
 ## [b]It is started on [signal Garage.grimed] and not in [method Node._ready].[/b]
 ## Laying the mud on casts tens of thousands of rays at the car and is the longest
@@ -225,16 +241,27 @@ const MOUSE_FINGER: int = -2
 ## so a car with anything left on it cannot reach this either.
 const FINISHED: float = 0.9999
 
-## How long this run gets, in seconds.
+## What [member run_seconds] means when nobody has overridden it: ask the mode.
 ##
-## [b]An export purely so a suite can run a whole run out in a frame.[/b] Three
+## A negative length rather than a zero one, because zero is a run that is over
+## before it starts and a suite is entitled to ask for exactly that.
+## [method _run_length] — the one reader — takes any negative length to mean the
+## same thing, so this is the value the export ships with rather than a magic
+## number that has to be matched exactly.
+const AS_THE_MODE_SAYS: float = -1.0
+
+## How long this run gets, in seconds, or [constant AS_THE_MODE_SAYS] to let
+## [method GameMode.seconds_for] decide.
+##
+## [b]An export purely so a suite can run a whole run out in a frame.[/b] Five
 ## minutes of real time is not a thing a headless test can wait for, and the end
 ## of a run is the one path on this screen that had nothing exercising it. Set
 ## before the node enters the tree, the same seam
 ## [code]src/screens/job_done.gd[/code] gives its save path and
 ## [code]tests/integration/test_play_screen_done.gd[/code] uses to pin the car it
-## wants. Nothing in the game ever sets it.
-@export var run_seconds: float = RunClock.SECONDS
+## wants. Nothing in the game ever sets it — what the game sets is the mode, one
+## screen earlier.
+@export var run_seconds: float = AS_THE_MODE_SAYS
 
 var _belt: ToolBelt = null
 var _finger: int = NO_FINGER
@@ -271,6 +298,7 @@ var _worked: PackedFloat64Array = _fresh_work()
 @onready var _masks: GrimeDebug = $GrimeDebug
 @onready var _scoreboard: ScoreHud = $ScoreHud
 @onready var _meter: TimeHud = $TimeHud
+@onready var _finish: Button = %Finish
 
 
 func _ready() -> void:
@@ -291,8 +319,15 @@ func _ready() -> void:
 	_readout.text = ""
 	# Built here and not in the member above, because the length is an export and
 	# an export is only the scene's value once the node has been instanced.
-	_clock = RunClock.new(run_seconds)
+	_clock = RunClock.new(_run_length())
 	_meter.show_time(_clock.left())
+	# The way out of a run nothing else can end — see the class docs. Dressed
+	# quiet rather than loud because the one red thing on this screen is the
+	# clock's last thirty seconds, and a run with no clock on it should not be
+	# shouting about the way out of itself.
+	dress_quiet(_finish)
+	_finish.visible = not _clock.is_timed()
+	_finish.pressed.connect(_on_finish_pressed)
 
 
 ## Hands the room what the player is asking for, every frame.
@@ -597,12 +632,56 @@ func _show_how_far_along(grime: Grime) -> void:
 ## the reason [code]src/screens/main_menu.gd[/code] reads it that way too: the
 ## car in the bay is the answer, and a remembered one is free to disagree with it.
 func _hand_in_the_job(grime: Grime) -> void:
-	var whole: bool = grime != null and grime.shine() >= FINISHED
+	var whole: bool = _is_finished(grime)
 	if not whole and not _clock.is_up():
 		return
+	_hand_it_in(whole)
+
+
+## Writes the run down and asks for the board. The last thing this screen does,
+## from whichever of the endings got here.
+##
+## Split out of [method _hand_in_the_job] when the simulation's pill arrived, so
+## that "the run is over" is written once: the polled ending and the pressed one
+## are the same three lines, and a second copy of them is a second place to
+## forget [method Node.set_process] — which is the line that stops this being
+## called once a frame for the rest of the screen's life.
+func _hand_it_in(whole: bool) -> void:
 	set_process(false)
 	RunResult.remember(_parked_style(), _score.total(), _score.patches(), whole)
 	request_transition(JobDoneGameState.new())
+
+
+## The pill an untimed run carries: the job, handed in where it stands.
+##
+## [b]It still asks whether the car is finished[/b] rather than reporting a
+## handed-in run as unfinished on principle. A player who presses this on the
+## stroke that completes the last panel has finished the car, and the board
+## should say so — [method RunResult.remember] carries the difference and
+## [code]src/screens/job_done.gd[/code] is the only thing that reads it.
+func _on_finish_pressed() -> void:
+	_hand_it_in(_is_finished(_garage.grime()))
+
+
+## Whether [param grime] says the whole car is done — see [constant FINISHED].
+##
+## One definition, because two callers now ask and a run that ended "finished" by
+## one arithmetic and "unfinished" by the other would be a heading nobody could
+## reproduce.
+func _is_finished(grime: Grime) -> bool:
+	return grime != null and grime.shine() >= FINISHED
+
+
+## How long this run gets: what the scene was told, or what the mode says.
+##
+## The override is the export above and the reason it exists is a headless suite;
+## the mode is what the player picked on the menu. Read here rather than in
+## [method Node._ready] so the two sources have one place they are reconciled,
+## and so the reconciliation is a line a test can point at.
+func _run_length() -> float:
+	if run_seconds < 0.0:
+		return GameMode.seconds_for(GameMode.chosen)
+	return run_seconds
 
 
 ## Which of the ten is parked in the bay, or [code]""[/code] for a room parking
