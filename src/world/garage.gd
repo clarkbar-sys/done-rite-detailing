@@ -354,15 +354,26 @@ const NO_SIDE_TO_IT: float = 0.35
 @export var walkaround: bool = false
 
 ## How fast holding left or right walks the eye around the car, in degrees per
-## second. At the radius the standoff settles on, 40°/s is about 1.6 m/s along
+## second. At the radius the standoff settles on, 72°/s is about 2.8 m/s along
 ## the paint — a walk with somewhere to be, which is right for a control you have
 ## to hold down. Slower reads as a stuck button.
-@export var turn_degrees_per_second: float = 40.0
+##
+## Was 40°/s (about 1.6 m/s), which read as a trudge rather than a walk once the
+## pad had to carry the whole crossing instead of four hold-to-move arrows. 1.8×,
+## the middle of the 1.5–2× a snappy walk needs — and [ThumbStick] squares the
+## normalised deflection before this is applied, so the nudge that lined up a
+## wing at the old number is not 1.8× twitchier along with the rim.
+@export var turn_degrees_per_second: float = 72.0
 
 ## How fast holding up or down moves the eye, in metres per second. The whole
-## range below is a shade over a second and a half at this rate; the point of the
-## axis is to get an eye onto a roof or down to a sill, not to fly.
-@export var lift_metres_per_second: float = 0.9
+## range below is about 0.8 s at this rate; the point of the axis is to get an
+## eye onto a roof or down to a sill, not to fly.
+##
+## Was 0.9 m/s (a shade over a second and a half for the same range). The same
+## 1.8× as [member turn_degrees_per_second], for the same reason and behind the
+## same squared curve — one control that used to read as sluggish, raised by one
+## consistent factor.
+@export var lift_metres_per_second: float = 1.6
 
 ## The lowest the eye may be driven, in metres above the floor. Crouched at a
 ## wheel arch rather than lying under the car — there is nothing under there to
