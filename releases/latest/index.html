@@ -45,6 +45,19 @@
 	`application/boot_splash/image` in project.godot, which the exporter writes
 	out beside index.html and substitutes into `index.png` — so this file
 	names no asset and the picture has exactly one home, assets/brand/.
+
+	THE TYPEFACE IS THE ONE ASSET THIS FILE DOES NAME, AND ONLY BY FILENAME.
+	Since #174 the game is set in two committed pixel faces rather than in the
+	engine's Open Sans, and this page was the last player-facing surface still
+	printed in a web sans — the first screen anybody sees, in the one typography
+	the pass existed to remove. There is no `$GODOT_*` token for a font, and a
+	plain HTML page cannot reach into the .pck, so `make build-web` copies
+	assets/brand/fonts/Silkscreen-Regular.ttf in beside index.html and the
+	@font-face below asks for it by name, relative. That keeps the asset's one
+	home where the logo's is; the alternative was a base64 copy pasted in here,
+	which tests/unit/test_web_shell.gd forbids for the same reason it forbids
+	one of the logo. The old stack is still behind it, so a font that does not
+	arrive costs a moment of the browser's sans and nothing else.
 -->
 <html lang="en">
 	<head>
@@ -56,6 +69,32 @@ html, body, #canvas {
 	margin: 0;
 	padding: 0;
 	border: 0;
+}
+
+/* The face the game itself is set in, so the first screen anybody sees is not
+   the one screen in the whole project still printed in a web sans. This is
+   Brand.BODY_FACE — the reading half of the two-face system in
+   src/core/brand.gd, and the same file project.godot names as the default
+   theme font.
+
+   BY FILENAME AND NOT INLINED, for the reason the splash is reached through
+   index.png rather than pasted in as a data URI (see
+   tests/unit/test_web_shell.gd): assets/brand/fonts/ is the one home of the
+   typeface, and a base64 copy in here would be a second one, drifting quietly
+   from the one the game draws with. `make build-web` copies the .ttf in beside
+   index.html after the export, which is why the URL is relative and bare.
+
+   It is a request over the network, which the fonts were committed to the repo
+   specifically to avoid — but not the same request. This one is same-origin,
+   32 KB, and made by a page that is already downloading a 39 MB bundle from
+   that host; the risk the commit was avoiding is a third-party CDN that may
+   never answer. `font-display: swap` and the old stack behind it mean the worst
+   case is the name drawn in the browser's sans for a moment, which is what it
+   was drawn in permanently before this. */
+@font-face {
+	font-family: 'Silkscreen';
+	src: url('Silkscreen-Regular.ttf') format('truetype');
+	font-display: swap;
 }
 
 body {
@@ -162,7 +201,7 @@ body {
    subtitle is: the logo has already said the name loudly once. */
 #status-name {
 	margin: 0;
-	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	font-family: 'Silkscreen', 'Noto Sans', 'Droid Sans', Arial, sans-serif;
 	font-size: 1.25rem;
 	color: #b9b9c1; /* Brand.MUTED */
 }
@@ -270,7 +309,7 @@ body {
 	border-radius: 0.5rem;
 	border: 1px solid #9b3943;
 	color: #e0e0e0;
-	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	font-family: 'Silkscreen', 'Noto Sans', 'Droid Sans', Arial, sans-serif;
 	line-height: 1.3;
 	margin: 2rem;
 	overflow: hidden;
@@ -297,7 +336,7 @@ body {
 				<div id="status-card">
 					<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
 				</div>
-				<p id="status-name">Done Rite Detailing</p>
+				<p id="status-name">Please wait&hellip;</p>
 				<progress id="status-progress"></progress>
 			</div>
 			<div id="status-notice"></div>
@@ -305,7 +344,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":39170240,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":35615900,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
