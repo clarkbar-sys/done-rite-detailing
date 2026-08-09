@@ -41,6 +41,7 @@ var _window_size_before: Vector2i = Vector2i.ZERO
 var _style_before: String = ""
 var _score_before: int = 0
 var _patches_before: int = 0
+var _finished_before: bool = false
 
 
 func before_each() -> void:
@@ -49,6 +50,7 @@ func before_each() -> void:
 	_style_before = RunResult.style
 	_score_before = RunResult.score
 	_patches_before = RunResult.patches
+	_finished_before = RunResult.finished
 	RunResult.forget()
 	_clear_the_save()
 	# A headless window is 64x64, which is smaller than one tap target, and the
@@ -61,7 +63,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	get_tree().root.size = _window_size_before
-	RunResult.remember(_style_before, _score_before, _patches_before)
+	RunResult.remember(_style_before, _score_before, _patches_before, _finished_before)
 	_clear_the_save()
 
 
@@ -70,13 +72,15 @@ func _clear_the_save() -> void:
 		DirAccess.remove_absolute(TEMP_SCORES)
 
 
-## Opens the screen on a finished run worth [param score] on [param style].
+## Opens the screen on a run worth [param score] on [param style] that ended
+## because the clock did — the ordinary case. [method _open_finished] is the
+## other one.
 ##
 ## The path is set through [method Object.set] rather than assigned: the scene's
 ## root is a [GameScreen] and the export belongs to the script on it, which is
 ## the one property in this file the type checker cannot see.
-func _open(style: String, score: int) -> void:
-	RunResult.remember(style, score, 1)
+func _open(style: String, score: int, whole: bool = false) -> void:
+	RunResult.remember(style, score, 1, whole)
 	var packed: PackedScene = load(JOB_DONE) as PackedScene
 	assert_not_null(packed, "could not load %s" % JOB_DONE)
 	if packed == null:
@@ -206,6 +210,26 @@ func test_the_board_names_the_car_it_belongs_to() -> void:
 	assert_true(
 		_label("Heading").text.ends_with(CarChoice.label_for(SEDAN)),
 		"the board did not say which car it is: %s" % _label("Heading").text
+	)
+
+
+func test_a_run_the_clock_ended_says_so() -> void:
+	_fill_the_board(SEDAN)
+	await _open(SEDAN, 1)
+	assert_true(
+		_label("Heading").text.begins_with("Time Up"),
+		"a timeout was not reported as one: %s" % _label("Heading").text
+	)
+
+
+func test_a_finished_car_is_not_reported_as_a_timeout() -> void:
+	# The one moment the game is actually asking for, and the whole reason
+	# RunResult carries which end a run got.
+	_fill_the_board(SEDAN)
+	await _open(SEDAN, 1, true)
+	assert_true(
+		_label("Heading").text.begins_with("Car Finished"),
+		"finishing the car read as running out of time: %s" % _label("Heading").text
 	)
 
 

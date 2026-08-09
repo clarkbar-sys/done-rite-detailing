@@ -33,18 +33,35 @@ static var score: int = 0
 ## score was work rather than luck with the multiplier, and it is free to keep.
 static var patches: int = 0
 
-
-## Writes down a finished run on [param car] worth [param total], over
-## [param done] patches.
+## Whether the run ended because the car was finished, rather than because
+## [RunClock] ran out.
 ##
-## A function rather than three assignments at the call site for
+## [b]Two ends and the player should be told which one they got.[/b] Finishing a
+## car inside three minutes is the thing this game is actually asking for, and a
+## screen that reported it in the same words as running out of time would be
+## taking the one moment worth celebrating and calling it a timeout. It changes
+## nothing about the score — see [code]src/screens/job_done.gd[/code], which puts
+## it in the heading and nowhere else.
+static var finished: bool = false
+
+
+## Writes down a run on [param car] worth [param total], over [param done]
+## patches, that ended because the car was [param whole] — or because the clock
+## did not care.
+##
+## A function rather than four assignments at the call site for
 ## [method CarChoice.choose]'s reason: what "the run ended" means is allowed to
 ## grow — a duration, a per-stage breakdown — and the one caller is already
 ## calling this.
-static func remember(car: String, total: int, done: int) -> void:
+##
+## The fourth argument is not called `finished` because [member finished] is, and
+## GDScript treats a parameter shadowing a member in the same class as an error
+## here — the same footnote [method Scoring.multiplier_for] carries.
+static func remember(car: String, total: int, done: int, whole: bool) -> void:
 	style = car
 	score = total
 	patches = done
+	finished = whole
 
 
 ## Whether there is a run to report.
@@ -66,3 +83,4 @@ static func forget() -> void:
 	style = ""
 	score = 0
 	patches = 0
+	finished = false

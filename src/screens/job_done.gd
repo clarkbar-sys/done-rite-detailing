@@ -121,6 +121,11 @@ var _score: int = 0
 var _style: String = ""
 var _table: Array[HighScores.Entry] = []
 
+## Whether the run ended because the car was finished rather than because the
+## clock ran out — [member RunResult.finished]. It is in the heading and nowhere
+## else: it changes nothing about the score or the board.
+var _finished: bool = false
+
 ## Which place the run took, or [constant HighScores.NOT_PLACED] for a run that
 ## did not make the board. Computed before the entry is written, which is the
 ## same index it lands at afterwards — see [method HighScores.placed].
@@ -156,6 +161,7 @@ var _cells: Array[Label] = []
 func _ready() -> void:
 	_score = RunResult.score
 	_style = RunResult.style
+	_finished = RunResult.finished
 	_table = HighScores.read_table(_style, scores_path)
 	if RunResult.handed_in():
 		_rank = HighScores.placed(_table, _score)
@@ -317,14 +323,21 @@ func _show_the_screen() -> void:
 	_play_again.grab_focus()
 
 
-## What the board is called: the car it belongs to, when there is one to name.
+## What the board is called: how the run ended, and the car it ended on.
+##
+## [b]The two ends of a run are worth different words.[/b] Finishing a car inside
+## three minutes is the thing the game is asking for, and reporting it in the same
+## sentence as running out of time would take the one moment worth celebrating and
+## call it a timeout. Nothing else on this screen knows the difference — see
+## [member RunResult.finished].
 ##
 ## A screen instanced with no run behind it — a test, or somebody opening the
-## scene — has no car and gets the plain heading rather than a dangling dash.
+## scene — has no car and no ending, and gets the plain heading rather than a
+## dangling dash.
 func _board_heading() -> String:
 	if _style.is_empty():
 		return "Top Scores"
-	return "Top Scores — %s" % CarChoice.label_for(_style)
+	return "%s — %s" % ["Car Finished" if _finished else "Time Up", CarChoice.label_for(_style)]
 
 
 ## Writes the three letters into their labels, the one under the cursor in the

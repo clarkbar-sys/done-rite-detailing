@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/grime_debug.tscn" id="5_grimedebug"]
 [ext_resource type="PackedScene" path="res://src/ui/score_hud.tscn" id="6_score"]
 [ext_resource type="Script" path="res://src/ui/sound_toggle.gd" id="7_sound"]
+[ext_resource type="Script" path="res://src/ui/time_hud.gd" id="8_time"]
 
 [node name="PlayScreen" type="Control"]
 layout_mode = 3
@@ -54,6 +55,34 @@ theme_override_colors/font_color = Color(0.95, 0.13, 0.16, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 32
+
+; The clock, along the top and centred — see src/ui/time_hud.gd, which owns
+; everything about how it looks and leaves only where it sits to this file.
+;
+; Top-centre because it is the one part of the top edge nothing else wants. The
+; panel readout runs from x=188 to x=536, and the score column is a third of the
+; screen in from the right margin (score_hud.gd's `_row_width`), which on the
+; 1280 design starts at x=853. This sits in the 317 px between them, 400 wide and
+; centred, so it stays clear of both at any screen shape rather than at this one.
+;
+; Anchored to the top edge and grown from the middle (anchors_preset 5) rather
+; than placed at a design-pixel offset: window/stretch/aspect is "expand", so a
+; portrait phone gets the design width and a great deal more height, and anything
+; measured from the top-left of a fixed rectangle would drift.
+[node name="TimeHud" type="Label" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 12.0
+offset_right = 200.0
+offset_bottom = 118.0
+grow_horizontal = 2
+text = "3:00"
+script = ExtResource("8_time")
 
 ; The score, in the top-right corner. Before the grime board in the tree so the
 ; board's toggle and its thumbnails draw over it rather than under — the two
