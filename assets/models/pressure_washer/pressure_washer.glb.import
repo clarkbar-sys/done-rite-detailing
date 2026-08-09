@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://bl77mklreeow4"
-path="res://.godot/imported/homemade_flamethrower.glb-0dc728a380abbfc9848060df59ea264d.scn"
+uid="uid://bntimtyj4hg4a"
+path="res://.godot/imported/pressure_washer.glb-68218bf26f7d841240cb6fa54e66e2a4.scn"
 
 [deps]
 
-source_file="res://assets/models/pressure_washer/homemade_flamethrower.glb"
-dest_files=["res://.godot/imported/homemade_flamethrower.glb-0dc728a380abbfc9848060df59ea264d.scn"]
+source_file="res://assets/models/pressure_washer/pressure_washer.glb"
+dest_files=["res://.godot/imported/pressure_washer.glb-68218bf26f7d841240cb6fa54e66e2a4.scn"]
 
 [params]
 

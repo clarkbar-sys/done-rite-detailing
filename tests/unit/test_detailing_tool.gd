@@ -192,12 +192,18 @@ func test_a_tool_is_a_primitive_unless_it_says_otherwise() -> void:
 	assert_eq(built.model_turn, Vector3.ZERO, "and a tool that names no turn is not turned")
 
 
-func test_only_a_model_authored_the_wrong_way_up_asks_to_be_turned() -> void:
+func test_no_model_on_the_belt_needs_righting_any_more() -> void:
 	# A turn is a correction to one asset and not a knob — see
-	# [member DetailingTool.model_turn]. Two ways it could quietly stop meaning
-	# that, and both are worth a line: a turn on a row with no model to turn is a
-	# number nothing reads, and a second tool growing one would mean the belt has
-	# started collecting artists' frames rather than fixing one.
+	# [member DetailingTool.model_turn]. The power wash was the one row that asked
+	# for one, because it was a Sketchfab flamethrower authored Z-up; since
+	# [code]#162[/code] the wand is drawn by this project the way up the game wants
+	# it and the table asks for nothing.
+	#
+	# Still asserted, and asserted this way round, because the field has not gone
+	# anywhere and the next borrowed model may well need it: a row that grows a
+	# turn is a claim about an artist's frame, and it should arrive with the
+	# reasoning rather than by nobody noticing. A turn on a row with no model to
+	# turn is the other half — a number nothing reads.
 	var turned: Array[String] = []
 	for tool_carried: DetailingTool in _tools:
 		if tool_carried.model_turn == Vector3.ZERO:
@@ -207,7 +213,7 @@ func test_only_a_model_authored_the_wrong_way_up_asks_to_be_turned() -> void:
 			"%s asks to be turned and has nothing to turn" % tool_carried.display_name
 		)
 		turned.append(tool_carried.display_name)
-	assert_eq(turned, ["Power Wash"], "the power wash is the one model authored Z-up")
+	assert_eq(turned, [], "a model is asking to be righted — say why in its row")
 
 
 func test_a_tool_keeps_what_it_was_built_with() -> void:

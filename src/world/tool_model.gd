@@ -27,27 +27,44 @@
 ## it. That is the case at its plainest: the same mesh has to arrive in the hand
 ## at two sizes, and a file can only claim one. The sponge is a second answer —
 ## a 16 cm one, which is a real sponge and is not the 24 cm the catalogue hands
-## the player. The pressure washer is a third: a download whose vertices are in
-## no unit at all — 21 of them from end to end, with the root node carrying the
-## scale that would make it metres, and this class never looks at a node.
-## Honouring any of those files would put a tool in the hand at a size nothing
-## else in the game agrees with. Reading the mesh's box instead makes the
+## the player. Honouring either file would put a tool in the hand at a size
+## nothing else in the game agrees with. Reading the mesh's box instead makes the
 ## export's scale irrelevant: re-export the same shape at any scale at all and
 ## the thing in the player's hand does not move.
+##
+## [b]The wand is the case that proves that reading is the right one[/b], by
+## being the one file that already agrees: it is drawn at exactly its catalogue
+## extent ([code]scripts/build-pressure-washer.py[/code]), so its fit works out as
+## the identity. Nothing here treats that as a special case and nothing may start
+## to — re-draw that wand at half the size and the tool in the hand must not move
+## either. It was a Sketchfab download whose vertices were in no unit at all, 21
+## of them end to end with the scale that would make them metres left on a node
+## this class never looks at, and the arithmetic that took that in is the same
+## arithmetic that takes this in.
 ##
 ## [b]Its orientation is not thrown away, and the turn that fixes one is data.[/b]
 ## The fit is axis by axis, so a mesh has to arrive with its long axis on
 ## [code]+Y[/code] and its business end at the top — which is where a
 ## [CylinderMesh] put them, and which is what [method ViewModel._build] hangs the
-## [code]Muzzle[/code] marker off. Three of the four models honour that as
-## authored. The pressure washer does not: it is a Sketchfab download whose own
-## frame is Z-up, and the barrel it is meant to spray out of is at the
-## [code]-Y[/code] end of its mesh, so fitted as it arrives the water leaves the
+## [code]Muzzle[/code] marker off. All four models on the belt honour it as
+## authored today; the power wash did not while it was a Sketchfab download whose
+## own frame was Z-up, with the barrel it is meant to spray out of at the
+## [code]-Y[/code] end of its mesh, so fitted as it arrived the water left the
 ## butt. So a model may name a turn — [member DetailingTool.model_turn] — and it
 ## is applied [i]before[/i] the box is measured, which is what keeps the
 ## catalogue's extent describing the tool the player ends up holding. In the table
 ## rather than in here, because "which way up did this artist model it" is a fact
 ## about one asset and this class must not grow a list of them.
+##
+## [b]The top of the box is a stronger promise than "which way up", and it is not
+## this class's to keep.[/b] The marker is hung at the top of the extent [i]on the
+## box's own axis[/i], so a model whose business end is the highest thing in it
+## but sits off to one side — a wand with a bottle strapped across it, sizing the
+## box by the bottle — passes every check here and still sprays out of thin air.
+## That was [code]#162[/code]. A fit cannot notice it: the box is all this class
+## is given, and where the nozzle is inside that box is a fact about the asset.
+## It is asserted where the assets are, in
+## [code]tests/integration/test_tool_model.gd[/code].
 ##
 ## [b]Fitted by rebuilding the mesh, not by scaling the node.[/b] The proxy's
 ## transform is rewritten every frame by its [ToolCarry] out of an orthonormal
