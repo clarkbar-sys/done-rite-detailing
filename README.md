@@ -159,6 +159,23 @@ other's half. There is deliberately no target and no percentage: the car still
 has spots a tool cannot reach, and a completion figure nobody can close is a
 worse thing to print on screen all game than a number that only goes up.
 
+And the score now outlives the tab it was earned in. Finish the car — the one
+moment this game can honestly call the end of a run, since there is no clock and
+no way to quit — and it asks for three letters the way a cabinet does: a wheel of
+thirty-six characters, a cursor that wraps, Up, Down, Next and Enter, and the
+arrow keys or the letter keys for anybody at a desk. What it writes is
+`user://high_scores.json`, which on the web build is IndexedDB behind
+Emscripten's filesystem, so the write is followed by the same `FS.syncfs` flush
+the sound toggle already needed — without it a score looks saved and is gone on
+the next reload. Ten places per car and not one table for all ten, because a
+wagon has more paint on it than a coupe does and a single board would be a
+ranking of which car is biggest with somebody's name beside it. A mangled save
+degrades to an empty board rather than a crash, which is the same rule the
+settings file follows and for the same reason.
+[`HighScores`](./src/core/high_scores.gd) is the board and the file,
+[`Initials`](./src/core/initials.gd) is the three-letter wheel, and
+[`job_done.tscn`](./src/screens/job_done.tscn) is the screen that draws both.
+
 And the title screen now plays it, which is what an arcade cabinet does with a
 machine nobody is standing at. Behind the logo the car is under mud and
 somebody is working it: the power wash takes a panel back to bare paint, the

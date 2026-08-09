@@ -136,6 +136,24 @@
 ## is why the readout has a second, quieter entry point that neither flashes nor
 ## pops.
 ##
+## [b]And the sixth loop is the end of the run[/b], which is the only one that
+## happens once. The room reports how far along the job is, this file watches for
+## that reaching one, and when it does the run is written down in [RunResult] and
+## the screen asks to be replaced by [JobDoneGameState]. See
+## [method _hand_in_the_job].
+##
+## [b]The car being finished is the end of the run because it is the only end
+## this game has.[/b] There is no clock, no fuel and no way to quit — the
+## paragraph below says so and gives the reason — so the one moment that can
+## honestly be called "the run is over" is [method Grime.shine] reaching one,
+## which is the same number [ScoreHud] has been printing as a percentage all
+## along. A player therefore ends a run by finishing the car, and nothing ends it
+## for them. That is a long job on a full car today, and the shape of this is what
+## makes a second way to end one — a clock, or handing the car back early — a
+## button wired to [method _hand_in_the_job] rather than a rewrite: the score is
+## already banked from [Scoring], the car is already read off the room, and
+## neither cares why the run stopped.
+##
 ## The eye walks a rail around the car and cannot look away from it, and that is
 ## a decision rather than an omission: turning your head brings a look control
 ## the phone has no thumb spare for, and walking anywhere else brings a character
@@ -185,6 +203,21 @@ const NO_FINGER: int = -1
 ## the engine hands out, and distinct from [constant NO_FINGER] — a mouse that
 ## shared the "nobody" value would be released by the first stray touch.
 const MOUSE_FINGER: int = -2
+
+## How much shine counts as the whole car being finished — see
+## [method _hand_in_the_job].
+##
+## [b]Not 1.0, and the missing ten-thousandth is not superstition.[/b]
+## [method Grime.shine] is a mean of seven panels' means over tens of thousands
+## of texels, every one of them a float, so a car whose last texel has genuinely
+## been buffed can read a hair under one — which is why
+## [code]tests/integration/test_play_screen_done.gd[/code] asserts that reading
+## with a tolerance rather than for equality. A run that ended on exactly 1.0 or
+## not at all would be a run that mostly did not end, on the one screen where
+## there is nothing else to do about it. The gap it leaves is about a tenth of
+## what one patch of a thousand-patch car is worth, so a car with anything left on
+## it cannot reach this either.
+const FINISHED: float = 0.9999
 
 var _belt: ToolBelt = null
 var _finger: int = NO_FINGER
@@ -250,6 +283,9 @@ func _process(_delta: float) -> void:
 		_masks.report(grime.remaining(), grime.shine())
 	_show_how_far_along(grime)
 	_pay_for_the_work(grime)
+	# Last, and nothing after it: this is the call that can free the screen this
+	# function is running on.
+	_hand_in_the_job(grime)
 
 
 ## Keys, for the half of the players who will never tap the [b]T[/b].
@@ -479,6 +515,46 @@ func _show_how_far_along(grime: Grime) -> void:
 	if grime == null:
 		return
 	_scoreboard.done(grime.shine())
+
+
+## Ends the run if [param grime] says the car is finished: writes down what it
+## was worth and asks for the screen that puts it on the board.
+##
+## [b]Polled, like the four things above it[/b], and for the same reason rather
+## than for want of a signal. [Grime] emits [signal Grime.patch_finished] per
+## patch and has nothing to say about the car as a whole; "every panel is done"
+## is a property of a running total, so it is read off one once a frame exactly
+## as the walk, the wage and the percentage are. A signal for it would be a
+## seventh thing [Grime] has to know it is being asked, to answer a question the
+## number it already publishes answers.
+##
+## [b][method Node.set_process] first, and it is not tidiness.[/b]
+## [method GameScreen.request_transition] reaches the host synchronously and the
+## host removes and frees this screen on the next line, so this is a function
+## that deletes the node it is running in. Turning the frame callback off first
+## means that even if the free is deferred a frame — which it is, [method
+## Node.queue_free] is — there is no second pass through here asking for a second
+## transition. The alternative, a [code]_handed_in[/code] flag, is a second piece
+## of state saying what the disabled callback already says.
+##
+## The style is read off the room rather than off [member CarChoice.chosen], for
+## the reason [code]src/screens/main_menu.gd[/code] reads it that way too: the
+## car in the bay is the answer, and a remembered one is free to disagree with it.
+func _hand_in_the_job(grime: Grime) -> void:
+	if grime == null or grime.shine() < FINISHED:
+		return
+	set_process(false)
+	RunResult.remember(_parked_style(), _score.total(), _score.patches())
+	request_transition(JobDoneGameState.new())
+
+
+## Which of the ten is parked in the bay, or [code]""[/code] for a room parking
+## something that is not one of them — which is every fixture under
+## [code]tests/fixtures/[/code], and reads as a run on no car rather than a crash
+## on the way to the board.
+func _parked_style() -> String:
+	var parked: MeshCar = _garage.car() as MeshCar
+	return "" if parked == null else parked.style
 
 
 ## A tally of nothing done, one entry per stage of the job.
