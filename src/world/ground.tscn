@@ -62,8 +62,10 @@ concrete = NodePath("Model/Sketchfab_model/Driveway_obj_cleaner_materialmerger_g
 ;   doing — the glb is authored Z-up and comes in turned, which sends the model's
 ;   +Y down the room's -Z.
 ;
-; What is deliberately NOT here: any import setting. The .import sidecars beside
-; the glb are Godot's defaults, and two of those defaults are load-bearing.
+; What is deliberately NOT here, still: any import setting. Four of them are
+; overridden below the glb and its two textures instead, beside the .import
+; sidecars they belong to and the numbers they are measurements of — see those
+; files rather than this one for what changed and why.
 ;
 ; No collision is generated, because generating it is something a glTF node asks
 ; for with a -col suffix and nothing in this model is named that way. That is the
@@ -71,12 +73,42 @@ concrete = NodePath("Model/Sketchfab_model/Driveway_obj_cleaner_materialmerger_g
 ; it is a default rather than a box somebody remembered to untick — see ground.gd
 ; on the two rays it would otherwise answer.
 ;
-; The two textures are extracted beside the glb rather than left embedded in it —
+; THE MESH, AND WHY generate_lods/create_shadow_meshes ARE OFF (#207).
+; sunken_driveway_parking_spot.glb.import used to leave both at Godot's default
+; true, and neither was buying anything: garage.tscn's one DirectionalLight3D
+; ("Key") never sets shadow_enabled, so nothing in this room has ever cast a
+; real-time shadow, and the car's own shadow is the procedural unshaded blob
+; garage.tscn draws instead (#171) — the shadow mesh baked in beside the
+; driveway had no shadow pass to be used by. Turning both off is therefore a
+; packaging change with nothing on the other side of the ledger: same
+; triangles, same vertices, same everything a shader reads. Measured off
+; .godot/imported/ after `make import`: the .scn dropped from 1,501,547 to
+; 955,311 bytes, a third of it, for the LOD copies and the shadow-only proxy
+; Godot was baking in and nothing that was ever drawn.
+;
+; THE TEXTURES, AND WHY THE #114 CONVENTION BREAKS HERE (#207). The two maps are
+; still extracted beside the glb rather than left embedded in it —
 ; sunken_driveway_parking_spot_0.jpg is the albedo and _1.png the normal map —
-; and imported lossless with mipmaps and detect_3d, which is byte for byte the
-; same set of parameters the ten cars' maps in assets/models/cars/ already carry.
-; #114 asked for a texture convention to be set deliberately the first time
-; textures arrived. They arrived with the car pack; this is that convention, and
-; the way it is kept is by not overriding it here.
+; but they are no longer imported Lossless. Every other texture in the project
+; (the ten cars, both bottles, the sponge) arrives at assets/models/ already cut
+; down to its shipped resolution by the Python bake that produced it, so
+; importing *that* Lossless costs nothing — there is no headroom left to spend.
+; The driveway was never baked: its two maps are the artist's 1024x1024 jpg and
+; png exactly as downloaded, and Lossless import of that pair cost
+; 840,980 + 951,072 = 1,792,052 pck bytes for a ground plane the showcase camera
+; never comes closer than Garage.orbit_radius (5.6 m) to. compress/mode=1
+; ("Lossy") and process/size_limit=512 on both .import files measured
+; 14,956 + 20,730 = 35,686 bytes for the same two maps — under either one alone,
+; used to cost. The files on disk do not change — sha256 the same as the
+; download, still the artist's file rather than a derivative of it — so this is
+; the import pipeline re-encoding the work for delivery, not a modification of
+; it, and the driveway keeps its "unmodified" line in the credit (#159) rather
+; than gaining the note #198 would otherwise require.
+;
+; TOGETHER: the three pck entries this model produces went from
+; 1,501,547 + 840,980 + 951,072 = 3,293,599 bytes to 955,311 + 14,956 + 20,730 =
+; 990,997 — under the 1 MiB #207 asked for. scripts/check-driveway-pack-size.gd
+; reads `make build-web`'s own .pck to say so, rather than trusting the import
+; cache the numbers above were measured from.
 [node name="Model" parent="." instance=ExtResource("2_model")]
 transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, -0.156, -0.15875, -0.309)
