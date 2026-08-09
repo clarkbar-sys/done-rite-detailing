@@ -1,7 +1,7 @@
 ## Integration test for the sound toggle as it sits on the play screen.
 ##
 ## Split out of [code]tests/integration/test_play_screen.gd[/code] for the same
-## reason the tool belt and the motion pad already are: this is a fourth loop
+## reason the tool belt and the walk already are: this is a fourth loop
 ## the screen owns and it fails for reasons of its own. What
 ## [code]tests/integration/test_sound_toggle.gd[/code] covers once — the size,
 ## the dressing, what a press does to [Sound] — is not repeated here. What is
@@ -42,9 +42,10 @@ func test_the_play_screen_carries_the_toggle() -> void:
 
 
 func test_it_sits_clear_of_every_other_corner_control() -> void:
-	# The belt owns bottom-left and the pad owns bottom-right — see
-	# src/ui/sound_toggle.gd. Measured against the actual pressable shape each
-	# one draws, not against its root [Control], which is anchored full-rect
+	# The belt owns bottom-left — see src/ui/sound_toggle.gd; the bottom-right
+	# went back to being the picture of the garage when the motion pad became a
+	# gesture (#179). Measured against the actual pressable shape the belt
+	# draws, not against its root [Control], which is anchored full-rect
 	# over the whole screen the way every HUD layer in this game is (so a finger
 	# past the belt's own corner still reaches the glass behind it) and would
 	# report an "overlap" against everything on screen.
@@ -53,11 +54,6 @@ func test_it_sits_clear_of_every_other_corner_control() -> void:
 	assert_false(
 		toggle.intersects(belt.toggle_button().get_rect()), "the sound toggle overlaps the belt"
 	)
-	var pad: MotionPad = _screen.get_node("MotionPad") as MotionPad
-	var stick: Rect2 = Rect2(
-		pad.centre() - Vector2.ONE * pad.radius(), Vector2.ONE * pad.radius() * 2.0
-	)
-	assert_false(toggle.intersects(stick), "the sound toggle overlaps the motion pad")
 
 
 func test_pressing_it_does_not_ask_the_host_for_anything() -> void:

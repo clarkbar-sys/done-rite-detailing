@@ -622,6 +622,11 @@ var _aiming: bool = false
 var _aim_at: Vector2 = Vector2.ZERO
 var _marked: String = ""
 
+## Whether the last resolved aim really landed on the car — the exact ray or
+## the swept tier, not the nearest-panel fallback, which answers for a press
+## that is plainly pointed somewhere else. See [method aim_on_panel].
+var _landed: bool = false
+
 @onready var _camera: Camera3D = %Camera
 @onready var _car: Car = %Car
 
@@ -780,6 +785,20 @@ func aim_at(where: Vector2) -> void:
 func release_aim() -> void:
 	_aiming = false
 	_held.drop()
+
+
+## Whether the aim is currently landing on a panel of the car: the exact ray or
+## the finger-forgiving sweep, and [i]not[/i] [method _nearest_on_the_car] —
+## the fallback always answers, so counting it would make this always true.
+##
+## What the play screen's walk gesture reads as its veto: a thumb still working
+## a panel may not start a walk, however far toward the edge its stroke has
+## carried it, and "still working a panel" is a fact only this room can state.
+## Re-read once a frame over there against once a tick resolved here, which is
+## the same one-tick staleness the readout has always carried. False whenever
+## nothing is aiming.
+func aim_on_panel() -> bool:
+	return _landed
 
 
 ## What the aim is drawn with, or [code]null[/code] on a screen that never took up
@@ -1083,6 +1102,7 @@ func _resolve_aim(delta: float) -> void:
 		# The noise stops on the same line for the same reason — what a tool sounds
 		# like and what it looks like are one statement, made in one place.
 		_sight.hold_fire()
+		_landed = false
 		if _racket != null:
 			_racket.hush()
 		if _marked.is_empty():
@@ -1105,6 +1125,9 @@ func _resolve_aim(delta: float) -> void:
 	# tick — but now there is one copy of the answer instead of three.
 	var held: DetailingTool = _view_model.belt().equipped()
 	var found: Dictionary = _under_the_finger(from, facing, _reach_of(held.id))
+	# `== true` rather than a bool() cast, which the type gate rejects for the
+	# Variant a Dictionary hands back.
+	_landed = found.get("on_panel", false) == true
 	if found.is_empty():
 		return
 	var surface: Vector3 = found["position"]
@@ -1291,11 +1314,17 @@ func _under_the_finger(from: Vector3, facing: Vector3, reach: float) -> Dictiona
 	)
 	if not hit.is_empty():
 		hit["surface"] = true
+		hit["on_panel"] = true
 		return hit
 	if not _held.holds(from, facing, reach):
 		_held.keep(_sweep.onto(space, from, facing, reach), from, facing, reach)
 	var swept: Dictionary = _held.answer()
 	if not swept.is_empty():
+		# Also on the panel: the sweep only forgives by the width of the tool in
+		# hand, so its answer is "aiming at the panel's edge", not "pointed away".
+		# Set here rather than in [AimSweep] because on-panel is this file's
+		# distinction — the tier the answer came from, which the sweep cannot know.
+		swept["on_panel"] = true
 		return swept
 	return _nearest_on_the_car(space, from, facing)
 

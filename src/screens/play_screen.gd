@@ -23,19 +23,36 @@
 ## as it took somebody to find this line.
 ##
 ## [b]The other loop this screen owns is movement[/b], and it is the same shape:
-## the pad ([MotionPad]) says which way the player is asking to go, the room
+## the gesture ([ThumbWalk]) says which way the player is asking to go, the room
 ## ([Garage]) works out what that does to a camera, and neither has heard of the
-## other. That seam has already been cashed in once: the pad was four arrow
-## buttons and is now a thumb stick, and nothing in this file or the room changed
-## — which is the whole reason the thing crossing here is two numbers in
-## [code]-1..1[/code] rather than a button.
+## other. That seam has now been cashed in twice: the walk was four arrow
+## buttons, then a thumb stick in the corner, and is now the aiming finger
+## itself drawn out toward a screen edge — and nothing in the room changed
+## either time, which is the whole reason the thing crossing here is two numbers
+## in [code]-1..1[/code] rather than a button.
+##
+## [b]Movement and aiming are one finger now, and the boundary between them is
+## the screen's own shape.[/b] A touch near the middle — which is where the car
+## is — aims the tool, exactly as it always has. The same finger drawn far
+## enough toward an edge lowers the tool and becomes a walk: direction from the
+## centre of the screen to the finger, speed from how far out it is, analog
+## like the stick it replaces. [ThumbWalk] owns the band, its hysteresis and
+## the walk vector; what this file adds is the veto that keeps a long scrub
+## from turning into a stroll — while [method Garage.aim_on_panel] says the aim
+## is landing on the car, the walk may not start — and the two calls that swap
+## the tool down and up as the finger crosses over. The pad this replaces owned
+## the bottom-right corner of every frame; the corner is the picture of the
+## garage again.
 ##
 ## [b]Movement is polled and tool changes are not, and that is not an
 ## inconsistency.[/b] Picking a tool happens at an instant, so it is a signal.
 ## Holding a direction is a thing that is true across frames, so it is read once
-## a frame — from the buttons themselves and from [Input], neither of which can
-## get stuck holding a press whose release went missing while the browser tab was
-## somewhere else.
+## a frame — from the gesture's own state and from [Input]. A held walk is a
+## flag, and a flag that never clears is a camera that walks forever, so the
+## flag is cleared everywhere a release can go missing: the finger lifting,
+## the window losing focus, the screen changing shape under a held thumb
+## (see [method _let_go], and the old pad's [code]_notification[/code] and
+## [code]_relayout[/code], which paid for both lessons first).
 ##
 ## [b]And the third loop is the trigger[/b], which is the same shape a third
 ## time. A finger goes down on the picture of the room, this file turns it into a
@@ -67,11 +84,9 @@
 ## a button, and the GUI system hands the event to [i]it[/i] rather than letting
 ## the event go unhandled. This screen is such a control, so this is where its
 ## taps go. The belt's icons still get their own taps first — they are separate
-## controls and the hit test finds them before it reaches this one — and the
-## motion pad's stick gets in earlier still, by claiming the touches that land on
-## it in [method Node._input], before the GUI pass runs at all. Both of those are
-## the same rule from two directions: a press that belongs to the HUD is not an
-## aim.
+## controls and the hit test finds them before it reaches this one. A press that
+## belongs to the HUD is not an aim; everything else, aim or walk, is this
+## file's to read.
 ##
 ## [b]The way that is wrong, because it was shipped for an hour and looked
 ## right.[/b] The obvious alternative is to set this root to
@@ -89,17 +104,18 @@
 ## [code]main.tscn[/code] and not through this scene alone, because a suite that
 ## instances the screen by itself cannot see this class of bug.
 ##
-## [b]Both fingers work, which took the long way round.[/b] The engine emulates a
-## mouse from touch — that is what makes the belt's [Button]s work on a phone at
-## all, and [code]project.godot[/code] says so — but it only emulates the
-## [i]first[/i] finger. So a thumb parked on the pad's stick would eat the
-## emulation and a second finger on the car would produce no mouse event
-## whatsoever: walk and aim, the two things a player does at once, would be
-## mutually exclusive. The fix is to read the touch events themselves and ignore
-## the emulated mice, which is exact rather than a heuristic —
-## [constant InputEvent.DEVICE_ID_EMULATION] is the engine's own mark on an event
-## it invented. Mouse events that are not emulated are somebody at a desk, and
-## they are handled too.
+## [b]Touches are read as touches, and the emulated mouse is dropped on
+## sight.[/b] The engine emulates a mouse from touch — that is what makes the
+## belt's [Button]s work on a phone at all, and [code]project.godot[/code] says
+## so — but it only emulates the [i]first[/i] finger, and acting on both the
+## touch and its invented mouse would handle one thumb twice.
+## [constant InputEvent.DEVICE_ID_EMULATION] is the engine's own mark on an
+## event it invented, so the filter is exact rather than a heuristic. Mouse
+## events that are not emulated are somebody at a desk, and they are handled
+## too — as aims only: a cursor near the frame edge is a precise, deliberate
+## aim (think painting the top of a windscreen), not a request to walk, and the
+## desk already has [code]W/A/S/D[/code] under its other hand. The walk gesture
+## is for fingers.
 ##
 ## [b]And the fourth loop is the bell[/b], which is the same shape read
 ## backwards. The room says a patch of the car finished a step of the job
@@ -183,8 +199,8 @@ const CLOSE_ACTION: String = "tool_belt_close"
 ## on the key; the belt is indexed from 0 and the conversion happens once, below.
 const SLOT_ACTION_PREFIX: String = "tool_slot_"
 
-## Walks the eye left around the car: the keyboard's half of pushing the pad's
-## stick left.
+## Walks the eye left around the car: the keyboard's half of drawing a thumb
+## toward the left edge of the screen.
 const TURN_LEFT_ACTION: String = "camera_left"
 
 ## Walks it right.
@@ -236,8 +252,34 @@ const FINISHED: float = 0.9999
 ## wants. Nothing in the game ever sets it.
 @export var run_seconds: float = RunClock.SECONDS
 
+## The walk gesture's band, as [method ThumbWalk.rho] fractions of the way from
+## the centre of the screen to its edge: where an aim becomes a walk, where a
+## walk becomes an aim again, and where the walk reaches full speed.
+##
+## Exports for exactly the reason [code]#179[/code]'s go conditions ask: the
+## numbers were sized on paper against the narrowest target screen, and the
+## feel pass on a real phone and a real tablet gets to retune them without
+## touching code. The defaults are [ThumbWalk]'s own constants, which carry the
+## arithmetic behind them; nothing in the game sets these.
+@export var walk_enter: float = ThumbWalk.WALK_ENTER
+@export var walk_exit: float = ThumbWalk.WALK_EXIT
+@export var walk_full_speed: float = ThumbWalk.FULL_SPEED
+
 var _belt: ToolBelt = null
 var _finger: int = NO_FINGER
+
+## Where [member _finger] last was, in this screen's coordinates. Meaningless
+## while nothing is down; kept because the walk boundary is re-read once a
+## frame rather than only when the finger moves — the veto's answer arrives
+## from the room a tick after the drag that asked it, so a finger holding still
+## past the band must still be able to cross over — see
+## [method _drive_the_gesture].
+var _finger_at: Vector2 = Vector2.ZERO
+
+## Which side of the band the held finger is on — aim or walk — and the walk
+## vector on the far side. Built in [method _ready] because the thresholds are
+## exports, and an export is only the scene's value once the node is instanced.
+var _walk: ThumbWalk = null
 
 ## The meter. Built here rather than read off anything, for [member _score]'s
 ## reason below: the room is also what the title card is showing off, and an
@@ -266,7 +308,6 @@ var _worked: PackedFloat64Array = _fresh_work()
 
 @onready var _garage: Garage = $Garage
 @onready var _hud: ToolBeltHud = $ToolBelt
-@onready var _pad: MotionPad = $MotionPad
 @onready var _readout: Label = $PanelReadout
 @onready var _masks: GrimeDebug = $GrimeDebug
 @onready var _scoreboard: ScoreHud = $ScoreHud
@@ -293,6 +334,13 @@ func _ready() -> void:
 	# an export is only the scene's value once the node has been instanced.
 	_clock = RunClock.new(run_seconds)
 	_meter.show_time(_clock.left())
+	# The gesture, for the same reason: the band's thresholds are exports.
+	_walk = ThumbWalk.new(walk_enter, walk_exit, walk_full_speed)
+	# A screen that changed shape under a held finger has moved the band out from
+	# under it — a rotation, a browser window dragged narrower — and the offset
+	# that was measured against the old centre is not a direction anybody is
+	# asking for any more. The old pad let go on relayout for the same reason.
+	resized.connect(_let_go)
 
 
 ## Hands the room what the player is asking for, every frame.
@@ -301,14 +349,16 @@ func _ready() -> void:
 ## any other, and a screen that only spoke up when something was pressed would
 ## leave the camera coasting on the last thing it heard.
 ##
-## The two input sources are summed and the room clamps the total, so holding the
-## right arrow key with the stick already pushed right walks at one speed rather
-## than two. [method Input.get_axis] is the engine's own idiom for a held pair and
-## returns the same [code]-1..1[/code] the pad does — the difference being that a
-## key is only ever at an end of that range and a thumb can be anywhere in it.
+## The two input sources are summed and the room clamps the total, so holding
+## the right arrow key with a thumb already out past the band walks at one speed
+## rather than two. [method Input.get_axis] is the engine's own idiom for a held
+## pair and returns the same [code]-1..1[/code] the gesture does — the
+## difference being that a key is only ever at an end of that range and a thumb
+## can be anywhere in it.
 func _process(delta: float) -> void:
-	var turn: float = _pad.turn() + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
-	var lift: float = _pad.lift() + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
+	var walked: Vector2 = _drive_the_gesture()
+	var turn: float = walked.x + Input.get_axis(TURN_LEFT_ACTION, TURN_RIGHT_ACTION)
+	var lift: float = walked.y + Input.get_axis(LIFT_DOWN_ACTION, LIFT_UP_ACTION)
 	_garage.steer(turn, lift)
 	var grime: Grime = _garage.grime()
 	# Only while the masks are up. The number costs a walk over every panel of the
@@ -399,31 +449,115 @@ func _gui_input(event: InputEvent) -> void:
 
 ## A finger [param index] going down or coming up at [param at].
 ##
-## [b]The first finger down wins and keeps aiming until it lifts.[/b] A second
-## one landing on the car while the first is still there is ignored rather than
-## taking over — two fingers cannot aim one tool, and the alternative is a tool
-## that snaps between them. And a release only counts from the finger that
-## claimed the aim, so lifting a thumb off the motion pad cannot put the
-## mark away.
+## [b]The first finger down wins and keeps the gesture until it lifts.[/b] A
+## second one landing on the car while the first is still there is ignored
+## rather than taking over — two fingers cannot aim one tool or steer one walk,
+## and the alternative is a tool that snaps between them. And a release only
+## counts from the finger that claimed the gesture, so a stray touch lifting
+## cannot put the mark away or stop the walk.
+##
+## [b]A fresh touch already past the band walks immediately[/b] — the tool
+## never comes up. A press out toward an edge that could not be reaching for
+## paint is a fair request to move, and requiring a centre-out drag would make
+## the far corners of the screen dead. [method ThumbWalk.begin] is that rule.
 func _finger_moved(index: int, at: Vector2, pressed: bool) -> void:
 	if pressed:
 		if _finger != NO_FINGER:
 			return
 		_finger = index
+		_finger_at = at
+		if index != MOUSE_FINGER and _walk.begin(at - size * 0.5, size * 0.5):
+			return
 		_garage.aim_at(_on_the_glass(_aim_point(index, at)))
 		return
 	if index != _finger:
 		return
-	_finger = NO_FINGER
-	_garage.release_aim()
+	_let_go()
 
 
-## The aiming finger sliding to [param at]. Anything else moving is somebody
+## The held finger sliding to [param at]. Anything else moving is somebody
 ## else's finger, or a mouse nobody is holding down.
+##
+## While the finger is a walk, the drag only updates where it is: the walk
+## vector is read off that once a frame by [method _drive_the_gesture], and the
+## room is not asked to aim at a point the tool is not up for. Which side of
+## the band the finger is on is also that method's question, not this one's —
+## the veto's answer arrives from the room a tick late, so deciding it here,
+## only when the finger happens to move, would leave a finger holding still
+## just past the band stuck on the wrong side of it.
 func _finger_dragged(index: int, at: Vector2) -> void:
 	if index != _finger:
 		return
+	_finger_at = at
+	if index != MOUSE_FINGER and _walk.walking():
+		return
 	_garage.aim_at(_on_the_glass(_aim_point(index, at)))
+
+
+## Reads the held finger once a frame — settles which side of the band it is
+## on, swaps the tool down or up when that changed, and returns what a walking
+## finger is asking for: [code](turn, lift)[/code], zero while aiming or while
+## nothing is down.
+##
+## A mouse is never a walk — the class docs have the argument — so it skips the
+## whole question. Everything else re-asks [method ThumbWalk.update] with the
+## room's current [method Garage.aim_on_panel], which is the veto that keeps a
+## long scrub on the paint from becoming a stroll: however far the stroke has
+## carried toward the edge, the walk may only start where the paint has run
+## out. Once a frame rather than only on drag events, because the room's answer
+## is resolved on the physics tick after the aim that asked it.
+func _drive_the_gesture() -> Vector2:
+	if _finger == NO_FINGER or _finger == MOUSE_FINGER:
+		return Vector2.ZERO
+	var offset: Vector2 = _finger_at - size * 0.5
+	var was_walking: bool = _walk.walking()
+	if _walk.update(offset, size * 0.5, _garage.aim_on_panel()) != was_walking:
+		_swap_the_gesture()
+	return _walk.input(offset, size * 0.5)
+
+
+## The finger crossed the band, one way or the other: put the tool down and
+## stop aiming, or take it back up where the finger now is.
+##
+## Both halves are the two calls the trigger has always been made of, pointed
+## at the transition instead of at a press. [method Garage.release_aim] lowers
+## the tool through [ToolAim]'s existing raise servo — the walk starting is
+## visibly the tool going down, which is the gesture explaining itself — and
+## [method Garage.aim_at] on the way back raises it again, so "does the tool
+## auto-raise when walking stops" answers itself: walking only stops by the
+## finger coming back to the car or lifting, and both already say what the
+## tool should do.
+func _swap_the_gesture() -> void:
+	if _walk.walking():
+		_garage.release_aim()
+		return
+	_garage.aim_at(_on_the_glass(_aim_point(_finger, _finger_at)))
+
+
+## Whatever the finger was doing, it is not doing it any more: the walk stops
+## dead, the mark comes off the car, and the tool lowers.
+##
+## One function for the three ways a gesture can end without a release event
+## meaning it — the finger lifting is the honest one, and the other two are the
+## cost of held state, paid the way the old pad paid it: a browser tab switched
+## away never sends its release ([method _notification]), and a screen resized
+## or rotated has moved the band out from under the thumb ([member
+## Control.resized], connected in [method _ready]). The aim gains the focus-out
+## release it quietly lacked before the walk made it load-bearing.
+func _let_go() -> void:
+	if _finger == NO_FINGER:
+		return
+	_finger = NO_FINGER
+	_walk.release()
+	_garage.release_aim()
+
+
+## The gesture lets go when the game stops being the thing in front of the
+## player. Both notifications, because the application and the window can lose
+## focus separately and either one means the thumb is no longer being watched.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		_let_go()
 
 
 ## Where a pointer [param index] touching down at [param at] is actually aiming.
@@ -635,8 +769,8 @@ static func _fresh_work() -> PackedFloat64Array:
 ## rather than an inconsistency.[/b] Finishing a patch happens at an instant, so
 ## it is a signal. Cleaning is a thing that is [i]true across frames[/i] — the
 ## trigger is held, water is landing, mud is coming off — so it is read once a
-## frame off a running total, exactly the way a direction is read off the pad and
-## the keys. The class docs make the same distinction about tool changes and
+## frame off a running total, exactly the way a direction is read off the gesture
+## and the keys. The class docs make the same distinction about tool changes and
 ## movement; this is its third instance.
 ##
 ## The alternative is a signal per touch, which is [Grime] emitting sixty times a

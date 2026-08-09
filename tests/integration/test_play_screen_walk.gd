@@ -33,7 +33,7 @@ const ABOVE_THE_RUNNER: int = 200
 ## Close enough for positions in metres — a tenth of a millimetre.
 const TOLERANCE: float = 0.0001
 
-## The keyboard half of the motion pad. Named here as strings rather than read
+## The keyboard half of the walk. Named here as strings rather than read
 ## off the screen, because [code]src/screens/play_screen.gd[/code] has no
 ## [code]class_name[/code] — no screen in this project does — and because the
 ## real source of truth for both copies is the InputMap in `project.godot`, which
@@ -117,8 +117,8 @@ var _window_size_before: Vector2i = Vector2i.ZERO
 
 func before_each() -> void:
 	# A headless window is 64x64, which is smaller than a single tap target — so
-	# the motion pad's stick would be laid out into nonsense and the one test
-	# below that uses a real finger would be measuring that instead.
+	# the walk band would be a few pixels wide and every test below that uses a
+	# real finger would be measuring that instead.
 	# `content_scale_size` is the design resolution from project.godot. Put back
 	# in after_each: every suite shares this window.
 	var root: Window = get_tree().root
@@ -170,8 +170,8 @@ func _view_model() -> Node3D:
 	return _garage().get_node("%ViewModel") as Node3D
 
 
-func _pad() -> MotionPad:
-	return _screen.get_node("MotionPad") as MotionPad
+func _marker() -> AimMarker:
+	return _garage().aim_marker()
 
 
 ## The car's bounding box in world space — read off the car rather than written
@@ -262,13 +262,53 @@ func _settle() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
 
 
-## Puts a finger on the glass at [param at], or takes it off again.
+## Puts a finger on the glass at [param at] — a point in the screen's design
+## coordinates — or takes it off again.
+##
+## Through the window's own transform on the way in, because [method Input]
+## takes window pixels and the tests below think in the design pixels the
+## screen is laid out in. The two are the same rectangle while the window sits
+## at the design resolution, which is why every suite before the portrait test
+## below could ignore the difference; a rotated window is exactly where they
+## stop agreeing.
 func _touch(at: Vector2, pressed: bool) -> void:
 	var touch: InputEventScreenTouch = InputEventScreenTouch.new()
-	touch.position = at
+	touch.position = _on_the_window(at)
 	touch.pressed = pressed
 	Input.parse_input_event(touch)
 	Input.flush_buffered_events()
+
+
+## Slides the finger to [param at], same units, without lifting it.
+func _drag(at: Vector2) -> void:
+	var dragged: InputEventScreenDrag = InputEventScreenDrag.new()
+	dragged.position = _on_the_window(at)
+	Input.parse_input_event(dragged)
+	Input.flush_buffered_events()
+
+
+## [param design] in the window pixels [method Input.parse_input_event] wants.
+func _on_the_window(design: Vector2) -> Vector2:
+	return get_tree().root.get_final_transform() * design
+
+
+## The middle of the screen — [method ThumbWalk.rho]'s origin — and the
+## half-extents everything below measures the band with, read off the screen
+## rather than written down so the portrait test measures portrait.
+func _half() -> Vector2:
+	return _screen.size * 0.5
+
+
+## A point [param fraction] of the way from the middle of the screen to the
+## middle of its right edge: [code]rho == fraction[/code], pure walk-right.
+func _rightward(fraction: float) -> Vector2:
+	return _half() + Vector2(_half().x * fraction, 0.0)
+
+
+## Where the parked car's middle lands on the glass, in design coordinates —
+## the one press that must always read as an aim, not a walk.
+func _at_the_car() -> Vector2:
+	return _camera().unproject_position(_car().global_position)
 
 
 func test_the_eye_can_be_walked_around_the_car() -> void:
@@ -345,37 +385,199 @@ func test_the_eye_cannot_be_walked_down_through_the_floor() -> void:
 	assert_gt(_camera().global_position.y, 0.0, "and above the floor it is standing on")
 
 
-func test_a_thumb_on_the_pad_walks_the_eye_too() -> void:
-	# The whole chain, through a real finger: a touch, to the stick, to
-	# [method MotionPad.turn], to the play screen's poll, to the garage, to a
-	# camera. Everything else here drives the keyboard half, which shares only the
-	# last three of those — so without this, a pad wired to nothing would pass.
+func test_a_press_out_toward_the_edge_walks_the_eye() -> void:
+	# The whole chain, through a real finger: a touch, to the screen's band, to
+	# [method ThumbWalk.begin], to the play screen's poll, to the garage, to a
+	# camera. Everything else above drives the keyboard half, which shares only
+	# the last three of those — so without this, a gesture wired to nothing would
+	# pass.
 	await _settle()
 	var before: float = _bearing()
-	var at: Vector2 = _pad().point_for(MotionPad.RIGHT)
+	var at: Vector2 = _rightward(ThumbWalk.FULL_SPEED)
 	_touch(at, true)
 	await wait_physics_frames(30)
 	var walked: float = _walked(before)
 	_touch(at, false)
-	assert_gt(walked, 0.0, "a thumb pushing the stick right must walk you right")
+	assert_gt(walked, 0.0, "a thumb out toward the right edge must walk you right")
 
 
-func test_a_thumb_can_walk_and_lift_at_the_same_time() -> void:
-	# The reason the four arrows became a circle, at the far end of the chain: one
-	# thumb in the corner of the stick asks for both axes, and both have to survive
-	# the summing in the play screen's poll and the clamping in [OrbitDrive].
-	# Neither is true of two buttons a single finger cannot hold at once.
+func test_a_thumb_out_toward_a_corner_walks_and_lifts_at_once() -> void:
+	# The analog property the stick had, kept by the gesture: one thumb toward a
+	# corner asks for both axes, and both have to survive the summing in the play
+	# screen's poll and the clamping in [OrbitDrive]. The bottom-right corner —
+	# the one the motion pad used to own — because the top corners belong to the
+	# score and the grime toggle, whose controls take the press first.
 	await _settle()
 	var before: float = _bearing()
 	var standing: float = _camera().global_position.y
-	var at: Vector2 = _pad().point_for(Vector2i(1, 1))
+	var at: Vector2 = _half() + Vector2(_half().x, _half().y) * 0.8
 	_touch(at, true)
 	await wait_physics_frames(30)
 	var walked: float = _walked(before)
-	var raised: float = _camera().global_position.y
+	var lowered: float = _camera().global_position.y
 	_touch(at, false)
-	assert_gt(walked, 0.0, "the corner of the stick walks you round the car")
-	assert_gt(raised, standing, "and raises your eye on the way")
+	assert_gt(walked, 0.0, "a thumb toward the bottom-right corner walks you round the car")
+	assert_lt(lowered, standing, "and lowers your eye on the way")
+
+
+func test_a_drag_from_the_car_to_the_edge_stops_the_tool_and_walks() -> void:
+	# The gesture itself: the same finger that was aiming leaves for the edge,
+	# the tool goes down, and the drag becomes a walk. The tool going down is
+	# asserted on the mark, which is the visible half of [method
+	# Garage.release_aim] — a screen that walked while still aiming would scrub
+	# whatever the crosshair crossed on its way round the car.
+	await _settle()
+	_touch(_at_the_car(), true)
+	await wait_physics_frames(4)
+	assert_true(_marker().is_marking(), "the press on the car aimed first")
+	var before: float = _bearing()
+	_drag(_rightward(ThumbWalk.FULL_SPEED))
+	await wait_physics_frames(30)
+	var walked: float = _walked(before)
+	var marking: bool = _marker().is_marking()
+	_touch(_rightward(ThumbWalk.FULL_SPEED), false)
+	assert_false(marking, "the tool went down when the finger left for the edge")
+	assert_gt(walked, 0.0, "and the drag walked the eye")
+
+
+func test_pulling_back_to_the_car_raises_the_tool_and_stops_the_walk() -> void:
+	# The way back across the band, which is the hysteresis' other half: inside
+	# [constant ThumbWalk.WALK_EXIT] the walk ends, the aim resumes where the
+	# finger is, and the camera holds still again.
+	await _settle()
+	_touch(_rightward(ThumbWalk.FULL_SPEED), true)
+	await wait_physics_frames(15)
+	assert_false(_marker().is_marking(), "the test needs the press to have walked")
+	_drag(_at_the_car())
+	await wait_physics_frames(4)
+	assert_true(_marker().is_marking(), "back over the car, the tool is up and aiming again")
+	var stopped: float = _bearing()
+	await wait_physics_frames(30)
+	var crept: float = _walked(stopped)
+	_touch(_at_the_car(), false)
+	assert_almost_eq(crept, 0.0, TOLERANCE, "and the walk has stopped dead")
+
+
+func test_letting_go_of_a_walk_stops_it_dead() -> void:
+	# The half that matters most, again, for the finger: a walk that kept going
+	# after the thumb came off is a game that has taken the wheel off the player.
+	# Settled after the release before measuring, exactly as the keyboard's
+	# version above is: the standoff's servo goes on easing the radius for a
+	# moment after the walk stops, and that easing is its own tested behaviour
+	# rather than a walk nobody asked for.
+	await _settle()
+	_touch(_rightward(ThumbWalk.FULL_SPEED), true)
+	await wait_physics_frames(15)
+	_touch(_rightward(ThumbWalk.FULL_SPEED), false)
+	await _settle()
+	var stopped: Vector3 = _camera().global_position
+	await wait_physics_frames(30)
+	assert_almost_eq(_camera().global_position.distance_to(stopped), 0.0, TOLERANCE)
+
+
+func test_the_walk_is_analog_a_toe_over_the_band_is_slow() -> void:
+	# The stick's low end, survived: strength rescales from the band's edge, so
+	# barely past it asks for almost nothing and the bezel asks for everything.
+	# Without the rescale both holds below would walk the same distance.
+	await _settle()
+	var before: float = _bearing()
+	var toe: Vector2 = _rightward(ThumbWalk.WALK_ENTER + 0.02)
+	_touch(toe, true)
+	await wait_physics_frames(30)
+	var crept: float = _walked(before)
+	_touch(toe, false)
+	await wait_physics_frames(2)
+	before = _bearing()
+	_touch(_rightward(ThumbWalk.FULL_SPEED), true)
+	await wait_physics_frames(30)
+	var strode: float = _walked(before)
+	_touch(_rightward(ThumbWalk.FULL_SPEED), false)
+	assert_gt(crept, 0.0, "a toe over the band still walks")
+	assert_lt(crept, strode * 0.5, "but at nothing like full stride")
+
+
+func test_a_stroke_that_stays_on_the_car_never_walks() -> void:
+	# The veto, end to end: a long scrub can cross any band — the parked shot
+	# puts the ends of the car out past [constant ThumbWalk.WALK_ENTER], which
+	# is what makes this honest — and while the aim is landing on the paint the
+	# walk may not start, however far the stroke has carried.
+	# [method Garage.aim_on_panel] is the room's half of that sentence; the
+	# finger is placed a thumb-lift below the bodywork point it is aiming at,
+	# because the band is tested against the finger and the paint against the
+	# lifted aim.
+	await _settle()
+	var box: AABB = _car_box()
+	var over_the_end: Vector3 = Vector3(
+		(box.position.x + box.end.x) * 0.5, box.position.y + box.size.y * 0.3, box.end.z
+	)
+	var stretch: float = get_tree().root.get_final_transform().get_scale().y
+	var lift: float = ThumbLift.design_lift(stretch, DisplayServer.screen_get_scale())
+	var finger: Vector2 = _camera().unproject_position(over_the_end) + Vector2(0.0, lift)
+	assert_gte(
+		ThumbWalk.rho(finger - _half(), _half()),
+		ThumbWalk.WALK_ENTER,
+		"the test needs the end of the car out past the band — re-aim it if the shot moved"
+	)
+	_touch(_at_the_car(), true)
+	await wait_physics_frames(4)
+	var before: float = _bearing()
+	_drag(finger)
+	await wait_physics_frames(30)
+	var marking: bool = _marker().is_marking()
+	var on_panel: bool = _garage().aim_on_panel()
+	var walked: float = _walked(before)
+	_touch(finger, false)
+	assert_true(on_panel, "the stroke is still on the paint")
+	assert_true(marking, "so the tool never went down")
+	assert_almost_eq(walked, 0.0, TOLERANCE, "and nothing walked, however far the stroke went")
+
+
+func test_a_mouse_never_walks() -> void:
+	# The desk's half of the split: a cursor near the frame edge is a precise,
+	# deliberate aim — think painting the top corner of the windscreen — and the
+	# desk already has the keys under its other hand. So the same drag that
+	# walks a finger keeps aiming a mouse.
+	await _settle()
+	var click: InputEventMouseButton = InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = _on_the_window(_at_the_car())
+	Input.parse_input_event(click)
+	Input.flush_buffered_events()
+	await wait_physics_frames(4)
+	assert_true(_marker().is_marking(), "the click aimed")
+	var before: float = _bearing()
+	var moved: InputEventMouseMotion = InputEventMouseMotion.new()
+	moved.position = _on_the_window(_rightward(ThumbWalk.FULL_SPEED))
+	Input.parse_input_event(moved)
+	Input.flush_buffered_events()
+	await wait_physics_frames(30)
+	assert_true(_marker().is_marking(), "dragged to the edge, a mouse is still aiming")
+	assert_almost_eq(_walked(before), 0.0, TOLERANCE, "and nothing walked")
+	click.pressed = false
+	click.position = _on_the_window(_rightward(ThumbWalk.FULL_SPEED))
+	Input.parse_input_event(click)
+	Input.flush_buffered_events()
+
+
+func test_the_walk_works_in_portrait_too() -> void:
+	# The orientation is the test: the band is a fraction of the screen's own
+	# shape, so the same fraction of the way out walks held either way up —
+	# which is the property a fixed pixel radius would have failed exactly here.
+	# The window really is rotated, so the stretch scale changes underneath the
+	# touch conversion too.
+	get_tree().root.size = Vector2i(
+		get_tree().root.content_scale_size.y, get_tree().root.content_scale_size.x
+	)
+	await wait_process_frames(2)
+	await _settle()
+	var before: float = _bearing()
+	var at: Vector2 = _rightward(ThumbWalk.FULL_SPEED)
+	_touch(at, true)
+	await wait_physics_frames(30)
+	var walked: float = _walked(before)
+	_touch(at, false)
+	assert_gt(walked, 0.0, "the same fraction of the way out walks in portrait too")
 
 
 func test_the_eye_keeps_looking_at_the_car_as_it_walks() -> void:

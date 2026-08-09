@@ -13,7 +13,7 @@
 ## [b]The wheel is [Initials] and this is the dial.[/b] What the player is doing
 ## is editing three characters with four verbs, all four of which are rules with
 ## edges — see that class — so the rules are unit-tested there and this owns only
-## which label is red and which button says what. Same split [MotionPad] makes
+## which label is red and which button says what. Same split [ThumbWalk] makes
 ## against [CameraOrbit] and [ToolBeltHud] against [ToolBelt]; what crosses is a
 ## string and an index.
 ##
@@ -37,8 +37,8 @@
 ## to move the ring between controls, so a screen that read them in
 ## [method Node._unhandled_input] would find the ring walking the four buttons
 ## while the letter under the cursor never moved. Claiming them earlier — the
-## same trick [MotionPad] uses for the touches that land on its stick, and for
-## the same reason — costs the focus ring its arrow keys on this one screen while
+## trick the old motion pad used for the touches that landed on its stick, and
+## for the same reason — costs the focus ring its arrow keys on this one screen while
 ## the prompt is up, which is a fair trade: [kbd]Tab[/kbd] still moves it,
 ## [kbd]Enter[/kbd] still presses it, and the arrows are doing the thing the
 ## player came here to do. They are handed back the moment the board appears.

@@ -19,8 +19,8 @@
 ## from the contact patch back toward whichever bottom corner of the phone the
 ## hand came from, so the ideal lift is up and away from that corner — up-left
 ## for a right thumb, up-right for a left one. Nothing in this game can observe
-## which hand is aiming: the aiming finger is whichever one is not on the motion
-## pad, and both hands reach both halves of the screen. Guessing from the touch's
+## which hand is aiming: either thumb aims on a phone held in two hands, and
+## both hands reach both halves of the screen. Guessing from the touch's
 ## own x is worse than not guessing, because a right thumb stretched across to
 ## the left of the screen still comes from the bottom right and the guess would
 ## push the mark further under the hand than no lift at all. Straight up is never

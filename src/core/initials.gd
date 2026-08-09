@@ -8,7 +8,7 @@
 ## alphabet does not have cannot be spelled at all. Those rules are worth a unit
 ## test and a [Label] is not, so they live here and
 ## [code]src/screens/job_done.gd[/code] only draws what this says. The same split
-## [ToolBelt] makes against [ToolBeltHud], and [CameraOrbit] against [MotionPad].
+## [ToolBelt] makes against [ToolBeltHud], and [CameraOrbit] against [ThumbWalk].
 ##
 ## [b]Thirty-six characters and no blank.[/b] A cabinet's wheel usually ends in a
 ## space, a rubout and an "END", and all three exist because the hardware had one

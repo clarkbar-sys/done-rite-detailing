@@ -35,9 +35,10 @@
 ##
 ## [b]And it does not know what a car is.[/b] It reports which way it points and
 ## nothing else — the menu turns that into a style and the room turns that into a
-## model. That is the same seam the motion pad has with the walk, for the same
-## reason: two numbers crossing is a control that can be replaced by a swipe, a
-## dial or a row of ten without anything on the other side hearing about it.
+## model. That is the same seam the walk gesture has with the room, for the
+## same reason: two numbers crossing is a control that can be replaced by a
+## swipe, a dial or a row of ten without anything on the other side hearing
+## about it.
 class_name CarArrow
 extends Button
 

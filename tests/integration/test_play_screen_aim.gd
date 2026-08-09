@@ -296,9 +296,10 @@ func _held_corners() -> Array[Vector3]:
 ##
 ## Straight at the [ToolAim] rather than through a press, on purpose: this is for
 ## the tests that sweep the corners of the cone, and the corners of the cone are
-## at the corners of the screen — where the tool belt and the motion pad live. A
-## press there is a press on a button, so driving the aim directly is the only way
-## to ask the question the fence is actually for.
+## at the corners of the screen — where the tool belt lives and where a touch is
+## out past the walk band. A press there is a button press or a walk, so driving
+## the aim directly is the only way to ask the question the fence is actually
+## for.
 func _swing_to(yaw: float, pitch: float) -> void:
 	var yawed: float = deg_to_rad(yaw)
 	var pitched: float = deg_to_rad(pitch)

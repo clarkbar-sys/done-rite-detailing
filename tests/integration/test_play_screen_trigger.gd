@@ -11,10 +11,10 @@
 ##
 ## [b]Most of what is here exists because the engine emulates a mouse from
 ## touch[/b], and only from the first finger. That is what makes the tool belt's
-## [Button]s work on a phone at all, and it is also what would have made walking
-## and aiming mutually exclusive — so the screen reads the touch events
-## themselves and drops the emulated mice. Every test below is a way that could
-## have gone wrong.
+## [Button]s work on a phone at all, and acting on both a touch and the mouse
+## invented from it would handle one thumb twice — so the screen reads the touch
+## events themselves and drops the emulated mice. Every test below is a way that
+## could have gone wrong.
 ##
 ## [b]This suite presses through [code]main.tscn[/code], and that is the whole
 ## point of it.[/b] Every other play-screen suite instances
@@ -126,10 +126,6 @@ func _marker() -> AimMarker:
 	return _garage().aim_marker()
 
 
-func _pad() -> MotionPad:
-	return _screen().get_node("MotionPad") as MotionPad
-
-
 ## Where [param point] in the world lands on the glass. Through the camera's own
 ## projection rather than by writing pixels down, because the eye moves: the
 ## standoff eases it back a metre and a quarter during [method _settle].
@@ -149,6 +145,14 @@ func _at_the_car() -> Vector2:
 ## same spot would let the theft through unnoticed.
 func _at_the_bonnet() -> Vector2:
 	return _on_screen(_car().global_position + Vector3(0.0, 0.15, 1.4))
+
+
+## A point out past the walk band, on otherwise empty glass: the middle of the
+## right edge at [constant ThumbWalk.FULL_SPEED] of the way out — mid-edge
+## because every corner the HUD does use is a corner, and this is not.
+func _walk_point() -> Vector2:
+	var half: Vector2 = _screen().size * 0.5
+	return half + Vector2(half.x * ThumbWalk.FULL_SPEED, 0.0)
 
 
 ## Puts a finger on the glass at [param at], or takes it off again.
@@ -227,34 +231,46 @@ func test_the_screen_host_underneath_still_stops_what_it_is_handed() -> void:
 # ---- whose finger was it -----------------------------------------------------
 
 
-func test_a_tap_on_the_motion_pad_is_not_an_aim() -> void:
-	# The stick claims presses that land on it, and this is the half of that claim
-	# only the real screen can show: a screen that also aimed on them would put a
-	# crosshair on the car every time the player took a step. It works because the
-	# pad takes the touch in [method Node._input], before the GUI hands it to the
-	# screen underneath — so a pad that had merely stopped picking it up in the
-	# right place would fail here rather than in a browser.
+func test_a_press_out_past_the_band_is_a_walk_and_not_an_aim() -> void:
+	# The gesture's own half of "whose press was it", through the real scene
+	# stack: a fresh touch already past [ThumbWalk]'s band walks immediately and
+	# the tool never comes up. A screen that also aimed on it would put a
+	# crosshair on the car every time the player took a step — the same failure
+	# the old motion pad's claim used to guard, with no pad left to claim it.
 	await _settle()
-	await _press(_pad().point_for(MotionPad.RIGHT))
-	assert_true(_pad().is_held(), "the stick took the press")
-	assert_false(_marker().is_marking(), "and the room was not asked to aim")
-
-
-func test_walking_and_aiming_at_the_same_time_both_work() -> void:
-	# The two-thumb case, and the whole reason this screen reads touch events
-	# instead of the mouse the engine emulates from them: the engine only emulates
-	# the *first* finger, so a thumb parked on the pad would otherwise make the
-	# second finger produce no event at all.
-	await _settle()
-	var stick: Vector2 = _pad().point_for(MotionPad.RIGHT)
 	var before: Vector3 = _camera().global_position
-	_touch(stick, true)
-	await wait_physics_frames(RESOLVE_FRAMES)
-	await _press(_at_the_car())
+	var out_by_the_edge: Vector2 = _walk_point()
+	_touch(out_by_the_edge, true)
 	await wait_physics_frames(RESOLVE_FRAMES * 4)
-	assert_true(_marker().is_marking(), "the second finger aimed")
-	assert_gt(before.distance_to(_camera().global_position), 0.0, "while the first one walked")
-	_touch(stick, false)
+	assert_false(_marker().is_marking(), "the room was not asked to aim")
+	assert_gt(before.distance_to(_camera().global_position), 0.0, "the press walked instead")
+	_touch(out_by_the_edge, false)
+	await wait_physics_frames(RESOLVE_FRAMES)
+
+
+func test_a_second_finger_cannot_start_a_walk_under_an_aim() -> void:
+	# One finger does one thing, and the first one down owns it — the deliberate
+	# v1 trade #179 records: walking while spraying went with the pad. A second
+	# finger out past the band while the first is on the car must be ignored,
+	# not read as a walk, or the crosshair would wander mid-scrub.
+	await _settle()
+	await _press(_at_the_car())
+	var before: Vector3 = _camera().global_position
+	var second: InputEventScreenTouch = InputEventScreenTouch.new()
+	second.index = 1
+	second.position = _walk_point()
+	second.pressed = true
+	Input.parse_input_event(second)
+	Input.flush_buffered_events()
+	await wait_physics_frames(RESOLVE_FRAMES * 4)
+	assert_true(_marker().is_marking(), "the first finger kept its aim")
+	assert_almost_eq(
+		before.distance_to(_camera().global_position), 0.0, TOLERANCE, "and nothing walked"
+	)
+	second.pressed = false
+	Input.parse_input_event(second)
+	Input.flush_buffered_events()
+	await wait_physics_frames(RESOLVE_FRAMES)
 
 
 func test_a_second_finger_does_not_steal_the_aim() -> void:

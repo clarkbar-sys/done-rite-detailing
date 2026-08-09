@@ -1,9 +1,8 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://src/screens/play_screen.gd" id="1_play"]
 [ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
 [ext_resource type="PackedScene" path="res://src/ui/tool_belt_hud.tscn" id="3_hud"]
-[ext_resource type="PackedScene" path="res://src/ui/motion_pad.tscn" id="4_pad"]
 [ext_resource type="PackedScene" path="res://src/ui/grime_debug.tscn" id="5_grimedebug"]
 [ext_resource type="PackedScene" path="res://src/ui/score_hud.tscn" id="6_score"]
 [ext_resource type="Script" path="res://src/ui/sound_toggle.gd" id="7_sound"]
@@ -25,17 +24,16 @@ walkaround = true
 noisy = true
 
 ; The one corner none of this screen's own HUD reaches: the belt owns
-; bottom-left, the pad owns bottom-right, and the score shares top-right with
-; the grime board's toggle — see src/ui/sound_toggle.gd.
+; bottom-left, and the score shares top-right with the grime board's toggle —
+; see src/ui/sound_toggle.gd. Bottom-right belonged to the motion pad until
+; the walk became a gesture on the glass itself (#179); it is the picture of
+; the garage again.
 [node name="Sound" type="Button" parent="."]
 unique_name_in_owner = true
 layout_mode = 0
 script = ExtResource("7_sound")
 
 [node name="ToolBelt" parent="." instance=ExtResource("3_hud")]
-layout_mode = 1
-
-[node name="MotionPad" parent="." instance=ExtResource("4_pad")]
 layout_mode = 1
 
 ; Which panel the mark is on, in the one corner of the screen neither the

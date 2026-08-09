@@ -131,7 +131,7 @@ text = "WALK ROUND THE CAR"
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Walk"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "Push the stick, bottom right, and you move at the speed you push it — let go and you stop. It raises and lowers your eye too. W/A/S/D or the arrow keys at a desk."
+text = "Drag your thumb from the car out toward any edge of the screen and you walk that way — the further out, the faster; let go and you stop. Pull back toward the car and the tool comes back up. W/A/S/D or the arrow keys at a desk."
 autowrap_mode = 3
 
 [node name="Press" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]

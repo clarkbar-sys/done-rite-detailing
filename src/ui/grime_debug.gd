@@ -164,11 +164,10 @@ func report(remaining: float, shine: float) -> void:
 
 ## Puts the toggle in the top-right corner and the board directly under it.
 ##
-## [b]The top corner, because the bottom one is taken.[/b] [ToolBeltHud] lays its
-## own toggle out at [constant ToolBeltHud.MARGIN] from the bottom left and rolls
-## its icons up out of it, and [MotionPad] owns the bottom-right corner. A board in
-## the bottom corner — which is where this one started — sits straight on top of
-## the belt's [b]T[/b].
+## [b]The top corner, because the bottom-left one is taken.[/b] [ToolBeltHud]
+## lays its own toggle out at [constant ToolBeltHud.MARGIN] from the bottom left
+## and rolls its icons up out of it. A board in the bottom corner — which is
+## where this one started — sits straight on top of the belt's [b]T[/b].
 ##
 ## [b]The right side, because the board hangs off whichever edge it's flush
 ## with.[/b] The board is wider than the toggle, so its position tracks its own

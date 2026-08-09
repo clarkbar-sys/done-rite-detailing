@@ -9,10 +9,10 @@
 ## than three copies a change to any one of them could fall out of step with.
 ##
 ## [b]The corner is free on every screen it sits on.[/b] [ToolBeltHud] owns the
-## bottom-left, [MotionPad] the bottom-right, and [ScoreHud] shares the top-right
-## with [GrimeDebug]'s own toggle. The title card and the menu use none of those
-## four, and the play screen's top-left is the one corner none of its own HUD
-## reaches — see [code]src/screens/play_screen.tscn[/code].
+## bottom-left, and [ScoreHud] shares the top-right with [GrimeDebug]'s own
+## toggle. The title card and the menu use neither, and the play screen's
+## top-left is the one corner none of its own HUD reaches — see
+## [code]src/screens/play_screen.tscn[/code].
 ##
 ## [b]The picture is a speaker, not a word.[/b] [GrimeDebug]'s docs already make
 ## the case against a text glyph for anything meant to read as part of the
