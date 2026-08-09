@@ -543,6 +543,15 @@ macOS build without one is worse than no macOS build.
   desktop-platform decisions behind that.
 - **Editors:** [`.editorconfig`](./.editorconfig) is the source of truth for
   charset, line endings, final newline, and indentation.
+- **Borrowed assets carry their licence:** every third-party model, texture or
+  typeface has its licence in the folder beside it under `assets/` and a credit
+  in [README.md](./README.md). The CC-BY models are credited in the game as
+  well, because attribution is a condition of that licence; the two OFL
+  typefaces are not, because it is not one of theirs — what the OFL does ask is
+  that the licence travel with the font, so `include_filter` in
+  `export_presets.cfg` puts the two `.txt` files inside the exported pack. A
+  `.ttf` becomes a `res://` resource and is packed by
+  `export_filter="all_resources"`; a `.txt` beside it is not and would not be.
 - **CI gates before merge:** type check, headless smoke, the test map, the GUT
   suites, a Linux export that boots, and a web export whose pack contains
   neither `tests/` nor GUT must all be green. Enable branch protection on

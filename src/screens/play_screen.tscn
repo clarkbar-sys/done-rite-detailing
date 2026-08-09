@@ -43,6 +43,12 @@ layout_mode = 1
 ; play_screen.gd — so it is a plain Label with a font big enough to read at the
 ; third-scale a phone renders this design at, and an outline because the thing
 ; behind it is sometimes sky and sometimes tarmac.
+;
+; 24 rather than the 32 it was, and it is not a taste change: the display face
+; play_screen.gd puts on this label advances a whole em per character
+; (Brand.DISPLAY_FACE), so a panel name costs twice the width it used to. The
+; box below is 348 px, which is fourteen characters at 24 and ten at 32, and the
+; longest name the room has is nine.
 ; Shifted clear of the grime board's toggle, which now sits in this corner at a
 ; full tap target's width. It used to start at x=12 and the two would overlap.
 [node name="PanelReadout" type="Label" parent="."]
@@ -54,7 +60,7 @@ offset_bottom = 56.0
 theme_override_colors/font_color = Color(0.95, 0.13, 0.16, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 8
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 24
 
 ; The clock, along the top and centred — see src/ui/time_hud.gd, which owns
 ; everything about how it looks and leaves only where it sits to this file.

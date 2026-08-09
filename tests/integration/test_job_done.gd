@@ -396,3 +396,70 @@ func test_the_prompt_fits_the_screen_it_is_drawn_on() -> void:
 	var card: Control = _node("Card")
 	assert_lte(card.size.y, _screen.size.y, "the initials prompt does not fit on the screen")
 	assert_lte(card.size.x, _screen.size.x)
+
+
+## The type. This card is what issue #174 called the hero use of the display
+## face — a score, three letters and a table of ten, which is the whole of what
+## an arcade cabinet's last screen is — so unlike every other screen in the game
+## there is nothing on it in the reading face.
+func test_every_word_on_the_card_is_in_the_display_face() -> void:
+	_fill_the_board(SEDAN)
+	await _open(SEDAN, SCORE)
+	for named: String in ["Heading", "Score", "Up", "Down", "Next", "Enter"]:
+		assert_eq(
+			_node(named).get_theme_font("font"),
+			Brand.DISPLAY_FACE,
+			"%s is not in the face the rest of the card is" % named
+		)
+	for index: int in Initials.LENGTH:
+		var letter: Label = _node("Letters").get_child(index) as Label
+		assert_eq(letter.get_theme_font("font"), Brand.DISPLAY_FACE, "letter %d" % index)
+	for place: int in HighScores.KEEP:
+		for column: int in 3:
+			assert_eq(
+				_cell(place, column).get_theme_font("font"),
+				Brand.DISPLAY_FACE,
+				"place %d cell %d" % [place, column]
+			)
+
+
+func test_every_size_on_the_card_is_on_the_faces_own_grid() -> void:
+	# The board is thirty short strings read as a block and the initials are the
+	# biggest type in the game; both are where an uneven stroke shows first.
+	await _open(SEDAN, SCORE)
+	var row: int = _cell(0, 0).get_theme_font_size("font_size")
+	assert_eq(row % Brand.TYPE_GRID, 0, "the board's rows are set at %d, off the grid" % row)
+	for named: String in ["Heading", "Score", "Up", "Down", "Next", "Enter"]:
+		var size: int = _node(named).get_theme_font_size("font_size")
+		assert_eq(size % Brand.TYPE_GRID, 0, "%s is set at %d, off the grid" % [named, size])
+	for index: int in Initials.LENGTH:
+		var letter: Label = _node("Letters").get_child(index) as Label
+		assert_eq(letter.get_theme_font_size("font_size") % Brand.TYPE_GRID, 0, "letter %d" % index)
+
+
+func test_the_board_columns_hold_the_widest_thing_they_can_ever_hold() -> void:
+	# The display face advances a whole em per character, so "widest" is
+	# arithmetic rather than a measurement — and that is exactly why it is worth
+	# asserting: the widths in job_done.gd are now derived numbers, and a change
+	# to ROW_FONT that forgets them clips a rank or a score with no other symptom.
+	_fill_the_board(SEDAN)
+	await _open(SEDAN, 1)
+	var longest: Array[String] = ["10", "AAA", "".lpad(ScoreHud.DIGITS, "0")]
+	for column: int in 3:
+		var cell: Label = _cell(0, column)
+		var ink: float = (
+			cell
+			. get_theme_font("font")
+			. get_string_size(
+				longest[column],
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1,
+				cell.get_theme_font_size("font_size")
+			)
+			. x
+		)
+		assert_lte(
+			ink,
+			cell.custom_minimum_size.x,
+			'column %d cannot hold "%s"' % [column, longest[column]]
+		)

@@ -114,6 +114,31 @@ window/stretch/aspect="expand"
 ; so the fact lives in a comment instead. Turning it off would break every
 ; button in the game on every touchscreen at once.
 
+[gui]
+
+; The face every Control in the game draws in unless it asks for the other one.
+;
+; This is the switch that makes issue #174 a type *system* rather than a list of
+; overrides. Godot's built-in Open Sans is the default until something replaces
+; it, and "something" would otherwise have to be every label, every button and
+; every caption in the project — including the ones nobody has written yet. One
+; missed override is a web sans sitting in the middle of a pixel-art game, and
+; nothing in the build would mention it.
+;
+; Silkscreen and not Press Start 2P, which is the deliberate half. The default
+; is what an unconsidered label gets, and the readable face is the right thing
+; to hand somebody who has not thought about it: a caption that came out in the
+; body face is a design opinion, where a paragraph that came out in the display
+; face is a wall of letters. Brand.DISPLAY_FACE is asked for by name — see
+; src/core/brand.gd for the whole argument, and tests/unit/test_brand.gd for the
+; assertion that this line and that file still name the same file.
+;
+; It is a path and not a Theme resource because there is nothing else in the
+; theme: every colour, corner and stylebox in this game already comes from
+; Brand, applied in code, and a .tres holding one font would be a second place
+; for the brand to live.
+theme/custom_font="res://assets/brand/fonts/Silkscreen-Regular.ttf"
+
 [input]
 
 ; The keyboard half of the tool belt. The T button in the corner is the spec and
