@@ -58,8 +58,7 @@
 ## [b]And the credit for the borrowed models is on this screen[/b], along the
 ## bottom. The ten cars in [code]assets/models/cars/[/code], the two spray
 ## bottles in [code]assets/models/cleaning_spray/[/code], the sponge in
-## [code]assets/models/sponge/[/code], the pressure washer in
-## [code]assets/models/pressure_washer/[/code] and the driveway the whole job
+## [code]assets/models/sponge/[/code] and the driveway the whole job
 ## happens on in [code]assets/models/driveway/[/code] are CC-BY 4.0,
 ## which makes attribution a condition of using them rather than a courtesy, and
 ## a licence is not satisfied by a file in a repository the player never sees.
@@ -106,6 +105,12 @@ func _ready() -> void:
 	_logo_card.add_theme_stylebox_override("panel", Brand.card())
 	_over_the_bay(_credits, Brand.MUTED)
 	_over_the_bay(_car_name, Brand.WHITE)
+	# The car's name is a caption for the room and is read at a glance, so it goes
+	# in the display face with the pills either side of it. The credit under it
+	# stays in the project's default readable face — it is a hundred and forty
+	# characters of licence text to a line, which is the one thing on this
+	# screen the chunky face would be actively wrong for.
+	_car_name.add_theme_font_override("font", Brand.DISPLAY_FACE)
 	dress_loud(_play)
 	dress_quiet(_how_to_play)
 	_play.pressed.connect(_on_play_pressed)

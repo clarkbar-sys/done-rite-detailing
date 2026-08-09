@@ -165,6 +165,26 @@ func test_every_face_of_start_is_dressed() -> void:
 		)
 
 
+func test_the_press_is_in_the_display_face_and_the_stamp_is_not() -> void:
+	# The first screen anybody sees, and the two ends of the type system on it at
+	# once: Start is the thing you press, so it says its word in the chunky face
+	# that GameScreen._wear puts on every pill; the build stamp is a line of
+	# small print nobody presses, so it is left to the project's default reading
+	# face. Both are asked of the control rather than of the scene file, because
+	# the whole point of the default is that a control can inherit it.
+	assert_eq(
+		_start_button().get_theme_font("font"),
+		Brand.DISPLAY_FACE,
+		"the one thing to press must be in the face a cabinet presses in"
+	)
+	var build: Label = _screen.get_node("%Build") as Label
+	assert_eq(
+		build.get_theme_font("font"),
+		Brand.BODY_FACE,
+		"the build stamp must be in the reading face, and must not be Open Sans"
+	)
+
+
 func test_start_asks_for_the_menu() -> void:
 	# Through the button's own signal rather than by calling the handler, so a
 	# connection dropped in `_ready()` fails here rather than in the browser.

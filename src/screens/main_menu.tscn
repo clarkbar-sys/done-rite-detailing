@@ -94,10 +94,14 @@ script = ExtResource("5_arrow")
 ; column given 44 px less room moves its bottom edge up by half of it. The two
 ; halves together take the pills up 44 px, and 23 of that is what the credit's
 ; third line costs at the size 16 px type sets on. The remaining 21 is spent on
-; something two lines only just had: the credit now clears the last row of ink in
-; "How to Play" by 37 px rather than by 16, which
-; tests/integration/test_main_menu.gd measures off the font rather than off these
-; offsets.
+; something two lines only just had: the credit cleared the last row of ink in
+; "How to Play" by 37 px rather than by 16 — 78 px since #174 took the credit's
+; type down to 12 and the pill's to 32, and 94 px since #162 took the fifth work
+; off the list again. It is tests/integration/test_main_menu.gd that measures the
+; clearance off the font rather than off these offsets, which is why neither a
+; change of face nor a credit going away needed a change of number here — and why
+; the 44 px this line is about has not been handed back, which is the same
+; argument the credit's own comment makes below.
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -169,26 +173,36 @@ text = "Play"
 ; Smaller than Play, and only just: 168 is a few pixels above
 ; TouchTarget.min_design_size() (164 for this design on a 375 px screen), which
 ; is the floor a button stops shrinking at whatever the layout would prefer.
-; "Secondary" is therefore said in type size and in colour — 44 against 64, and
+; "Secondary" is therefore said in type size and in colour — 32 against 64, and
 ; Brand.quiet_pill against Brand.RED — rather than in a height nobody on a phone
 ; could hit.
+;
+; 32 and not the 44 it was, and the gap widened for a reason that is arithmetic
+; rather than emphasis. Brand.DISPLAY_FACE advances a whole em per character, so
+; a caption is exactly `length x size` px wide: "How to Play" is eleven
+; characters, which is 352 px at 32 and 484 at 44 — wider than the 440 px pill it
+; is printed on, and a Button grows to fit its own text rather than clipping it.
+; So the second pill would have come out wider than the first. Play is four
+; characters and 256 px at 64, which is why the loud one kept its size while the
+; quiet one gave up twelve.
 [node name="HowToPlay" type="Button" parent="Center/Column"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(440, 168)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 32
 text = "How to Play"
 
 ; The credits for the borrowed models, along the bottom of the menu.
 ;
 ; CC-BY 4.0 is the licence the ten models in assets/models/cars/ arrive under —
-; and the licence the tyre cleaner's bottle, the sponge, the pressure washer and
-; the driveway all five of them are used on arrive under too — and attribution is
-; a condition of it, not a courtesy. So it has to be somewhere a player can
-; actually read, and this is the screen every player passes through on the way to
-; the bay. The same lines are in README.md and in the five ATTRIBUTION.txt files
-; beside the assets; this is the copy the licence is actually satisfied by,
+; and the licence the tyre cleaner's bottle, the sponge and the driveway all four
+; of them are used on arrive under too — and attribution is a condition of it, not
+; a courtesy. So it has to be somewhere a player can actually read, and this is
+; the screen every player passes through on the way to the bay. The same lines are
+; in README.md and in the ATTRIBUTION.txt files beside the assets — five of those,
+; because the wand keeps one saying that nothing about it is borrowed; this is the
+; copy the licence is actually satisfied by,
 ; because the others ship to whoever clones the repo rather than to whoever plays
 ; the game.
 ;
@@ -221,11 +235,52 @@ text = "How to Play"
 ; and 44 off the Center container, each worth half of itself to a centred column,
 ; which takes both pills up 44 px. That puts the last row of ink in "How to Play"
 ; at y = 601.5, so the credit clears it by 37 px where two lines cleared it by 16.
-; The type is still 16 and the credit still sits on the bottom margin.
+; The type was still 16 and the credit still sat on the bottom margin.
 ;
-; The three lines are 1,105, 1,146 and 734 px wide in that 1,248 px label, and the
-; design width is a floor rather than a target (window/stretch/aspect is
-; "expand"), so none of them wraps on any screen shape.
+; AND THE FACE CHANGED UNDER ALL OF IT (#174), WHICH IS WHY THE SIZE SAYS 12.
+; Everything above is arithmetic against Godot's built-in Open Sans, which is no
+; longer what this label is drawn in: the project now ships its own type and the
+; default face is Brand.BODY_FACE (Silkscreen), a pixel face that advances about
+; three quarters of an em where a web sans averages half. Same words, one and a
+; half times the width — at 16 the longest line measured 1,548 px in a 1,248 px
+; label and would have wrapped to a fourth and fifth line straight across the
+; pill.
+;
+; 12 is the largest size that still fits, and it is a hard edge rather than a
+; preference: the three lines are 1,168, 1,152 and 743 px at 12, and the longest
+; goes to 1,260 at 13 — 12 px over the label. That is also why this one number is
+; not a multiple of Brand.TYPE_GRID when every other size in the project is. The
+; grid's next step down is 8, which is small print nobody can read at a third
+; scale, and its next step up is 16, which does not fit. A licence line is a
+; fixed number of characters in a fixed width, and it is the one place in the
+; game where the copy cannot give and the box cannot either.
+;
+; What the smaller type buys back is room. Silkscreen sets 12 px type on 16
+; rather than the 23 the old face needed, so the block is 48 px in y = 660 .. 708
+; where it was 69 in y = 639 .. 708 — and the last row of ink in "How to Play"
+; (now at y = 550 .. 582, the pill's own type having come down from 44 to 32)
+; is cleared by 78 px where three lines used to clear it by 37. The ground #154
+; took off the lockup and off the Center container has not been given back,
+; because the menu is not crowded now and un-picking that would move both pills
+; for no reason a player could see.
+;
+; AND BACK TO TWO LINES (#162), BECAUSE THE FIFTH WORK STOPPED BEING BORROWED.
+; The power wash was drawn from a downloaded flamethrower and is now drawn by
+; scripts/build-pressure-washer.py, so there is no licence to satisfy for it and
+; its line comes off. Four works, 2 + 2, and the driveway joins the sponge on the
+; second line rather than the list keeping a line to itself: measured, that line
+; is 1,185 px against the 1,168 of the first, so the pair fit the label with 63 px
+; to spare and neither wraps. The block is 32 px in y = 676 .. 708 and clears the
+; pill's last row of ink by 94 px.
+;
+; The type stays at 12 rather than going back up. 16 does not fit — see the
+; paragraph above, where that is measured rather than assumed — and it is the
+; longest line that decides, which is still the one about the cars and the
+; bottles and is unchanged by any of this.
+;
+; None of the lines wraps on any screen shape: the design width is a floor
+; rather than a target (window/stretch/aspect is "expand"), so 1,248 px is the
+; least this label is ever given.
 ;
 ; vertical_alignment 2 is what makes those numbers true of the text rather than
 ; of the box: the label's own height only grows past the offsets below once the
@@ -261,7 +316,7 @@ offset_right = -16.0
 offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 12
 text = "Cars: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) · Bottles: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nSponge: “Sponge” by Aullwen (sketchfab.com/Aullwen) · Driveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0"
 vertical_alignment = 2
 autowrap_mode = 3
@@ -277,6 +332,6 @@ offset_left = -320.0
 offset_top = 16.0
 offset_right = -16.0
 grow_horizontal = 0
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 20
 text = "v0.0.0 (local)"
 horizontal_alignment = 2

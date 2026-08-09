@@ -233,7 +233,10 @@ func test_the_credit_does_not_cross_the_how_to_play_label() -> void:
 	# 16 px two lines had in hand, and the menu bought the room back rather than
 	# shrinking the type: 44 px off the lockup and 44 off the column's container —
 	# src/screens/main_menu.tscn has that arithmetic — and this is the measurement
-	# that says it was enough.
+	# that says it was enough. That work has since gone (#162, the wand is drawn
+	# by this project and is owed to nobody) and the room has not been given back,
+	# so what this now measures is slack rather than a near miss. It is still the
+	# measurement that would notice a sixth work arriving.
 	#
 	# Both boxes are measured off the text rather than off the control: a Label
 	# is as tall as its offsets whatever it has in it, and a pill is mostly
@@ -250,15 +253,17 @@ func test_the_credit_does_not_cross_the_how_to_play_label() -> void:
 
 func test_the_font_can_draw_the_credit() -> void:
 	# The same bug `tests/integration/test_how_to_play.gd` pins, in the one place
-	# on this screen where the copy is not plain ASCII: this project ships no font
-	# of its own, so every label is drawn in Godot's built-in Open Sans, and a
-	# glyph it does not have is a tofu box in a released build rather than an error
-	# anybody would see. The credit carries curly quotes and an em dash.
+	# on this screen where the copy is not plain ASCII: a glyph the face does not
+	# have is a tofu box in a released build rather than an error anybody would
+	# see. The credit carries curly quotes, an interpunct and an em dash, and
+	# since #174 the face it is drawn in is Brand.BODY_FACE — a 226-glyph pixel
+	# face rather than the built-in Open Sans this was written against, which is
+	# the direction that makes the question sharper rather than moot.
 	#
 	# The line break between the two works is skipped, and only it: a control
 	# character is layout rather than type, no font has a glyph for one, and
-	# asking whether Open Sans can draw a newline is a question with a wrong
-	# answer either way. Everything from the space upwards is still asked.
+	# asking whether a face can draw a newline is a question with a wrong answer
+	# either way. Everything from the space upwards is still asked.
 	var credits: Label = _screen.get_node("%Credits") as Label
 	var font: Font = credits.get_theme_font("font")
 	for i: int in credits.text.length():
@@ -272,6 +277,28 @@ func test_the_font_can_draw_the_credit() -> void:
 				% [glyph, char(glyph), font.get_font_name()]
 			)
 		)
+
+
+func test_the_two_faces_are_used_for_the_two_jobs_they_are_for() -> void:
+	# This screen is where the two-face system is easiest to get wrong, because
+	# both faces are on it at once and they are eight design pixels apart in size.
+	# The pills and the car's name are read at a glance and are chunky; the
+	# credit is a hundred and forty characters of licence text a line at a time
+	# and is not. Set the credit in the display face and it wraps to a wall over
+	# the buttons — which is what `test_the_credit_does_not_cross_the_button`
+	# would then catch, one failure later than this.
+	for pill: Button in [_play_button(), _how_to_play_button()]:
+		assert_eq(pill.get_theme_font("font"), Brand.DISPLAY_FACE, "%s must be chunky" % pill.name)
+	assert_eq(
+		(_screen.get_node("%CarName") as Label).get_theme_font("font"),
+		Brand.DISPLAY_FACE,
+		"the car's name is a caption for the room, read at a glance"
+	)
+	assert_eq(
+		(_screen.get_node("%Credits") as Label).get_theme_font("font"),
+		Brand.BODY_FACE,
+		"the credit is small print and must be in the reading face"
+	)
 
 
 func test_the_credit_is_legible_over_a_lit_driveway() -> void:

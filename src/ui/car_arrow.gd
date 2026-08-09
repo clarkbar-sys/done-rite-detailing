@@ -2,17 +2,28 @@
 ## in the pack.
 ##
 ## [b]Why it is a script at all, when a [Button] with a caption would do.[/b]
-## Because the caption would be a tofu box. This project ships no font of its
-## own, so every label is drawn in Godot's built-in Open Sans — and
-## [code]tests/integration/test_main_menu.gd[/code] already gates the credit
-## line's curly quotes against exactly that, because a glyph the font does not
-## have is a blank rectangle in a released build rather than an error anybody
-## would see. "◀" is a glyph Open Sans has no business having. So the arrow is
-## drawn rather than typed, which is the same conclusion [SoundToggle] reached
-## about a speaker and [GrimeDebug] about its own corner, and it is drawn with
+## Because the caption would have been a tofu box. This was written while the
+## project shipped no font of its own and every label was drawn in Godot's
+## built-in Open Sans, which has no geometric shapes block — and a glyph the
+## font does not have is a blank rectangle in a released build rather than an
+## error anybody would see, which is what
+## [code]tests/integration/test_main_menu.gd[/code] gates the credit line's
+## curly quotes against. So the arrow was drawn rather than typed, which is the
+## same conclusion [SoundToggle] reached about a speaker and [GrimeDebug] about
+## its own corner, and it is drawn with
 ## [method ToolBeltHud.stroke_glyph] — the same table-of-points-on-a-grid every
 ## other icon in this game is built from, so a sixth icon does not mean a second
 ## way of drawing one.
+##
+## [b]The tofu is gone and the drawing stays, which is worth saying out loud
+## rather than leaving as inertia.[/b] Since #174 the game ships its own type,
+## and [constant Brand.DISPLAY_FACE] — the face a [Button] wears — does have
+## U+25C0. So the original reason expired. What replaced it is the better one:
+## every other mark in this game — the speaker, the belt's corner, the five tool
+## heads — is strokes on a grid, and one typed arrow among them would be two
+## icon languages. [constant Brand.BODY_FACE] has no geometric shapes block
+## either, so a typed arrow would also be a caption that reads correctly in
+## exactly one of the project's two faces.
 ##
 ## [b]What it does not own is where it sits or what colour it is.[/b] The layout
 ## is [code]src/screens/main_menu.tscn[/code]'s, like every other control on that

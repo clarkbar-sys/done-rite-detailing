@@ -64,7 +64,7 @@ theme_override_constants/separation = 16
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 32
 text = "New High Score"
 horizontal_alignment = 1
 
@@ -72,10 +72,15 @@ horizontal_alignment = 1
 ; number the corner of the play screen was showing a second ago — the padding
 ; is the arcade convention that HUD already follows, and the two would look like
 ; different scores without it.
+;
+; 56 is ScoreHud.TOTAL_FONT, which is the rest of that sentence: same digits,
+; same face, same size, so the number appears to have been lifted out of the
+; corner and put in the middle of the card rather than reprinted. It moved from
+; 76 with the HUD when #174 put both in Brand.DISPLAY_FACE.
 [node name="Score" type="Label" parent="Frame/Sheet/Card/Column"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 76
+theme_override_font_sizes/font_size = 56
 text = "000000"
 horizontal_alignment = 1
 
@@ -83,9 +88,14 @@ horizontal_alignment = 1
 ; is the one thing on this screen the player is actually operating and it has to
 ; be legible at a third of the design size in a hand.
 ;
-; 110 px wide each holds the widest capital Open Sans has at this size with room
-; either side, so the row does not shuffle sideways as the wheel turns — the same
-; pinned-field reasoning ScoreHud's zero padding is for.
+; 96 px of Brand.DISPLAY_FACE in a 110 px box, and the pinned field this was
+; written for is now free rather than bought: the display face advances a whole
+; em for every character, so every capital on the wheel is exactly 96 px wide and
+; the row cannot shuffle sideways whatever it is spelling. The box keeps its 7 px
+; either side so a letter is not flush against its neighbour's cell, and 96 is a
+; multiple of Brand.TYPE_GRID — at the size the player is staring hardest at, an
+; A with one bar three pixels thick and one four is the whole of what the grid
+; exists to prevent.
 [node name="Letters" type="HBoxContainer" parent="Frame/Sheet/Card/Column"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -95,7 +105,7 @@ theme_override_constants/separation = 24
 [node name="Letter0" type="Label" parent="Frame/Sheet/Card/Column/Letters"]
 custom_minimum_size = Vector2(110, 150)
 layout_mode = 2
-theme_override_font_sizes/font_size = 110
+theme_override_font_sizes/font_size = 96
 text = "A"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -103,7 +113,7 @@ vertical_alignment = 1
 [node name="Letter1" type="Label" parent="Frame/Sheet/Card/Column/Letters"]
 custom_minimum_size = Vector2(110, 150)
 layout_mode = 2
-theme_override_font_sizes/font_size = 110
+theme_override_font_sizes/font_size = 96
 text = "A"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -111,19 +121,24 @@ vertical_alignment = 1
 [node name="Letter2" type="Label" parent="Frame/Sheet/Card/Column/Letters"]
 custom_minimum_size = Vector2(110, 150)
 layout_mode = 2
-theme_override_font_sizes/font_size = 110
+theme_override_font_sizes/font_size = 96
 text = "A"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 ; The four verbs, as words rather than as arrows — src/screens/job_done.gd has
-; why (Open Sans has no ▲, and a glyph the font lacks is a blank rectangle in a
-; released build).
+; why, and the reason has changed since it was written without changing the
+; answer.
 ;
 ; 168 tall is the height the menu's How to Play pill wears: a few pixels above
 ; TouchTarget.min_design_size() (164 for this design on a 375 px screen), which
 ; is the floor anything a finger has to hit stops shrinking at. Four of them at
 ; 240 wide with 24 between is 1,032 px of the 1,248 the frame leaves.
+;
+; 32 rather than the 40 they were: Brand.DISPLAY_FACE is one em per character, so
+; the longest of the four captions is 5 x size, and "Enter" at 40 is 200 px in a
+; 240 px pill with 20 either side. 32 puts it at 160 and gives the word the same
+; air the menu's pills have.
 [node name="Keys" type="HBoxContainer" parent="Frame/Sheet/Card/Column"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -134,21 +149,21 @@ theme_override_constants/separation = 24
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 168)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 32
 text = "Up"
 
 [node name="Down" type="Button" parent="Frame/Sheet/Card/Column/Keys"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 168)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 32
 text = "Down"
 
 [node name="Next" type="Button" parent="Frame/Sheet/Card/Column/Keys"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 168)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 32
 text = "Next"
 
 ; The red one, and the only red one while the prompt is up: Brand.RED is the
@@ -157,7 +172,7 @@ text = "Next"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 168)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 32
 text = "Enter"
 
 ; The board: HighScores.KEEP places in two columns of five, which is six grid
@@ -188,12 +203,12 @@ theme_override_constants/separation = 24
 unique_name_in_owner = true
 custom_minimum_size = Vector2(400, 168)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 32
 text = "Main Menu"
 
 [node name="PlayAgain" type="Button" parent="Frame/Sheet/Card/Column/Exits"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(400, 168)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 32
 text = "Play Again"
