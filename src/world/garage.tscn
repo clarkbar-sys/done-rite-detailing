@@ -66,12 +66,19 @@ reflected_light_source = 1
 ; and gone by the edge, drawn on one quad src/world/garage.gd sizes to whichever
 ; of the ten cars is parked — that file has the whole argument for why it is a
 ; sibling of the car and not a child of it, and why a quad rather than a
-; realtime shadow. Procedural rather than an art asset, because a two-stop
+; realtime shadow. Procedural rather than an art asset, because a three-stop
 ; gradient is the whole of the shape and there is no picture to keep in step
 ; with ten different footprints.
+;
+; Three stops and not two, and the middle one is the point: a straight fade
+; from 0.75 at the centre to nothing at the rim reads as a smudge rather than a
+; shadow, because the part of the blob directly under the car — where an N64
+; shadow is flat and dark — is already most of the way to transparent. Holding
+; 0.6 out to just past half the radius keeps that middle dark and leaves only
+; the rim to soften, which is what an old-school blob actually looks like.
 [sub_resource type="Gradient" id="Gradient_shadow"]
-offsets = PackedFloat32Array(0, 1)
-colors = PackedColorArray(0, 0, 0, 0.55, 0, 0, 0, 0)
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0, 0, 0, 0.75, 0, 0, 0, 0.6, 0, 0, 0, 0)
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_shadow"]
 gradient = SubResource("Gradient_shadow")
