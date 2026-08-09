@@ -194,8 +194,13 @@ func _ready() -> void:
 ## walking round the car with the trigger up costs one comparison a frame rather
 ## than a string built and three controls moved. The same early-out
 ## [method PatchFlash.fade] takes, for the same reason.
+##
+## [b]"Arrived" is [method @GlobalScope.is_equal_approx] and that is not the same
+## thing as arrived[/b] — see [method _land], which is what stops the difference
+## from being points the player earned and never saw.
 func _process(delta: float) -> void:
 	if _flying <= 0 and _flash <= 0.0 and is_equal_approx(_shown, float(_total)):
+		_land()
 		return
 	_roll_digits(delta)
 	_fade_flash(delta)
@@ -328,6 +333,33 @@ func flying() -> int:
 ## Whether the multiplier is being printed at all.
 func run_shown() -> bool:
 	return _run_label.visible
+
+
+## Puts the digits exactly on the total once the roll has been called arrived.
+##
+## [b]The gap [method @GlobalScope.is_equal_approx] tolerates is not always
+## smaller than a point.[/b] Its tolerance is proportional — a hundred-thousandth
+## of the larger value — so at a score of 200,000 it is 2.0, and the roll is
+## declared finished with a whole two points still to travel. [method _process]
+## then stops rolling, [method _paint] keeps printing [method @GDScript.int] of
+## where the digits got to, and the difference is points the player earned and
+## can never see. It does not correct itself either: the next tick compares
+## against the same total and takes the same early-out.
+##
+## Found by [code]tests/integration/test_score_hud.gd[/code]'s trickle case,
+## which failed once behind a heavier suite and passed on its own — because at
+## small totals the same bug needs the last step of the roll to land inside a
+## hundredth of the target, which is a thing one frame's [param delta] decides.
+## The deterministic version of it is the six-figure case beside it.
+##
+## Snapping rather than rolling the last of it is right on both counts: two
+## points at 200,000 is not an animation, and the whole reason the digits roll is
+## to show a sum happening, which a gap this small is not.
+func _land() -> void:
+	if _shown == float(_total):
+		return
+	_shown = float(_total)
+	_paint()
 
 
 ## Moves the digits [param delta] worth of the way to the total.
