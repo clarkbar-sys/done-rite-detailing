@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.14.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.13.0...v1.14.0) (2026-08-09)
+
+
+### Features
+
+* **brand:** set the game in pixel type rather than the site's web sans ([#184](https://github.com/clarkbar-sys/done-rite-detailing/issues/184)) ([4292592](https://github.com/clarkbar-sys/done-rite-detailing/commit/429259290fd455dcba23020208a39aae470d7834)), closes [#174](https://github.com/clarkbar-sys/done-rite-detailing/issues/174)
+* ground the car with an N64-style blob shadow ([#191](https://github.com/clarkbar-sys/done-rite-detailing/issues/191)) ([0cdb185](https://github.com/clarkbar-sys/done-rite-detailing/commit/0cdb1858e8f6c44d855e93ef26537c3bd052fe39))
+* **hud:** count all three passes in the done percentage ([#200](https://github.com/clarkbar-sys/done-rite-detailing/issues/200)) ([2395f53](https://github.com/clarkbar-sys/done-rite-detailing/commit/2395f53a2b15b3feb0b69ab67d8b3fc2b9801b1e))
+* **hud:** make the tool belt corner a pixel hamburger ([#201](https://github.com/clarkbar-sys/done-rite-detailing/issues/201)) ([e754ac2](https://github.com/clarkbar-sys/done-rite-detailing/commit/e754ac2c652f22ac55260500e26cfd84a0394ec9))
+* **motion-pad:** raise walk and lift speed on the on-screen stick ([#199](https://github.com/clarkbar-sys/done-rite-detailing/issues/199)) ([17c7f8a](https://github.com/clarkbar-sys/done-rite-detailing/commit/17c7f8aabc276e8ed2d00c4390c5c53103114912))
+* **scores:** three minutes on the run, and the ten best on each car signed with three letters ([#181](https://github.com/clarkbar-sys/done-rite-detailing/issues/181)) ([3561fe4](https://github.com/clarkbar-sys/done-rite-detailing/commit/3561fe48fee2c699749e6e6d1c52ad5ade47c2f6))
+* **ui:** redraw the six belt marks as 16x16 pixel sprites ([#192](https://github.com/clarkbar-sys/done-rite-detailing/issues/192)) ([4c0763d](https://github.com/clarkbar-sys/done-rite-detailing/commit/4c0763de76b037465cff2a48812113a36a476c03)), closes [#173](https://github.com/clarkbar-sys/done-rite-detailing/issues/173)
+* **world:** cut the paint palette to six hot arcade colours ([#195](https://github.com/clarkbar-sys/done-rite-detailing/issues/195)) ([9855606](https://github.com/clarkbar-sys/done-rite-detailing/commit/9855606ebefe6a60ee453909db6e8c5638780782))
+
+
+### Bug Fixes
+
+* **menu:** say which borrowed models were changed, and check all of them are credited ([#198](https://github.com/clarkbar-sys/done-rite-detailing/issues/198)) ([a04c081](https://github.com/clarkbar-sys/done-rite-detailing/commit/a04c081f90fa527b900dad71bf765a1cc961f12e)), closes [#159](https://github.com/clarkbar-sys/done-rite-detailing/issues/159)
+* **world:** drop Viper Black from the paint palette ([#202](https://github.com/clarkbar-sys/done-rite-detailing/issues/202)) ([3be8ad9](https://github.com/clarkbar-sys/done-rite-detailing/commit/3be8ad9bbeeb9d51b1c507d9ba8c53668e9d4f71))
+* **world:** stow the drying rag lower and further right when idle ([#182](https://github.com/clarkbar-sys/done-rite-detailing/issues/182)) ([01769b7](https://github.com/clarkbar-sys/done-rite-detailing/commit/01769b7bb816b4584a8835df18d4ba1a3bf81f22)), closes [#176](https://github.com/clarkbar-sys/done-rite-detailing/issues/176)
+* **world:** the water leaves the nozzle, and the flamethrower leaves the belt ([#189](https://github.com/clarkbar-sys/done-rite-detailing/issues/189)) ([fbdce0e](https://github.com/clarkbar-sys/done-rite-detailing/commit/fbdce0e99cfa74643be3cac30b53b9a057f9d562)), closes [#162](https://github.com/clarkbar-sys/done-rite-detailing/issues/162)
+
+
+### Performance Improvements
+
+* **ci:** halve the pipeline, and fix the score bug that exposed ([#183](https://github.com/clarkbar-sys/done-rite-detailing/issues/183)) ([1798850](https://github.com/clarkbar-sys/done-rite-detailing/commit/179885085f90d7a6a04b900a8ed138aaee568dc3))
+* **tests:** build the room once in the six suites that never move it ([#190](https://github.com/clarkbar-sys/done-rite-detailing/issues/190)) ([949c0e9](https://github.com/clarkbar-sys/done-rite-detailing/commit/949c0e9888850f5147407e6907d68272469c7d7b)), closes [#186](https://github.com/clarkbar-sys/done-rite-detailing/issues/186)
+
 ## [1.13.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.12.0...v1.13.0) (2026-08-08)
 
 
