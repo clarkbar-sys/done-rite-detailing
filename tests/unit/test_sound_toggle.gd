@@ -5,7 +5,7 @@
 ## here is [method SoundToggle.glyph], a static table of points that needs no
 ## [SceneTree] to read — the same split
 ## [code]tests/integration/test_tool_belt_hud.gd[/code] makes for
-## [method ToolBeltHud.ToolIcon.glyph]. Whether the picture actually reaches a
+## [method ToolBeltHud.ToolIcon.sprite]. Whether the picture actually reaches a
 ## button on screen is [code]tests/integration/test_sound_toggle.gd[/code]'s
 ## half of the job.
 extends GutTest

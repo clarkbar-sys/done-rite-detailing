@@ -109,23 +109,32 @@ var model: String
 
 ## How far [member model] has to be turned, in degrees, before it is the way up
 ## the game holds it. [code]Vector3.ZERO[/code] for a mesh that already is, which
-## is every one of these but the power wash.
+## is every model on the belt today.
 ##
 ## [b]An artist's frame is not the game's, and only one of them can be wrong
 ## here.[/b] [ToolModel] fits a mesh axis by axis into [member extent], so a model
 ## has to arrive with its long axis on [code]+Y[/code] and the end it emits from
 ## at the top — which is where the [CylinderMesh] it replaces put them, and where
-## [ViewModel] hangs the [code]Muzzle[/code] marker. Three of the four models on
-## the belt were authored that way. The pressure washer was authored Z-up, with
-## its barrel at the [code]-Y[/code] end of the mesh, so fitted as it arrives it
-## sprays out of its own hose end.
+## [ViewModel] hangs the [code]Muzzle[/code] marker. A download that was authored
+## Z-up arrives lying on its side, or end over end, and fitted as it comes it
+## sprays out of its own hose end. That is not hypothetical: the power wash was a
+## Sketchfab flamethrower until [code]#162[/code] and this row is what stood it
+## the right way up.
 ##
 ## [b]A row here rather than an edit to the file or a branch in [ToolModel].[/b]
-## The asset is a CC-BY download this project keeps byte for byte — see
-## [code]assets/models/pressure_washer/ATTRIBUTION.txt[/code] — and "which way up
-## did this artist model it" is a fact about one asset, which is what this table
-## is for. [ToolModel] applies it before it measures the box, so [member extent]
-## goes on describing the tool the player actually ends up holding.
+## A borrowed model is kept byte for byte — the licence it arrives under is a
+## reason and the diffability is another — and "which way up did this artist model
+## it" is a fact about one asset, which is what this table is for. [ToolModel]
+## applies it before it measures the box, so [member extent] goes on describing
+## the tool the player actually ends up holding.
+##
+## [b]Zero everywhere is not the same as unused.[/b] The wand that replaced the
+## flamethrower is drawn by this project rather than downloaded
+## ([code]scripts/build-pressure-washer.py[/code]), so it is authored the way up
+## the game wants and asks for no turn — and the next borrowed model may well ask
+## for one again. [code]tests/integration/test_tool_model.gd[/code] keeps this
+## honest by turning that same wand on purpose and requiring it to come out
+## upside down.
 ##
 ## [b]Right angles only.[/b] This is for righting a frame, not for posing a tool —
 ## posing is [method ViewModel._held_pose]'s, and a tool turned a few degrees here
@@ -166,17 +175,28 @@ func _init(
 ## startup is not a cost worth designing around.
 static func catalogue() -> Array[DetailingTool]:
 	var tools: Array[DetailingTool] = []
-	# A wand: long, aimed, and the only metal on the belt. Modelled now — see
-	# [code]assets/models/pressure_washer/ATTRIBUTION.txt[/code] — and the model is
-	# what all three numbers below come from.
+	# A wand: long, aimed, and the only metal on the belt. Modelled, and the one
+	# model on the belt this project draws rather than borrows — see
+	# [code]scripts/build-pressure-washer.py[/code], which is where the shape is
+	# argued and where these three numbers are also written down.
 	#
-	# [b]All three, because the fit is per axis.[/b] [ToolModel] maps the mesh's own
-	# box onto this one axis by axis, and the mesh is not a bare barrel: it is
-	# 5.632 x 21.391 x 14.655 in its own units, a pipe with a gas bottle strapped
-	# across it. The old 0.06 x 0.72 x 0.06 would have squashed that to a third of
-	# its width and a twelfth of its depth. These three are the mesh's own box at
-	# one scale, so the fit is uniform to a tenth of a per cent and the pipe stays
-	# round.
+	# [b]The box and the mesh are the same box, which is the point.[/b] Every other
+	# model arrives at its artist's scale and [ToolModel] fits it to whatever this
+	# row says; this one is drawn at 42 x 550 x 60 mm, so the fit is the identity
+	# and the centring is zero. That is not an optimisation — nothing about
+	# [ToolModel] changes, and re-scaling the file would move nothing — it is so
+	# that the one thing the model and this table have to agree about is a pair of
+	# literals: the nozzle is the topmost point of the mesh, on its own axis, and
+	# [member ViewModel.MUZZLE] is hung at [code](0, extent.y / 2, 0)[/code]. Those
+	# two being the same point is what makes the water leave the nozzle.
+	#
+	# [b]It was not, and that was [code]#162[/code].[/b] The flamethrower this
+	# replaced was 5.632 x 21.391 x 14.655 in its own units — a pipe with a gas
+	# bottle strapped across it — and the bottle is what sized the box. Fitted, the
+	# middle of its barrel's end face came out 46 mm off the box's axis in X and
+	# 121 mm in Z, so the water left a point in mid-air 120 mm from the nozzle,
+	# measured in the running game. No amount of tuning [WashJet] could have fixed
+	# that: the marker was exactly where this table said, and the model was not.
 	#
 	# [b]And the scale is the hand's clearance budget rather than taste.[/b] This is
 	# the one tool that stays in the hand and turns about it, so what it spends is
@@ -185,38 +205,21 @@ static func catalogue() -> Array[DetailingTool]:
 	# press the glass allows. Both are measured — in
 	# [code]tests/integration/test_view_model.gd[/code] and
 	# [code]tests/integration/test_play_screen_wand.gd[/code] — and both failed on
-	# the way here rather than in theory. At the 0.72 m the barrel used to be, the
-	# corner reaches 0.495 m and comes to 0.03 m of the lens; at 0.60 m the reach is
-	# fine and the lens is still only 0.037 m away. At 0.55 m the corner is 0.391 m
-	# out and clears the near plane by 0.068 m at rest and 0.072 m aimed.
-	#
-	# So the tool is a fifth shorter than the barrel it replaces and several times
-	# bulkier, which is the trade this model is: a thin 6 cm tube could be long
-	# because it was thin, and a pipe with a bottle across it cannot.
-	#
-	# [b]And it is turned end over end, because the artist's frame is not this
-	# one.[/b] The download is authored Z-up — the wrapper node the exporter writes
-	# carries the quarter turn that would say so, and [ToolModel] never looks at a
-	# node — so in the mesh's own space the barrel is at [code]-Y[/code] and the
-	# hose end is at [code]+Y[/code]. Fitted as it arrives, the wand sprays out of
-	# the end nearest the hand: reported as "the washer is shooting out the opposite
-	# end", which is exactly what it was doing. Half a turn about [code]Z[/code]
-	# rather than about [code]X[/code], and that is the axis with the argument: both
-	# put the barrel at the top, and only this one leaves the mesh's own up —
-	# [code]+Z[/code], the side the barrel sits on above the bottle — pointing out
-	# of the screen at the player once [method ViewModel._held_pose] has tipped the
-	# wand away. About [code]X[/code] the player would be shown its underside.
+	# the way to the 0.55 m below rather than in theory. At the 0.72 m the original
+	# barrel was, the corner reaches 0.495 m and comes to 0.03 m of the lens; at
+	# 0.60 m the reach is fine and the lens is still only 0.037 m away. The length
+	# is unchanged from the flamethrower's and the other two axes are a third and a
+	# sixth of it, so a wand that already cleared both now clears them by more.
 	tools.append(
 		DetailingTool.new(
 			Id.POWER_WASH,
 			"Power Wash",
 			Shape.CYLINDER,
-			Vector3(0.145, 0.550, 0.377),
+			Vector3(0.042, 0.550, 0.060),
 			Color(0.78, 0.80, 0.84),
 			0.9,
 			0.25,
-			"res://assets/models/pressure_washer/homemade_flamethrower.glb",
-			Vector3(0.0, 0.0, 180.0)
+			"res://assets/models/pressure_washer/pressure_washer.glb"
 		)
 	)
 	# Stretched, as specified — a cube reads as a dice, and the thing that says

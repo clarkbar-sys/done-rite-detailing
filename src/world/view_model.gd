@@ -71,10 +71,14 @@
 ## the proxy, with their [code]-Z[/code] pointed out of the nozzle — which is the
 ## axis a [GPUParticles3D] emits along, so [WashJet] and [SprayMist] are stood on
 ## the first one every tick and throw their contents down it with no arithmetic of
-## their own. Which end is which is the proxy's [code]+Y[/code] and nothing else,
-## so a modelled tool has to arrive the right way up in it — see
-## [member DetailingTool.model_turn], which is the pressure washer's row for
-## exactly that reason. They are also what a test measures the alignment with: the line
+## their own. Where they sit is [method ToolCarry.nozzle] and its opposite number,
+## which is to say the two ends of the catalogue's box on the box's own axis — so
+## a modelled tool has to arrive the right way up in it (see
+## [member DetailingTool.model_turn]) [i]and[/i] with the end it emits from on
+## that axis. The second half of that is not free and was not true: see
+## [code]#162[/code], where the wand's nozzle sat 12 cm off the axis and the water
+## left the marker rather than the wand. They are also what a test measures the
+## alignment with: the line
 ## between them is the tool, and asserting on two nodes is honest in a way that
 ## re-deriving the axis from the same [Basis] the code posed it with is not.
 ##
