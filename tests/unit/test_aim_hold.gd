@@ -1,4 +1,4 @@
-## Unit tests for [AimHold] — the rule that lets [method Garage._under_the_finger]
+## Unit tests for [AimHold] — the rule that lets [method AimProbe.under_the_finger]
 ## ask the swept-sphere tier once per aim instead of once per physics tick.
 ##
 ## Under tests/unit/ because an [AimHold] is a [RefCounted] that has never heard of

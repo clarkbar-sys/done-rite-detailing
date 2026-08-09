@@ -184,7 +184,7 @@ func _at_the_car() -> Vector2:
 	return _on_screen(_car().global_position)
 
 
-## Well over the roof: a press no tier of [method Garage._under_the_finger] can
+## Well over the roof: a press no tier of [method AimProbe.under_the_finger] can
 ## answer off real geometry, and so one the room answers with a corner of the
 ## nearest panel's bounding box.
 ##

@@ -184,7 +184,7 @@ func lay_on(
 ## without one — where to stand, what to aim at, where a hit lands in the atlas,
 ## how far to grow it — is in that class, where a unit test can reach it. What is
 ## left here is the loop and the query, and the query is deliberately the same
-## [method PhysicsDirectSpaceState3D.intersect_ray] [method Garage._under_the_finger]
+## [method PhysicsDirectSpaceState3D.intersect_ray] [method AimProbe.under_the_finger]
 ## spends the trigger through: reachability is then defined by the code that
 ## actually decides what a press lands on, rather than by a second model of the car
 ## that can disagree with it.

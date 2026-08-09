@@ -3,7 +3,7 @@
 ## aim it was asked about has not moved.
 ##
 ## [b]The measurement this exists for.[/b] [code]scripts/perf-probe.gd[/code] times
-## each query [method Garage._under_the_finger] makes, one at a time, against the
+## each query [method AimProbe.under_the_finger] makes, one at a time, against the
 ## CSG blockout the game was tuned on and two of the car pack's ten styles.
 ## Measured on this hardware, headless, microseconds per call:
 ##
@@ -79,7 +79,7 @@ const HELD_METRES: float = 0.002
 ## against the screen: a swept sphere comes to rest a whole tool-radius off the
 ## line it was cast down — 0.4 m for the power wash — so a centimetre is two orders
 ## of magnitude inside the approximation the answer already is. Nothing exact is
-## held this way; [method Garage._under_the_finger] casts its exact ray every tick
+## held this way; [method AimProbe.under_the_finger] casts its exact ray every tick
 ## regardless, so every press that lands on the car is as sharp as it ever was.
 ##
 ## Comfortably clear of the noise floor, too: a [Vector3] holds 32-bit floats,
