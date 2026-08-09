@@ -195,12 +195,28 @@ func _ready() -> void:
 ## than a string built and three controls moved. The same early-out
 ## [method PatchFlash.fade] takes, for the same reason.
 ##
-## [b]"Arrived" is [method @GlobalScope.is_equal_approx] and that is not the same
-## thing as arrived[/b] — see [method _land], which is what stops the difference
-## from being points the player earned and never saw.
+## [b]The arrival test is exact, and [method is_equal_approx] here was a bug.[/b]
+## [method shown] truncates, and that tolerance scales with the number:
+## [code]CMP_EPSILON * 1200[/code] is 0.012, so a roll that had reached 1199.99
+## read as arrived, the digits stopped, and the readout sat on 1199 for the rest
+## of the game. [method move_toward] clamps to its target exactly, so the exact
+## comparison is the one that is always eventually true — it just costs the one
+## further frame the approximate one was skipping. Measured at 1/60 deltas,
+## which is both what the game runs at and what CI's [code]--fixed-fps[/code]
+## run pins: a 30-frame trickle to 1200 landed on 1199 before this and 1200
+## after. Not caught sooner because a headless test run used to free-wheel at
+## thousands of tiny frames a second, where the last step happened to land on
+## the target rather than a hundredth short of it.
+##
+## [b]And the tolerance is bigger than a point above 100,000.[/b] It scales, so
+## at 200,000 it is 2.0 — the same bug with no float luck in it at all, where a
+## single-point tick was swallowed outright rather than landing a hundredth
+## short. That is the case
+## [code]tests/integration/test_score_hud.gd[/code] pins deterministically,
+## because the 1,200 one above only fails when a frame's delta puts the last step
+## in the wrong place.
 func _process(delta: float) -> void:
-	if _flying <= 0 and _flash <= 0.0 and is_equal_approx(_shown, float(_total)):
-		_land()
+	if _flying <= 0 and _flash <= 0.0 and _shown == float(_total):
 		return
 	_roll_digits(delta)
 	_fade_flash(delta)
@@ -333,33 +349,6 @@ func flying() -> int:
 ## Whether the multiplier is being printed at all.
 func run_shown() -> bool:
 	return _run_label.visible
-
-
-## Puts the digits exactly on the total once the roll has been called arrived.
-##
-## [b]The gap [method @GlobalScope.is_equal_approx] tolerates is not always
-## smaller than a point.[/b] Its tolerance is proportional — a hundred-thousandth
-## of the larger value — so at a score of 200,000 it is 2.0, and the roll is
-## declared finished with a whole two points still to travel. [method _process]
-## then stops rolling, [method _paint] keeps printing [method @GDScript.int] of
-## where the digits got to, and the difference is points the player earned and
-## can never see. It does not correct itself either: the next tick compares
-## against the same total and takes the same early-out.
-##
-## Found by [code]tests/integration/test_score_hud.gd[/code]'s trickle case,
-## which failed once behind a heavier suite and passed on its own — because at
-## small totals the same bug needs the last step of the roll to land inside a
-## hundredth of the target, which is a thing one frame's [param delta] decides.
-## The deterministic version of it is the six-figure case beside it.
-##
-## Snapping rather than rolling the last of it is right on both counts: two
-## points at 200,000 is not an animation, and the whole reason the digits roll is
-## to show a sum happening, which a gap this small is not.
-func _land() -> void:
-	if _shown == float(_total):
-		return
-	_shown = float(_total)
-	_paint()
 
 
 ## Moves the digits [param delta] worth of the way to the total.

@@ -32,7 +32,7 @@ const SETTLE_SECONDS: float = 1.0
 
 ## A six-figure score, for the one case where "the digits have arrived" and "the
 ## digits are on the total" come apart on purpose rather than by luck of the
-## frame. See [method ScoreHud._land] and the test at the bottom of this file.
+## frame. See [method ScoreHud._process] and the test at the bottom of this file.
 const BIG_SCORE: int = 200_000
 
 var _hud: ScoreHud = null
@@ -194,18 +194,20 @@ func test_a_trickle_every_frame_is_tracked_and_lands() -> void:
 
 
 ## A point added to a six-figure score has to arrive, and the reason it might not
-## is arithmetic rather than timing.
+## has no float luck in it at all.
 ##
-## [method @GlobalScope.is_equal_approx] tolerates a hundred-thousandth of the
-## larger value, which at 200,000 is 2.0 — so the readout's own "have the digits
-## arrived" test says yes with a whole two points still to travel, stops rolling,
-## and prints a score one under the one the player earned for the rest of the run.
-## [method ScoreHud._land] is the fix and this is the case that pins it: no waiting
-## on a particular frame, no flake, just a gap the tolerance is bigger than.
+## [code]#183[/code] took [method @GlobalScope.is_equal_approx] out of
+## [method ScoreHud._process]'s arrival test, and the trickle case above is what
+## found it: at 1,200 the tolerance is 0.012, so the bug needs the last step of
+## the roll to land inside a hundredth of the target, which is a thing one
+## frame's delta decides. That is a real case and a poor guard — it passed on its
+## own and failed behind a heavier suite.
 ##
-## The trickle case above is the same bug at the other end of the scale, where the
-## gap has to land inside a hundredth of the target for the tolerance to swallow
-## it — which one frame's delta decides, and which is exactly how this was found.
+## This is the same bug with the luck taken out. The tolerance is proportional,
+## so at 200,000 it is 2.0 and a single-point tick is inside it from the first
+## frame: the roll is declared arrived before it has moved, and the point is
+## swallowed outright rather than landing a hundredth short. Nothing here depends
+## on a delta, so it fails on the old comparison every time.
 func test_a_point_on_a_six_figure_score_still_arrives() -> void:
 	_hud.tick(BIG_SCORE)
 	await wait_seconds(SETTLE_SECONDS)
