@@ -32,14 +32,11 @@ behind. So the bake:
   * resamples every texture to 256x256. The bottle is 0.30 m tall in the corner
     of the frame and never fills more than about a fifth of the screen height,
     so a 1024 map is roughly four times the texels that can ever be seen;
+  * simplifies each part down to a share of the whole bottle's TRIANGLE_BUDGET —
+    68,096 triangles in, 8,496 out. That is the long section below;
   * narrows indices to 16-bit where the primitive fits, which every one of them
-    does (the largest is 11,923 vertices).
-
-Geometry is otherwise the artist's, untouched: 68,096 triangles, which is
-deliberately NOT decimated here. There is no mesh simplifier in this repo's
-toolchain and a hand-rolled one is a quality risk on a smooth-shaded model with
-UV seams; the tri count is printed at the end of a run so the number stays
-visible rather than becoming a surprise.
+    does (the largest is now 2,072 vertices, and was 11,923 before the
+    simplifier).
 
 The bottle is NOT re-proportioned to the catalogue's extent, and that is the
 one distortion this script deliberately leaves in place. The source bottle is
@@ -52,6 +49,123 @@ a cosmetic swap. A rounder bottle is the cheaper of the two prices.
 
 Re-running is safe and produces byte-identical files: nothing here reads the
 clock, iterates a set, or depends on dict ordering the interpreter chose.
+
+
+WHY THE MESH IS SIMPLIFIED, AND WHAT THE BUDGET IS WORTH (measured)
+--------------------------------------------------------------------
+This script used to say the artist's 68,096 triangles were deliberately left
+alone, on the grounds that a hand-rolled simplifier is a quality risk. What was
+missing from that trade was the size of the other half of it. Measured, on the
+pinned Godot, by importing the same .glb with the sidecar's two mesh switches
+flipped in turn:
+
+    tire_cleaner.glb -> .godot/imported/....scn      bytes
+      generate_lods + create_shadow_meshes (shipping)  1,938,697
+      generate_lods only                               1,133,323
+      create_shadow_meshes only                        1,275,000
+      neither                                            796,877
+
+So the LOD chain and the shadow mesh are two thirds of the file, and turning
+them off — which is what the issue that opened this asked about first — still
+leaves 0.78 MiB of bare mesh, twice what the whole scene was allowed to cost.
+The bloat is not the import settings. It is 68,096 triangles on a bottle held in
+the corner of the frame, and the only lever that moves all three numbers at once
+is the triangle count.
+
+TRIANGLE_BUDGET is 8,500 because the imported scene costs about 28.5 bytes a
+triangle at those settings (1,938,697 / 68,096) and the bottle was asked to fit
+in 0.4 MB. What it actually buys, re-measured on the files this script now
+writes, with the pack read by scripts/list-pck.py:
+
+    imported .scn, each bottle    1,938,697 -> 253,739 bytes   (-86.9%)
+    both bottles in index.pck     3,878,067 ->   507,464 bytes
+    .glb in this repository       2,094,068 ->   734,660 bytes
+    ToolModel build, each bottle  33 ms -> 18 ms    (see src/world/tool_model.gd)
+
+3.37 MB off a 35.6 MB pack, for two props held in the corner of the frame, which
+is what the load-time epic this belongs to is spending.
+
+
+HOW IT IS SIMPLIFIED, AND WHY IT KEEPS THE ARTIST'S UVs EXACTLY
+-----------------------------------------------------------------
+Garland & Heckbert's quadric error metric over half-edge collapses, in about two
+hundred lines below, standard library only. Blender is not in this repo's
+toolchain and adding it for one asset would put a 400 MB dependency behind a
+file that has to rebuild in CI; the rest of scripts/ manipulates glTF with json
+and struct, and this is the same idea carried one step further.
+
+The one place it deliberately departs from the textbook is where the survivor
+lands. Textbook QEM puts it wherever the summed quadric is smallest, which is a
+new point in space with no texture coordinate of its own — so the UV has to be
+interpolated, and an interpolated UV on a bottle wearing a printed label is how
+a decimator smears a wordmark. Here a collapse always lands on one of the two
+vertices it joins. Nothing is ever moved and nothing is ever invented: the
+output's POSITION, NORMAL and TEXCOORD_0 are all bit-for-bit the artist's, and
+the whole of what this script decides is which vertices stop being drawn.
+
+That costs a little accuracy per collapse and it is bought back by having six
+times as many collapses to choose from. Measured on the result — every one of
+the 37,286 source vertices, to the nearest point on the simplified surface:
+
+    Bottle   worst 0.476 mm   mean 0.050 mm
+    Neck     worst 0.002 mm   mean 0.000 mm
+    Nozzle   worst 0.080 mm   mean 0.007 mm
+    Top_1    worst 0.346 mm   mean 0.049 mm
+    Top_2    worst 0.304 mm   mean 0.058 mm
+    Trigger  worst 0.460 mm   mean 0.071 mm
+
+Half a millimetre, worst case, on a 269 mm bottle that is about a fifth of the
+screen's height — a fifth of a pixel at 720p. The overall box is 101 x 269 x 80
+mm before and after, and the bottle's own height moves by 0.04 mm.
+
+
+AND WHAT THE QUADRIC CANNOT SEE
+---------------------------------
+A quadric measures distance from planes. It is therefore blind to three things
+that would each ruin this asset in a way no size measurement would notice, and
+each of them is refused explicitly in `Decimator.collapse`:
+
+  * a UV seam is one ridge of the surface authored twice, once per side. Welding
+    by position is what lets the simplifier see the surface at all — otherwise
+    every seam reads as two open borders and nothing near one can move — and the
+    duplicates then have to be carried through each collapse as "wedges", with a
+    map derived from the two triangles the collapse deletes. If that map does not
+    reach every wedge, or would land two of them on one, the seam is being
+    pinched and the collapse is refused;
+  * the texture can be folded even when the surface is not. Two vertices whose
+    UVs happen to be nearly collinear make a triangle that samples a line of the
+    map across a patch of bottle — measured, before this was guarded, the nozzle
+    had triangles spreading a millionth of the texture per square metre where the
+    artist's sparsest spreads 191. So a collapse is refused if it would leave any
+    triangle thinner than UV_DENSITY_SLACK of the sparsest triangle *that part*
+    already had, which is a floor read off the artist's own layout rather than a
+    number invented here;
+  * a triangle can be turned inside out at no quadric cost at all, because a
+    plane does not care which side you are on. FLIP_LIMIT refuses that, and
+    SLIVER_AREA refuses the degenerate triangle it shades into.
+
+The two caps are also the only parts with an open border — 280 edges and 128 —
+and BORDER_PENALTY holds those rims about a hundred times harder than the flat
+beside them, because faces alone say nothing about an edge with nothing on the
+other side of it.
+
+
+RUNNING THIS WITHOUT THE DOWNLOAD
+-----------------------------------
+`--src` accepts either the Sketchfab download or a previous full-resolution run
+of this script, told apart by the generator string the output carries. The second
+route exists because the download is not in this repository — src-models/ holds
+the two .blend files this asset used to be made from, and the 8.0 MiB .glb has
+always had to be fetched — so a checkout that wants to change how the bottle is
+baked would otherwise have nothing to bake from.
+
+On that route the flattening, the UV pruning and the resample have already
+happened, so the parts are read straight off the six primitives and the textures
+are passed through byte for byte rather than resampled to the size they already
+are. What is asserted is what makes the route honest: the same six parts in the
+same order, every map already TEXTURE_PX square, and the geometry still at the
+artist's full FULL_TRIANGLES. That last one is what stops an already-simplified
+bottle being fed back in and simplified a second time.
 
 Only Pillow is imported beyond the standard library, and only to resample PNG.
 The glTF itself is read and written with struct + json, the same way
@@ -91,7 +205,9 @@ import argparse
 import json
 import struct
 import sys
+from heapq import heappop, heappush
 from io import BytesIO
+from math import sqrt
 from pathlib import Path
 
 try:
@@ -118,6 +234,51 @@ PARTS = {
 # Square, because every source map is. See the docstring for the texel-density
 # arithmetic behind the number.
 TEXTURE_PX = 256
+
+# What the artist's six parts add up to before anything is collapsed. Asserted
+# on the re-bake route (see `parts_of_bake`) so an already-simplified bottle
+# cannot be fed back in and simplified a second time.
+FULL_TRIANGLES = 68096
+
+# How many triangles the whole bottle is allowed to leave the bake with, shared
+# out between the six parts in proportion to what each arrived with. See the
+# docstring for the measurements behind the number: the imported `.scn` costs
+# about 28.5 bytes a triangle, so this is the budget that buys a 0.24 MB scene
+# where the artist's mesh cost 1.94 MB.
+TRIANGLE_BUDGET = 8500
+
+# How near two POSITIONs have to be to be the same corner of the surface, in
+# metres. A micron rather than a tolerance anybody has to tune: the source's UV
+# seams are exact duplicates — measured, welding at this quantum takes the
+# bottle's 11,923 vertices to 11,074, which is exactly the 22,144-triangle closed
+# surface Euler says is under them — so nothing here is deciding what "near"
+# means, it is only undoing the duplication a UV seam is.
+WELD_QUANTUM = 1e-6
+
+# What an open border edge is worth next to a face when the quadrics are built.
+# The two caps are the only parts that have a border — 280 edges on the cap and
+# 128 on the collar, and none anywhere else — and it is the rim you look straight
+# down on, so it is held about a hundred times harder than the flat beside it.
+BORDER_PENALTY = 100.0
+
+# How far a triangle's normal may swing during a collapse before the collapse is
+# refused. A fifth, which is about 78 degrees: a fold reads as a black facet on a
+# smooth-shaded bottle long before it reads as geometry.
+FLIP_LIMIT = 0.2
+
+# The smallest triangle a collapse may leave behind — the length of the cross
+# product rather than the area, so twice it. Below this the triangle has no
+# normal worth carrying and the collapse is refused instead.
+SLIVER_AREA = 1e-12
+
+# How much thinner than the artist's own thinnest triangle a collapse may leave
+# the texture spread, as a share. Half, and the *artist's* thinnest rather than a
+# number chosen here, because the floor that matters is a property of the
+# authored UV layout and not of this script — see the docstring's "AND WHAT THE
+# QUADRIC CANNOT SEE". A collapse is refused if it would leave any triangle
+# mapping fewer than this share of the UV area per square metre that the sparsest
+# triangle of the same part already managed.
+UV_DENSITY_SLACK = 0.5
 
 # The bottle, measured off the source and asserted on the way through. A
 # re-export that lands outside this is not the same object and the fit into
@@ -269,18 +430,423 @@ def assert_rigid(matrix: list[float], where: str) -> None:
 
 
 # --------------------------------------------------------------------------
+# The simplifier
+#
+# Garland & Heckbert's quadric error metric, over half-edge collapses, with the
+# survivor placed on one of the two vertices rather than at the quadric's own
+# minimum. See the module docstring for why that restriction is the whole point
+# and not a corner cut: a vertex that never moves keeps the artist's UV.
+# --------------------------------------------------------------------------
+
+
+def welded(positions: list[tuple]) -> tuple[list[int], list[tuple]]:
+    """Group `positions` by coincidence: a weld id per vertex, and one point each.
+
+    A UV seam is one ridge of the surface authored twice, once for each side's
+    texture coordinate, and a simplifier that could not see that would treat the
+    seam as two open borders and refuse to touch either. So topology is decided
+    here on position alone, and the duplicates ride along as this module's
+    "wedges" — see `Decimator.collapse`, which is where they are kept honest.
+    """
+    seen: dict[tuple[int, int, int], int] = {}
+    weld: list[int] = []
+    points: list[tuple] = []
+    for point in positions:
+        key = (
+            round(point[0] / WELD_QUANTUM),
+            round(point[1] / WELD_QUANTUM),
+            round(point[2] / WELD_QUANTUM),
+        )
+        at = seen.get(key)
+        if at is None:
+            at = len(points)
+            seen[key] = at
+            points.append(point)
+        weld.append(at)
+    return weld, points
+
+
+def plane_of(first: tuple, second: tuple, third: tuple) -> tuple[tuple | None, float]:
+    """The unit plane through three points, and twice the area of their triangle.
+
+    `(None, 0.0)` for a degenerate triangle, which has no plane to speak of and
+    would contribute nothing to a quadric anyway.
+    """
+    along = (second[0] - first[0], second[1] - first[1], second[2] - first[2])
+    across = (third[0] - first[0], third[1] - first[1], third[2] - first[2])
+    normal = (
+        along[1] * across[2] - along[2] * across[1],
+        along[2] * across[0] - along[0] * across[2],
+        along[0] * across[1] - along[1] * across[0],
+    )
+    length = sqrt(normal[0] ** 2 + normal[1] ** 2 + normal[2] ** 2)
+    if length <= 0.0:
+        return None, 0.0
+    unit = (normal[0] / length, normal[1] / length, normal[2] / length)
+    offset = -(unit[0] * first[0] + unit[1] * first[1] + unit[2] * first[2])
+    return (unit[0], unit[1], unit[2], offset), length
+
+
+def quadric_of(plane: tuple, weight: float) -> list[float]:
+    """`weight` times the outer product of `plane` with itself, upper triangle only.
+
+    Ten numbers rather than sixteen because the matrix is symmetric, in the order
+    a², ab, ac, ad, b², bc, bd, c², cd, d² — which is the order `error_at` reads
+    them back in and the only place that order is written down.
+    """
+    a, b, c, d = plane
+    return [
+        weight * a * a,
+        weight * a * b,
+        weight * a * c,
+        weight * a * d,
+        weight * b * b,
+        weight * b * c,
+        weight * b * d,
+        weight * c * c,
+        weight * c * d,
+        weight * d * d,
+    ]
+
+
+def add_quadric(into: list[float], block: list[float]) -> None:
+    for at in range(10):
+        into[at] += block[at]
+
+
+def error_at(quadric: list[float], point: tuple) -> float:
+    """What `point` costs against `quadric` — the sum of squared plane distances."""
+    x, y, z = point[0], point[1], point[2]
+    return (
+        quadric[0] * x * x
+        + 2.0 * quadric[1] * x * y
+        + 2.0 * quadric[2] * x * z
+        + 2.0 * quadric[3] * x
+        + quadric[4] * y * y
+        + 2.0 * quadric[5] * y * z
+        + 2.0 * quadric[6] * y
+        + quadric[7] * z * z
+        + 2.0 * quadric[8] * z
+        + quadric[9]
+    )
+
+
+class Decimator:
+    """One primitive's triangles, collapsed down to a triangle budget.
+
+    Built from the flattened part — positions already in the game's own metres
+    and the index buffer that draws them — and run once. What comes back is a
+    new index buffer over the *same* vertices: every surviving corner keeps the
+    exact POSITION, NORMAL and TEXCOORD_0 the artist gave it, because the only
+    thing this class ever does is decide which vertices stop being referenced.
+
+    That is the restriction the whole design turns on. The textbook collapse puts
+    the survivor wherever the summed quadric is smallest, which is a new point
+    with no UV of its own — and inventing one on a bottle wrapped in a printed
+    label is how a decimator smears a wordmark. Collapsing onto an endpoint costs
+    a little accuracy per collapse and buys exactness everywhere else: nothing is
+    interpolated, so nothing can be interpolated wrongly.
+    """
+
+    def __init__(self, positions: list[tuple], uvs: list[tuple], indices: list[int]) -> None:
+        self.uvs = uvs
+        self.weld, self.at = welded(positions)
+        # A triangle is carried twice over: once in weld ids, which is the
+        # surface's own topology, and once in the vertex ids the file draws with,
+        # which is what a UV seam splits. Every collapse has to keep both true.
+        self.corners: list[list[int]] = []
+        self.wedges: list[list[int]] = []
+        for base in range(0, len(indices), 3):
+            drawn = indices[base : base + 3]
+            weld = [self.weld[at] for at in drawn]
+            if weld[0] == weld[1] or weld[1] == weld[2] or weld[2] == weld[0]:
+                continue
+            self.corners.append(weld)
+            self.wedges.append(list(drawn))
+        self.alive = bytearray(b"\1" * len(self.corners))
+        self.triangles = len(self.corners)
+        self.faces: list[set[int]] = [set() for _ in self.at]
+        for face, weld in enumerate(self.corners):
+            for vertex in weld:
+                self.faces[vertex].add(face)
+        self.gone = bytearray(len(self.at))
+        # A version per vertex, bumped whenever its quadric changes, so a stale
+        # entry left in the heap by an earlier collapse is recognised and dropped
+        # instead of being re-costed. Cheaper than finding and deleting it.
+        self.stamp = [0] * len(self.at)
+        self.border: set[int] = set()
+        self.quadrics = self._quadrics()
+        self.floor = UV_DENSITY_SLACK * self._thinnest()
+
+    def _thinnest(self) -> float:
+        """The least UV area per square metre any triangle of this part is drawn at.
+
+        The floor `collapse` holds the texture to, read off the artist's own
+        layout. Some parts are mapped far more sparsely than others — measured on
+        this bottle, the body's sparsest triangle spreads 0.59 UV units² over a
+        square metre and the nozzle's spreads 191 — so a single number written
+        here would be six different amounts of nothing.
+        """
+        thinnest = float("inf")
+        for face, wedge in enumerate(self.wedges):
+            _, twice_area = plane_of(*(self.at[vertex] for vertex in self.corners[face]))
+            if twice_area <= 0.0:
+                continue
+            thinnest = min(thinnest, self._uv_area(wedge) / twice_area)
+        return 0.0 if thinnest == float("inf") else thinnest
+
+    def _uv_area(self, wedge: list[int]) -> float:
+        """Twice the area a triangle's three corners cover in texture space."""
+        first, second, third = (self.uvs[at] for at in wedge)
+        return abs(
+            (second[0] - first[0]) * (third[1] - first[1])
+            - (third[0] - first[0]) * (second[1] - first[1])
+        )
+
+    # -- setting up -------------------------------------------------------
+
+    def _quadrics(self) -> list[list[float]]:
+        """A quadric per weld vertex: its faces' planes, and its borders' walls.
+
+        Faces are weighted by area, which is what makes the metric a measure of
+        volume swept rather than of planes counted — a vertex in a dense patch of
+        small triangles is not thereby more important than one holding a big
+        flat. Borders get a second plane standing square to the surface along the
+        open edge, weighted by [constant BORDER_PENALTY]: without it the two caps
+        would be simplified from the rim inwards, because an open edge is the one
+        place the faces alone say nothing.
+        """
+        quadrics: list[list[float]] = [[0.0] * 10 for _ in self.at]
+        edges: dict[tuple[int, int], list[int]] = {}
+        for face, weld in enumerate(self.corners):
+            plane, twice_area = plane_of(*(self.at[vertex] for vertex in weld))
+            if plane is not None:
+                block = quadric_of(plane, twice_area)
+                for vertex in weld:
+                    add_quadric(quadrics[vertex], block)
+            for corner in range(3):
+                first, second = weld[corner], weld[(corner + 1) % 3]
+                edges.setdefault((min(first, second), max(first, second)), []).append(face)
+        for (first, second), faces in edges.items():
+            if len(faces) != 1:
+                continue
+            self.border.add(first)
+            self.border.add(second)
+            plane, _ = plane_of(*(self.at[vertex] for vertex in self.corners[faces[0]]))
+            if plane is None:
+                continue
+            here, there = self.at[first], self.at[second]
+            along = (there[0] - here[0], there[1] - here[1], there[2] - here[2])
+            wall, length = plane_of(here, there, (here[0] + plane[0], here[1] + plane[1], here[2] + plane[2]))
+            if wall is None:
+                continue
+            weight = BORDER_PENALTY * (along[0] ** 2 + along[1] ** 2 + along[2] ** 2)
+            block = quadric_of(wall, weight)
+            add_quadric(quadrics[first], block)
+            add_quadric(quadrics[second], block)
+        return quadrics
+
+    # -- running ----------------------------------------------------------
+
+    def run(self, budget: int) -> list[int]:
+        """Collapse until `budget` triangles are left, and return the index buffer.
+
+        Cheapest first, out of a heap, which is the ordinary shape of this
+        algorithm: a collapse changes what its neighbours cost, so the queue is
+        re-offered around the survivor rather than rebuilt. A collapse that turns
+        out to be illegal by the time it reaches the top is dropped rather than
+        retried — its edge is offered again the next time either end moves, and
+        an edge no legal collapse ever reaches is exactly one that should stay.
+        """
+        heap: list[tuple[float, int, int, int, int]] = []
+        offered: set[tuple[int, int]] = set()
+        for weld in self.corners:
+            for corner in range(3):
+                first, second = weld[corner], weld[(corner + 1) % 3]
+                key = (min(first, second), max(first, second))
+                if key in offered:
+                    continue
+                offered.add(key)
+                self._offer(heap, first, second)
+                self._offer(heap, second, first)
+        while self.triangles > budget and heap:
+            _, source, target, was_source, was_target = heappop(heap)
+            if self.gone[source] or self.gone[target]:
+                continue
+            if self.stamp[source] != was_source or self.stamp[target] != was_target:
+                continue
+            if not self.collapse(source, target):
+                continue
+            self.stamp[target] += 1
+            for face in list(self.faces[target]):
+                for vertex in self.corners[face]:
+                    if vertex != target:
+                        self._offer(heap, vertex, target)
+                        self._offer(heap, target, vertex)
+        return self.indices()
+
+    def _offer(self, heap: list, source: int, target: int) -> None:
+        """Queue "remove `source`, keep `target`" at what that would cost."""
+        summed = list(self.quadrics[source])
+        add_quadric(summed, self.quadrics[target])
+        cost = error_at(summed, self.at[target])
+        heappush(heap, (cost, source, target, self.stamp[source], self.stamp[target]))
+
+    def collapse(self, source: int, target: int) -> bool:
+        """Remove `source` onto `target` if that is legal, and say whether it was.
+
+        Five things have to hold, and each of them is a way a simplifier can
+        quietly ruin an asset rather than crash:
+
+          * **the seam has to survive.** `source` may be a UV seam vertex, which
+            is two drawn vertices at one point. The two triangles either side of
+            the collapsed edge say which of `target`'s drawn vertices each of
+            them becomes; if that map does not reach every one of `source`'s
+            wedges, or if two of them would land on one, the seam is being
+            pinched and the collapse is refused. That is what stops a body vertex
+            being pulled across the label's edge;
+          * **an open border stays a border.** A vertex on the caps' rim may only
+            be collapsed along the rim, never inwards, or the rim gains a notch;
+          * **the link condition**, which is the standard test that a collapse
+            leaves a surface rather than a pinched non-manifold seam: the
+            vertices that neighbour both ends must be exactly the ones opposite
+            the edge being collapsed;
+          * **no triangle may fold**, which the quadric alone does not prevent —
+            it measures distance from planes and is happily satisfied by a
+            triangle turned inside out on one of them;
+          * **no triangle may have its texturing pulled flat**, which the quadric
+            cannot see at all: three corners that happen to be nearly collinear
+            in UV draw a line of the map across a patch of bottle. `self.floor`
+            is what that is measured against.
+        """
+        around = [face for face in self.faces[source] if self.alive[face]]
+        shared = [face for face in around if target in self.corners[face]]
+        if not shared or len(shared) > 2:
+            return False
+        if source in self.border and len(shared) != 1:
+            return False
+        # The wedge map, read off the triangles the collapse deletes.
+        becomes: dict[int, int] = {}
+        for face in shared:
+            weld = self.corners[face]
+            leaving = self.wedges[face][weld.index(source)]
+            staying = self.wedges[face][weld.index(target)]
+            if becomes.setdefault(leaving, staying) != staying:
+                return False
+        if len(set(becomes.values())) != len(becomes):
+            return False
+        for face in around:
+            if self.wedges[face][self.corners[face].index(source)] not in becomes:
+                return False
+        # The link condition.
+        mine = {vertex for face in around for vertex in self.corners[face]} - {source}
+        theirs = {
+            vertex for face in self.faces[target] if self.alive[face] for vertex in self.corners[face]
+        } - {target}
+        opposite = {vertex for face in shared for vertex in self.corners[face]} - {source, target}
+        if mine & theirs != opposite:
+            return False
+        # The fold test, and the texture's own.
+        landing = self.at[target]
+        for face in around:
+            if face in shared:
+                continue
+            weld = self.corners[face]
+            was = [self.at[vertex] for vertex in weld]
+            now = [landing if vertex == source else self.at[vertex] for vertex in weld]
+            before, _ = plane_of(*was)
+            after, now_area = plane_of(*now)
+            if after is None or now_area < SLIVER_AREA:
+                return False
+            if before is not None:
+                turned = before[0] * after[0] + before[1] * after[1] + before[2] * after[2]
+                if turned < FLIP_LIMIT:
+                    return False
+            corner = weld.index(source)
+            moved = list(self.wedges[face])
+            moved[corner] = becomes[moved[corner]]
+            if self._uv_area(moved) < self.floor * now_area:
+                return False
+        # Legal. Do it.
+        for face in shared:
+            self.alive[face] = 0
+            self.triangles -= 1
+            for vertex in self.corners[face]:
+                self.faces[vertex].discard(face)
+        for face in around:
+            if not self.alive[face]:
+                continue
+            corner = self.corners[face].index(source)
+            self.corners[face][corner] = target
+            self.wedges[face][corner] = becomes[self.wedges[face][corner]]
+            self.faces[target].add(face)
+        self.faces[source].clear()
+        self.gone[source] = 1
+        add_quadric(self.quadrics[target], self.quadrics[source])
+        return True
+
+    def indices(self) -> list[int]:
+        """What is left, as a flat index buffer over the vertices we were given."""
+        drawn: list[int] = []
+        for face, wedge in enumerate(self.wedges):
+            if self.alive[face]:
+                drawn += wedge
+        return drawn
+
+
+def compacted(
+    positions: list[tuple], normals: list[tuple], uvs: list[tuple], indices: list[int]
+) -> tuple[list[tuple], list[tuple], list[tuple], list[int]]:
+    """The three attribute arrays with the vertices nothing draws any more dropped.
+
+    In the order the index buffer first reaches them rather than in the source's
+    own order, which is free here and is the ordering a vertex cache prefers.
+    """
+    seen: dict[int, int] = {}
+    drawn: list[int] = []
+    for at in indices:
+        moved = seen.get(at)
+        if moved is None:
+            moved = len(seen)
+            seen[at] = moved
+        drawn.append(moved)
+    kept = sorted(seen, key=lambda at: seen[at])
+    return (
+        [positions[at] for at in kept],
+        [normals[at] for at in kept],
+        [uvs[at] for at in kept],
+        drawn,
+    )
+
+
+def budgets(counts: list[int], total_budget: int) -> list[int]:
+    """`total_budget` triangles shared out in proportion to what each part has.
+
+    Proportional rather than per-part hand tuning, because the artist already
+    decided where this model's detail belongs — the body and the neck are two
+    thirds of it — and a table of six numbers here would be a second opinion
+    about that, drifting from the first the day the source is re-exported.
+    """
+    total = sum(counts)
+    return [max(1, round(count * total_budget / total)) for count in counts]
+
+
+# --------------------------------------------------------------------------
 # Reading the source scene
 # --------------------------------------------------------------------------
 
 
-def parts_of(src: Source) -> list[tuple[str, int, list[float]]]:
-    """Every mesh in the scene as (material name, mesh index, world matrix).
+IDENTITY = [1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0]
+
+
+def parts_of(src: Source) -> list[tuple[str, dict, list[float]]]:
+    """Every mesh in the download as (material name, primitive, world matrix).
 
     Walked from the scene roots so the ancestors' matrices are composed rather
     than ignored, and returned in the order the walk finds them — which is the
     source's own node order, and is therefore stable across runs.
     """
-    found: list[tuple[str, int, list[float]]] = []
+    found: list[tuple[str, dict, list[float]]] = []
 
     def walk(index: int, parent: list[float]) -> None:
         node = src.nodes[index]
@@ -290,18 +856,55 @@ def parts_of(src: Source) -> list[tuple[str, int, list[float]]]:
             if len(primitives) != 1:
                 raise AssertionError(f"{node.get('name')}: expected one primitive per part")
             assert_rigid(matrix, node.get("name", f"node {index}"))
-            found.append((src.materials[primitives[0]["material"]]["name"], node["mesh"], matrix))
+            found.append((src.materials[primitives[0]["material"]]["name"], primitives[0], matrix))
         for child in node.get("children", []):
             walk(child, matrix)
 
-    identity = [1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0]
     for root in src.gltf["scenes"][src.gltf.get("scene", 0)]["nodes"]:
-        walk(root, identity)
+        walk(root, IDENTITY)
 
     names = [name for name, _, _ in found]
     if names != list(PARTS):
         raise AssertionError(f"source parts are {names}, expected {list(PARTS)}")
     return found
+
+
+def parts_of_bake(src: Source) -> list[tuple[str, dict, list[float]]]:
+    """The same six parts, read back out of this script's own full-res output.
+
+    See the docstring's "RUNNING THIS WITHOUT THE DOWNLOAD" for why that is a
+    supported input. The flattening has already happened, so every matrix here is
+    the identity and every primitive is a part — but the two things that make a
+    re-bake meaningful rather than convenient are asserted rather than hoped for:
+    the parts are the same six in the same order, and the geometry is still the
+    artist's full resolution. That second check is what stops an already-simplified
+    bottle being fed back in and simplified again, which would compound silently.
+    """
+    if len(src.gltf["nodes"]) != 1 or len(src.gltf["meshes"]) != 1:
+        raise AssertionError("a re-bake source must be one node holding one mesh")
+    found = [
+        (src.materials[prim["material"]]["name"], prim, IDENTITY)
+        for prim in src.gltf["meshes"][0]["primitives"]
+    ]
+    names = [name for name, _, _ in found]
+    if names != list(PARTS):
+        raise AssertionError(f"source parts are {names}, expected {list(PARTS)}")
+    triangles = sum(src.gltf["accessors"][prim["indices"]]["count"] for _, prim, _ in found) // 3
+    if triangles != FULL_TRIANGLES:
+        raise AssertionError(
+            f"the re-bake source holds {triangles} triangles, not the artist's {FULL_TRIANGLES}"
+        )
+    return found
+
+
+def is_rebake(src: Source) -> bool:
+    """Whether this source is a previous run of this script rather than the download."""
+    return src.gltf["asset"].get("generator") == GENERATOR
+
+
+def parts_in(src: Source) -> list[tuple[str, dict, list[float]]]:
+    """The six parts of whichever of the two supported inputs `src` turned out to be."""
+    return parts_of_bake(src) if is_rebake(src) else parts_of(src)
 
 
 def attribution_of(src: Source) -> str:
@@ -353,8 +956,9 @@ def resampled(png: bytes, size: int) -> bytes:
 class Builder:
     """Accumulates the output glTF: buffer, accessors, materials, one mesh."""
 
-    def __init__(self, src: Source) -> None:
+    def __init__(self, src: Source, rebake: bool = False) -> None:
         self.src = src
+        self.rebake = rebake
         self.blob = bytearray()
         self.views: list[dict] = []
         self.accessors: list[dict] = []
@@ -403,10 +1007,10 @@ class Builder:
         )
         return len(self.accessors) - 1
 
-    def add_indices(self, values: list[tuple], vertices: int) -> int:
+    def add_indices(self, values: list[int], vertices: int) -> int:
         """Triangle indices, 16-bit when the primitive's vertices fit in 16 bits."""
         narrow = vertices < SHORT_INDEX_LIMIT
-        payload = b"".join(struct.pack("<H" if narrow else "<I", v[0]) for v in values)
+        payload = b"".join(struct.pack("<H" if narrow else "<I", v) for v in values)
         self.accessors.append(
             {
                 "bufferView": self._view(payload, ELEMENT_ARRAY_BUFFER),
@@ -428,7 +1032,20 @@ class Builder:
         tire_cleaner_image_0.png and friends.
         """
         if source_index not in self._image_map:
-            png = resampled(self.src.image_bytes(source_index), TEXTURE_PX)
+            png = self.src.image_bytes(source_index)
+            if self.rebake:
+                # A re-bake's maps came out of this same function on the run that
+                # wrote them, so they are already TEXTURE_PX and already opaque
+                # RGB. Passed through byte for byte rather than resampled to the
+                # size they are: that is what makes the two input routes agree on
+                # the textures exactly, instead of agreeing on a re-encode of
+                # them. Asserted, because "already the right size" is the whole
+                # of the argument.
+                width, height = Image.open(BytesIO(png)).size
+                if (width, height) != (TEXTURE_PX, TEXTURE_PX):
+                    raise AssertionError(f"{name}: a re-bake's map is {width}x{height}")
+            else:
+                png = resampled(png, TEXTURE_PX)
             self.texture_bytes += len(png)
             self.images.append({"bufferView": self._view(png), "mimeType": "image/png", "name": name})
             self._image_map[source_index] = len(self.images) - 1
@@ -465,18 +1082,28 @@ class Builder:
 
 
 def build(src: Source) -> tuple[bytes, dict, dict]:
-    """Flatten the six parts into one mesh and return (blob, gltf, stats)."""
-    builder = Builder(src)
+    """Flatten the six parts into one mesh, simplify each, return (blob, gltf, stats)."""
+    parts = parts_in(src)
+    builder = Builder(src, rebake=is_rebake(src))
+    allowed = budgets(
+        [src.gltf["accessors"][prim["indices"]]["count"] // 3 for _, prim, _ in parts],
+        TRIANGLE_BUDGET,
+    )
     primitives = []
     triangles = 0
     vertices = 0
-    for name, mesh_index, matrix in parts_of(src):
-        prim = src.meshes[mesh_index]["primitives"][0]
+    per_part: list[tuple[str, int, int]] = []
+    for (name, prim, matrix), budget in zip(parts, allowed):
         attributes = prim["attributes"]
         positions = [apply(matrix, v) for v in src.accessor(attributes["POSITION"])]
         normals = [rotate(matrix, n) for n in src.accessor(attributes["NORMAL"])]
         uvs = src.accessor(attributes["TEXCOORD_0"])
-        indices = src.accessor(prim["indices"])
+        indices = [drawn[0] for drawn in src.accessor(prim["indices"])]
+        was = len(indices) // 3
+        positions, normals, uvs, indices = compacted(
+            positions, normals, uvs, Decimator(positions, uvs, indices).run(budget)
+        )
+        per_part.append((name, was, len(indices) // 3))
         primitives.append(
             {
                 "attributes": {
@@ -507,7 +1134,13 @@ def build(src: Source) -> tuple[bytes, dict, dict]:
         "bufferViews": builder.views,
         "buffers": [{"byteLength": len(builder.blob) + (-len(builder.blob) % 4)}],
     }
-    stats = {"triangles": triangles, "vertices": vertices, "texture_bytes": builder.texture_bytes}
+    stats = {
+        "triangles": triangles,
+        "vertices": vertices,
+        "texture_bytes": builder.texture_bytes,
+        "parts": per_part,
+        "was": sum(before for _, before, _ in per_part),
+    }
     return bytes(builder.blob), gltf, stats
 
 
@@ -523,11 +1156,19 @@ def verify(path: Path) -> tuple[list[float], list[float]]:
         raise AssertionError(f"the output must be one mesh of {len(PARTS)} primitives")
     low = [float("inf")] * 3
     high = [float("-inf")] * 3
+    triangles = 0
     for prim in gltf["meshes"][0]["primitives"]:
         accessor = gltf["accessors"][prim["attributes"]["POSITION"]]
+        triangles += gltf["accessors"][prim["indices"]]["count"] // 3
         for axis in range(3):
             low[axis] = min(low[axis], accessor["min"][axis])
             high[axis] = max(high[axis], accessor["max"][axis])
+    # One triangle of slack a part, because the budget is shared out by rounding
+    # and six roundings can each go up. Asserted at all because the budget is the
+    # whole point of the simplifier: a run that quietly stopped collapsing would
+    # otherwise only show up as a 1.9 MB scene four commands later.
+    if triangles > TRIANGLE_BUDGET + len(PARTS):
+        raise AssertionError(f"the output holds {triangles} triangles, over the {TRIANGLE_BUDGET} budget")
     for axis, expected in enumerate(EXPECTED_SIZE_M):
         measured = high[axis] - low[axis]
         if abs(measured - expected) > SIZE_TOLERANCE_M:
@@ -553,7 +1194,12 @@ def main() -> int:
     size = [high[axis] - low[axis] for axis in range(3)]
     print(f"{args.src.name}: {args.src.stat().st_size / 1024:.0f} KiB in")
     print(f"  parts      {len(PARTS)} -> 1 mesh of {len(PARTS)} primitives")
-    print(f"  geometry   {stats['triangles']} triangles, {stats['vertices']} vertices")
+    for name, before, after in stats["parts"]:
+        print(f"    {name:<8} {before:>6} -> {after:>5} triangles")
+    print(
+        f"  geometry   {stats['was']} -> {stats['triangles']} triangles"
+        f" ({stats['triangles'] / stats['was']:.1%}), {stats['vertices']} vertices"
+    )
     print(f"  textures   {len(gltf['images'])} at {TEXTURE_PX}px, {stats['texture_bytes'] / 1024:.0f} KiB")
     print(f"  bounds     {size[0] * 1000:.0f} x {size[1] * 1000:.0f} x {size[2] * 1000:.0f} mm, base at y = {low[1]:.4f}")
     print(f"{args.out.name}: {args.out.stat().st_size / 1024:.0f} KiB out")

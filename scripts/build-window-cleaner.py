@@ -30,14 +30,21 @@ below re-reads both files afterwards and requires exactly that.
 WHAT IT COSTS, SINCE IT IS NOT NOTHING
 ---------------------------------------
 The window bottle used to be a 2,352-vertex cylinder out of
-src-models/cleaning_spray/window_cleaner.blend and is now this 37,286-vertex
-sprayer. So it costs 2.0 MiB of repository — the geometry is duplicated, and
-only one of the six textures differs — and about 35 ms more of the bay's load,
+src-models/cleaning_spray/window_cleaner.blend and is now this 5,982-vertex
+sprayer. So it costs 0.70 MiB of repository — the geometry is duplicated, and
+only one of the fourteen textures differs — and about 18 ms of the bay's load,
 because ToolModel rebuilds every vertex of every model it fits. Both numbers are
 written down here and in src/world/tool_model.gd rather than left to be
 discovered later. The alternative — one asset drawn twice with a tint over it —
 would tint the printed label along with the plastic, which is exactly what this
 recolour exists to avoid.
+
+Those two numbers were 37,286 vertices and 2.0 MiB until the tyre bottle's bake
+grew a mesh simplifier. Nothing in this script changed for that: it copies
+whatever geometry arrives across untouched and asserts that it did, so the
+simplifier landed here as a smaller input and a smaller output and not as a
+line of code. That is the whole point of forking the two liveries after the
+bake rather than before it.
 
 The .blend stays where it is. src-models/ is read-only (see its AGENTS.md) and
 is the one place the untouched sources live, whether or not the game currently
