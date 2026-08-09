@@ -59,6 +59,69 @@ const INK: Color = Color("#09090b")
 ## `--white`: primary type, and the only colour that goes on top of [constant RED].
 const WHITE: Color = Color("#ffffff")
 
+## The face the game says things in: [b]Press Start 2P[/b], by CodeMan38, under
+## the SIL Open Font Licence 1.1 — [code]assets/brand/fonts/[/code] holds the
+## file and the licence beside it.
+##
+## [b]This is the one place the game stops being the site, and it is on
+## purpose.[/b] Everything above is transcribed from a stylesheet; the site sets
+## its type in a web sans and looks like a business that details cars. The game
+## is an arcade cabinet — a score in the corner, a multiplier, a ding — and a
+## cabinet's type is bitmap type. So the palette crossed over and the typeface
+## did not, and the two disagreements are the two halves of the same decision:
+## the colours say whose game it is and the letters say what kind of game it is.
+##
+## [b]Committed rather than fetched, which is not a preference.[/b] The build
+## people click on is a web export served off GitHub Pages, and a font named in
+## CSS is a font that has to arrive over the network before the first frame can
+## be drawn with it — or not arrive at all, on a locked-down connection, and
+## leave the whole game set in whatever the browser felt like. 118 KB committed
+## here is smaller than that risk and is the only version of "the type is the
+## type" that survives the network having an opinion.
+##
+## [b]Monospaced at exactly one em.[/b] Every glyph in this face advances a full
+## font size — measured rather than assumed, in
+## [code]tests/unit/test_brand.gd[/code] — so a string is
+## [code]length × size[/code] pixels wide and nothing else. That is worth
+## knowing before choosing a number: it is roughly twice what a proportional
+## sans of the same size costs, which is why every display size in this project
+## went down when this face went in, and why they went down by about half.
+const DISPLAY_FACE: FontFile = preload("res://assets/brand/fonts/PressStart2P-Regular.ttf")
+
+## The face the game explains things in: [b]Silkscreen[/b], by Jason Kottke,
+## under the same licence and in the same folder.
+##
+## [b]Why there are two faces at all.[/b] [constant DISPLAY_FACE] draws a
+## capital seven pixels tall in an eight-pixel cell and charges a whole em for
+## every character, which is exactly right for a word read at a glance —
+## [code]Start[/code], [code]000000[/code], a heading — and exactly wrong for a
+## paragraph: the rules screen is about seven hundred characters, and set in the
+## display face they wrap to a wall. Silkscreen is the same idea drawn small — a
+## capital is four pixels wide and five tall in a six-pixel cell, so about three
+## quarters of an em rather than a whole one — and it is still a pixel face, so
+## the screen reads as one system rather than as a cabinet with a web page taped
+## to it.
+##
+## [b]It is also the default, and that is the load-bearing half.[/b]
+## [code]project.godot[/code] names this file as [code]gui/theme/custom_font[/code],
+## so it is what every [Control] in the game draws in unless something asks for
+## the other one. The alternative — leave the engine's Open Sans as the default
+## and override the two faces everywhere — means the day somebody adds a label
+## and forgets, the game has a third typeface in it and nothing says so. This
+## way the failure mode is a caption in the readable pixel face instead of the
+## chunky one, which is a design opinion rather than a bug.
+const BODY_FACE: FontFile = preload("res://assets/brand/fonts/Silkscreen-Regular.ttf")
+
+## How many of a face's own pixels fit in an em. Both faces above are drawn on
+## the same 8-unit grid — every outline coordinate in either file is a multiple
+## of an eighth of an em — so a size that is a multiple of this is a size whose
+## every font pixel is the same whole number of screen pixels, and any other
+## size is one where some are three across and some are four.
+##
+## That is the whole of what [method crisp] is for, and the whole of why the
+## sizes in the scene files are the numbers they are.
+const TYPE_GRID: int = 8
+
 ## `border-radius:30px` — the corner of a hero card.
 const CARD_RADIUS: int = 30
 
@@ -147,6 +210,31 @@ const LUMA_RED: float = 0.2126
 const LUMA_GREEN: float = 0.7152
 const LUMA_BLUE: float = 0.0722
 const LUMA_FLOOR: float = 0.05
+
+
+## [param size] moved to the nearest point size either face draws without
+## breaking its own pixels — a multiple of [constant TYPE_GRID], and never zero.
+##
+## [b]What a non-multiple actually looks like, since "blurry" is the wrong
+## word.[/b] Antialiasing, hinting and subpixel positioning are all off in the
+## import settings (see [code]assets/brand/fonts/*.import[/code]), so a glyph is
+## never soft — it is stamped out of hard black-or-nothing pixels at any size.
+## What a size off the grid costs is [i]evenness[/i]: at 20 px a font pixel is
+## two and a half screen pixels, which the rasteriser resolves as a row of
+## alternating twos and threes, and a capital [code]E[/code] gets three bars of
+## different thicknesses. That reads as a slightly broken font rather than as a
+## small one, which is the failure this exists to avoid.
+##
+## [b]Rounded to nearest rather than down.[/b] Down is the safe direction for
+## fitting and the wrong one for a scale: it turns every 1.1x into a no-op and a
+## 1.9x into a 1.0x, so type asked to grow would sit still until it suddenly
+## jumped a whole step. Nearest splits the difference at the half-step, which is
+## where a reader would put it too.
+##
+## The floor is one whole grid rather than one pixel. Below that a face has less
+## than a pixel per pixel and there is nothing left to be crisp about.
+static func crisp(size: int) -> int:
+	return maxi(TYPE_GRID, roundi(float(size) / float(TYPE_GRID)) * TYPE_GRID)
 
 
 ## The site's pill button ([code].btn[/code]) in [param fill], sized for a

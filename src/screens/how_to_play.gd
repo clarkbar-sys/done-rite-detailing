@@ -140,8 +140,9 @@ func _remember() -> void:
 ## Everything on this screen that draws words: the labels and the two buttons.
 ##
 ## A [Button] is not a [Label] and this is the second time that has mattered —
-## the two glyphs Open Sans could not draw were both on a button, and so is a
-## third of the type that has to grow here.
+## the two glyphs Open Sans could not draw were both on a button, back when Open
+## Sans was what this game drew in, and so is a third of the type that has to
+## grow here.
 static func _typeset(root: Node) -> Array[Control]:
 	var found: Array[Control] = []
 	for child: Node in root.get_children():
@@ -238,6 +239,26 @@ static func _fits(factor: float, written: float, room: float) -> float:
 ## its corner radius from the height it is handed, and the height has just
 ## changed. A pill that kept its old radius at three times the size is a
 ## rectangle with slightly rounded corners.
+##
+## [b]This is the one place in the game that does not round to
+## [method Brand.crisp], and the exemption is worth its paragraph.[/b] Both faces
+## are drawn on an eighth of an em, so a size off that grid draws some strokes
+## three screen pixels wide and some four — everywhere else in this project the
+## sizes are multiples of eight for exactly that reason. Snapping here breaks two
+## things at once. [method _fits] is a deliberate under-estimate whose error is
+## meant to land in the margin, and [method Brand.crisp] rounds to
+## [i]nearest[/i], so a 1.9x estimate becomes a 2.0x sheet — the error moves out
+## of the margin and off the bottom of the screen, which is the failure this
+## whole method exists to avoid. And the scale would quantise: with a base of 16
+## there is nothing between 1.0x and 1.5x, so a phone that could take 1.2x either
+## gets nothing or overflows.
+##
+## What is given up is smaller than it sounds. The sizes the scene authors are
+## all on the grid, so a 16:9 screen — where the factor is small and the type is
+## nearest its authored size — is nearly right; and the further from it a screen
+## gets, the more the type is being grown for a reader holding a phone at arm's
+## length rather than examined at 1:1. Uneven pixels on a paragraph lose to a
+## paragraph nobody can read.
 func _scale_type(factor: float) -> void:
 	for control: Control in _base_type:
 		control.add_theme_font_size_override(
@@ -284,16 +305,19 @@ func _dress() -> void:
 	_card.add_theme_stylebox_override("panel", Brand.card())
 	_rule.color = Brand.RED
 	_title.add_theme_color_override("font_color", Brand.WHITE)
+	_title.add_theme_font_override("font", Brand.DISPLAY_FACE)
 	_title_accent.add_theme_color_override("font_color", Brand.RED)
+	_title_accent.add_theme_font_override("font", Brand.DISPLAY_FACE)
 	_subtitle.add_theme_color_override("font_color", Brand.MUTED)
-	_paint(_card, HEADING, Brand.RED)
-	_paint(_card, BODY, Brand.WHITE)
+	_subtitle.add_theme_font_override("font", Brand.BODY_FACE)
+	_paint(_card, HEADING, Brand.RED, Brand.DISPLAY_FACE)
+	_paint(_card, BODY, Brand.WHITE, Brand.BODY_FACE)
 	dress_quiet(_main_menu)
 	dress_loud(_play)
 
 
-## Colours every [Label] named [param label_name] anywhere under [param root] in
-## [param colour].
+## Sets every [Label] named [param label_name] anywhere under [param root] in
+## [param colour] and [param face].
 ##
 ## Found rather than listed because there are fourteen of them. A screen of rules
 ## is almost entirely labels, and a [code]@onready[/code] line per label would be
@@ -301,12 +325,25 @@ func _dress() -> void:
 ## time a row is added or reordered. What this walks instead is a convention the
 ## scene states out loud in its own node names — [constant HEADING] and
 ## [constant BODY] — which is one thing to keep true rather than fourteen.
-static func _paint(root: Node, label_name: String, colour: Color) -> void:
+##
+## [b]Colour and face together, because on this screen they are one decision.[/b]
+## A heading is red and chunky and a paragraph is white and readable; those are
+## not two rules that happen to agree, they are the two halves of "this is a
+## label and that is a sentence". Splitting them into two walks would let a row
+## end up red and readable, which is a heading that has stopped looking like one.
+##
+## The body face is set here even though [code]project.godot[/code] already makes
+## it the default. Redundant on paper and not in practice: this screen is the one
+## that grows its own type, so it is the one where "what face is this drawn in"
+## has to be a question with an answer in this file rather than an inheritance
+## nobody can see.
+static func _paint(root: Node, label_name: String, colour: Color, face: FontFile) -> void:
 	for child: Node in root.get_children():
 		var label: Label = child as Label
 		if label != null and label.name == label_name:
 			label.add_theme_color_override("font_color", colour)
-		_paint(child, label_name, colour)
+			label.add_theme_font_override("font", face)
+		_paint(child, label_name, colour, face)
 
 
 ## Back to the menu, with nothing started and nothing stopped.

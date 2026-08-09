@@ -47,6 +47,30 @@ const HEIGHTS: Array[float] = [48.0, HEIGHT, 176.0]
 ## not that number either.
 const BADGE_SIDE: float = 100.0
 
+## Where the two faces are committed, written out a second time on purpose —
+## same argument as [constant CSS] above. Reading the constant under test to
+## check the constant under test would assert nothing, and what is being checked
+## here is precisely that the file is in the repo at the path everything else
+## expects.
+const DISPLAY_PATH: String = "res://assets/brand/fonts/PressStart2P-Regular.ttf"
+const BODY_PATH: String = "res://assets/brand/fonts/Silkscreen-Regular.ttf"
+
+## The [ProjectSettings] key that decides what every unstyled [Control] in the
+## game draws in. Named rather than typed out at the call site because it is a
+## string the engine owns and a typo in it would read as "unset" and pass.
+const DEFAULT_FONT_SETTING: String = "gui/theme/custom_font"
+
+## Point sizes to measure the faces at: one grid step, the size the score rests
+## at, and the size it punches to. Every one a multiple of
+## [constant Brand.TYPE_GRID], because that is the claim under test.
+const GRID_SIZES: Array[int] = [8, 16, 24, 32, 56, 64]
+
+## Every character the game prints that is not plain ASCII: the menu's guillemet
+## exits, the credit's curly quotes and interpunct and em dash, and the score's
+## multiplication sign. Collected here rather than left to the per-screen suites
+## because a face is chosen once and this is the bill it has to pay.
+const NON_ASCII: String = "«»·×—“”"
+
 
 func test_the_palette_is_the_sites_palette() -> void:
 	assert_eq(Brand.RED.to_html(false), CSS["red"], "the accent must be the site's --red")
@@ -310,6 +334,144 @@ func test_the_picked_badge_says_so_without_using_colour() -> void:
 		plain.corner_radius_top_left,
 		"a picked badge is still the same disc"
 	)
+
+
+# ---- the type: two faces, one grid -------------------------------------------
+
+
+func test_the_two_faces_are_the_files_committed_beside_the_logo() -> void:
+	# A transcription gate, like the palette at the top: the whole reason the
+	# fonts are in the repo is that a web export cannot fetch one at runtime, and
+	# the way that promise breaks quietly is somebody pointing these at a path
+	# that is not in `assets/`. Asserted on `resource_path` and not on the
+	# preload, because the preload is what is under test.
+	assert_eq(Brand.DISPLAY_FACE.resource_path, DISPLAY_PATH)
+	assert_eq(Brand.BODY_FACE.resource_path, BODY_PATH)
+	assert_eq(Brand.DISPLAY_FACE.get_font_name(), "Press Start 2P")
+	assert_eq(Brand.BODY_FACE.get_font_name(), "Silkscreen")
+
+
+func test_the_projects_default_face_is_the_body_face() -> void:
+	# The one line of project.godot that makes this a type *system* rather than a
+	# list of overrides — every Control that does not ask for a face gets this
+	# one, including the ones nobody has written yet. Two files naming the same
+	# font is exactly the drift this repo puts a test on: if the setting is
+	# dropped or repointed, the game quietly grows a third typeface and nothing
+	# else in the build would say so.
+	assert_eq(
+		str(ProjectSettings.get_setting(DEFAULT_FONT_SETTING, "")),
+		BODY_PATH,
+		"project.godot's default theme font must be Brand.BODY_FACE"
+	)
+
+
+func test_neither_face_is_softened_on_its_way_to_the_screen() -> void:
+	# The import settings are the other half of "pixel arcade", and they are the
+	# half that is invisible in a diff of the scenes: the same font with grey
+	# antialiasing and subpixel positioning on is a blurry font, which is worse
+	# than no pixel font at all. Read off the imported resource rather than out of
+	# the .import file, so this asserts what the engine actually built.
+	for face: FontFile in [Brand.DISPLAY_FACE, Brand.BODY_FACE]:
+		var named: String = face.get_font_name()
+		assert_eq(face.antialiasing, TextServer.FONT_ANTIALIASING_NONE, "%s is antialiased" % named)
+		assert_eq(face.hinting, TextServer.HINTING_NONE, "%s is hinted" % named)
+		assert_eq(
+			face.subpixel_positioning,
+			TextServer.SUBPIXEL_POSITIONING_DISABLED,
+			"%s is subpixel-positioned" % named
+		)
+		assert_false(face.generate_mipmaps, "%s is mipmapped" % named)
+		assert_false(face.multichannel_signed_distance_field, "%s is an SDF" % named)
+		# And a glyph neither face has must come out as the tofu box the existing
+		# per-screen font tests are written to catch, rather than as whatever the
+		# machine running the editor happens to have installed — which the machine
+		# running the browser will not.
+		assert_false(face.allow_system_fallback, "%s falls back to a system font" % named)
+
+
+func test_the_display_face_is_one_em_per_character() -> void:
+	# The number every display size in this project was chosen against, and the
+	# reason they all went down by about half when the face went in. Measured
+	# here so that "a string is length x size wide" is a fact with a test on it
+	# rather than a sentence in a doc comment.
+	for size: int in GRID_SIZES:
+		for word: String in ["W", "il", "000000", "How to Play"]:
+			assert_eq(
+				Brand.DISPLAY_FACE.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x,
+				float(word.length() * size),
+				'"%s" at %d must be exactly %d px wide' % [word, size, word.length() * size]
+			)
+
+
+func test_both_faces_scale_cleanly_on_the_grid() -> void:
+	# What Brand.TYPE_GRID claims: both faces are drawn on an eighth of an em, so
+	# a size that is k grids wide draws every glyph exactly k times the width it
+	# has at one grid. That is the property that makes a grid size crisp and any
+	# other size uneven, and it is checkable without a screenshot.
+	var sample: String = _printable_ascii()
+	for face: FontFile in [Brand.DISPLAY_FACE, Brand.BODY_FACE]:
+		var unit: float = (
+			face.get_string_size(sample, HORIZONTAL_ALIGNMENT_LEFT, -1, Brand.TYPE_GRID).x
+		)
+		for size: int in GRID_SIZES:
+			var steps: int = size / Brand.TYPE_GRID
+			assert_eq(
+				face.get_string_size(sample, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x,
+				unit * float(steps),
+				(
+					"%s at %d is not %d times its width at %d"
+					% [face.get_font_name(), size, steps, Brand.TYPE_GRID]
+				)
+			)
+
+
+func test_crisp_lands_on_the_grid_and_never_below_it() -> void:
+	assert_eq(Brand.crisp(56), 56, "a size already on the grid must not move")
+	assert_eq(Brand.crisp(60), 64, "half a step up rounds up")
+	assert_eq(Brand.crisp(59), 56, "and just under half rounds down")
+	assert_eq(Brand.crisp(1), Brand.TYPE_GRID, "the floor is one whole grid")
+	assert_eq(Brand.crisp(0), Brand.TYPE_GRID, "including at zero")
+	assert_eq(Brand.crisp(-40), Brand.TYPE_GRID, "and at a size nobody should ask for")
+	# The properties the callers actually depend on, over the whole range a font
+	# size in this project can reach. The half-step bound is asked only at or
+	# above the grid, and that is the floor being honest rather than an excuse:
+	# below one whole grid there is no rounding left to do, so crisp(1) moves
+	# seven and is meant to.
+	for size: int in range(1, 256):
+		var snapped: int = Brand.crisp(size)
+		assert_eq(snapped % Brand.TYPE_GRID, 0, "crisp(%d) is off the grid" % size)
+		assert_gte(snapped, Brand.TYPE_GRID, "crisp(%d) went under the floor" % size)
+		if size >= Brand.TYPE_GRID:
+			assert_lte(
+				absi(snapped - size),
+				Brand.TYPE_GRID / 2,
+				"crisp(%d) moved further than half a step" % size
+			)
+
+
+func test_both_faces_can_draw_every_word_in_the_game() -> void:
+	# The bug this whole family of tests exists for, moved to the type system
+	# itself: a glyph a face does not have is not an error and not a warning, it
+	# is a blank rectangle in a released build. The per-screen suites already ask
+	# this of the copy they can see; this asks it of the alphabet, so a face
+	# swapped for one with a thinner glyph set fails here rather than on somebody's
+	# phone.
+	var wanted: String = _printable_ascii() + NON_ASCII
+	for face: FontFile in [Brand.DISPLAY_FACE, Brand.BODY_FACE]:
+		for i: int in wanted.length():
+			var glyph: int = wanted.unicode_at(i)
+			assert_true(
+				face.has_char(glyph),
+				"%s cannot draw U+%04X (%s)" % [face.get_font_name(), glyph, char(glyph)]
+			)
+
+
+## Space through tilde: the alphabet every screen in this game is written in.
+func _printable_ascii() -> String:
+	var found: String = ""
+	for code: int in range(0x20, 0x7F):
+		found += char(code)
+	return found
 
 
 ## The albedo of [param id] as the catalogue actually declares it. Read from

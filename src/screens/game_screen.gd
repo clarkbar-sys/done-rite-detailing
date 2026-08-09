@@ -110,7 +110,8 @@ static func dress_quiet(button: Button) -> void:
 
 
 ## Puts [param normal], [param hover] and [param pressed] on [param button],
-## along with the focus ring and white type, and leaves nothing to the theme.
+## along with the focus ring, white type and the display face, and leaves
+## nothing to the theme.
 ##
 ## The height every shape is cut to is [member Control.custom_minimum_size], not
 ## [member Control.size]: this runs in [method Node._ready], before the first
@@ -118,9 +119,20 @@ static func dress_quiet(button: Button) -> void:
 ## size it wants and this reads that — which is also why the scene files below
 ## give every button a [code]custom_minimum_size[/code] even where a container
 ## would have stretched it anyway.
+##
+## [b]The face is here for the same reason the hover box is.[/b] A pill is the
+## one thing on a screen you are meant to press, and [constant Brand.DISPLAY_FACE]
+## is what a thing you press says its word in — on all three screens that have
+## one, without any of them being able to forget. The project's default face is
+## the readable one (see [code]project.godot[/code]), so a button left to the
+## theme would come out set in the caption face and look like a caption. Written
+## out once, that is a rule; written out four times, it is four chances to miss
+## one — which is the sentence this method already existed to make true about
+## styleboxes.
 static func _wear(
 	button: Button, normal: StyleBoxFlat, hover: StyleBoxFlat, pressed: StyleBoxFlat
 ) -> void:
+	button.add_theme_font_override("font", Brand.DISPLAY_FACE)
 	button.add_theme_stylebox_override("normal", normal)
 	button.add_theme_stylebox_override("hover", hover)
 	button.add_theme_stylebox_override("pressed", pressed)

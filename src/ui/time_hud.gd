@@ -35,10 +35,18 @@
 class_name TimeHud
 extends Label
 
-## Point size. The same as [constant ScoreHud.TOTAL_FONT], because the clock and
-## the score are the two numbers a player checks mid-run and neither is more
+## Point size. [constant ScoreHud.TOTAL_FONT] itself, because the clock and the
+## score are the two numbers a player checks mid-run and neither is more
 ## important than the other.
-const FONT: int = 76
+##
+## Read from there rather than copied, which it was until #174 moved the score
+## from 76 to 56 for the pixel face and left this on the old number — two
+## constants that are meant to be equal and are written down twice can disagree,
+## and this pair disagreed within one commit of being introduced. It also inherits
+## that constant's other property for free: a multiple of
+## [constant Brand.TYPE_GRID], which is what [code]0:59[/code] needs to have all
+## four of its glyphs the same weight.
+const FONT: int = ScoreHud.TOTAL_FONT
 
 ## How thick the outline under it is. [constant ScoreHud.OUTLINE], for that
 ## constant's reason: what is behind the top of this screen is sometimes sky and
@@ -79,6 +87,11 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_theme_font_size_override("font_size", FONT)
+	# The same face the score in the opposite corner wears, for the same reason it
+	# is the same size: these are the two numbers of a run, and a clock in the
+	# project's default reading face beside a score that is not would read as the
+	# one thing on the HUD nobody dressed.
+	add_theme_font_override("font", Brand.DISPLAY_FACE)
 	add_theme_color_override("font_outline_color", Color(Brand.INK, SHADOW_ALPHA))
 	add_theme_constant_override("outline_size", OUTLINE)
 	# Drawn full before the first frame, so the clock does not appear a frame

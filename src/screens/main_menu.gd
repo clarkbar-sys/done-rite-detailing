@@ -106,6 +106,12 @@ func _ready() -> void:
 	_logo_card.add_theme_stylebox_override("panel", Brand.card())
 	_over_the_bay(_credits, Brand.MUTED)
 	_over_the_bay(_car_name, Brand.WHITE)
+	# The car's name is a caption for the room and is read at a glance, so it goes
+	# in the display face with the pills either side of it. The credit under it
+	# stays in the project's default readable face — it is a hundred and forty
+	# characters of licence text three lines deep, which is the one thing on this
+	# screen the chunky face would be actively wrong for.
+	_car_name.add_theme_font_override("font", Brand.DISPLAY_FACE)
 	dress_loud(_play)
 	dress_quiet(_how_to_play)
 	_play.pressed.connect(_on_play_pressed)
