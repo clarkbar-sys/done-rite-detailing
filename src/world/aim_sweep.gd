@@ -5,7 +5,7 @@
 ## [b]What was wrong before this, and it is not what it looks like.[/b] The room
 ## has never had trouble [i]finding[/i] the car when a press misses it:
 ## [NearestPoint] answers "which panel did I come closest to" for any aim
-## whatsoever, and [method Garage._nearest_on_the_car] then plants a post at the
+## whatsoever, and [method AimProbe._nearest_on_the_car] then plants a post at the
 ## nearest point on that panel's box and casts a second ray at it. What that pair
 ## cannot always produce is a place with a [i]measured normal[/i] — and a measured
 ## normal is the one thing [method Garage._spend_the_trigger] cannot do without,
@@ -32,7 +32,7 @@
 ## were pointing at: aim at a door from slightly above and the sphere clips the
 ## roof edge on its way past, and the mark lands on the roof. Run as the only
 ## query it would be strictly worse than the exact ray at every grazing angle. So
-## [method Garage._under_the_finger] keeps [method
+## [method AimProbe.under_the_finger] keeps [method
 ## PhysicsDirectSpaceState3D.intersect_ray] first and reaches for this only once
 ## that has come back empty — which is to say, only when there is no exact answer
 ## to steal from.
@@ -103,7 +103,7 @@ func _init(reach: float) -> void:
 ##
 ## Shaped like the engine's own [method PhysicsDirectSpaceState3D.intersect_ray]
 ## result — [code]position[/code], [code]normal[/code], [code]collider[/code] —
-## plus the [code]surface[/code] key [method Garage._under_the_finger] reads, so
+## plus the [code]surface[/code] key [method AimProbe.under_the_finger] reads, so
 ## that all three of its tiers hand back one shape and a caller cannot forget
 ## which one it is holding. It is set here rather than by the caller, and it is
 ## always true: every field of this answer came off real geometry, which is the

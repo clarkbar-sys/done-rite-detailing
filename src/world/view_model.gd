@@ -614,7 +614,7 @@ func _pointed_at() -> Vector3:
 ##
 ## [b]Until a ray has said otherwise, the paint faces the hand.[/b] That is the
 ## honest guess for a tool brought up on the first frame of a press: it is what
-## [method Garage._nearest_on_the_car] invents for a mark it could not measure a
+## [method AimProbe._nearest_on_the_car] invents for a mark it could not measure a
 ## normal for, it is never wrong by more than the angle the panel is turned away
 ## at, and — like [method _pointed_at]'s own guess — it is only ever read while
 ## the raise is still near zero and the pose it feeds is still the resting one.

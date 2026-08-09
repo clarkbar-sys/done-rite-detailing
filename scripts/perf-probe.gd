@@ -5,7 +5,7 @@
 ## meshes" and a ranked list of suspects, and every entry on that list was a guess
 ## about which of three or four engine calls the physics tick is really spending
 ## its time in. A guess is a bad thing to refactor a room on: the three tiers of
-## [method Garage._under_the_finger] look about equally expensive written down, and
+## [method AimProbe.under_the_finger] look about equally expensive written down, and
 ## they are not remotely equally expensive when run. So this script runs each of
 ## them on its own, thousands of times, against the blockout the game was tuned on
 ## and against two of the ten pack styles, and prints the microseconds. The fix in
