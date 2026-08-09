@@ -100,6 +100,16 @@ func test_the_ramp_between_them_only_ever_goes_up() -> void:
 		previous = asked
 
 
+func test_half_the_travel_asks_for_a_quarter_not_half() -> void:
+	# The ramp is squared, not straight — the curve behind [OrbitDrive]'s raised
+	# top speed. A thumb halfway across the travel outside the dead middle asks
+	# for a quarter of full, so raising the speed at the rim does not also speed
+	# up the nudge that was already fine at the old, lower number.
+	var reach: float = _dead() + (RADIUS - _dead()) * 0.5
+	var asked: float = ThumbStick.input_from(_right(reach), RADIUS).x
+	assert_almost_eq(asked, 0.25, TOLERANCE, "half the travel is a quarter of full, not half")
+
+
 # ---- which way is which ------------------------------------------------------
 
 
