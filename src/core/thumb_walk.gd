@@ -84,9 +84,7 @@ var _walking: bool = false
 ## The thresholds belong to the screen's exports, for the reason [OrbitDrive]
 ## takes its speeds from the scene: one set of answers, where somebody can see
 ## and change them. The defaults are this class's own constants.
-func _init(
-	enter: float = WALK_ENTER, exit_at: float = WALK_EXIT, full: float = FULL_SPEED
-) -> void:
+func _init(enter: float = WALK_ENTER, exit_at: float = WALK_EXIT, full: float = FULL_SPEED) -> void:
 	_enter = enter
 	_exit = exit_at
 	_full = full

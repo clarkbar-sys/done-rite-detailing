@@ -75,7 +75,6 @@ const SKY_STEPS: int = 80
 ## being a press, and this suite has already been round that loop once.
 const INSIDE_THE_FRAME: float = 8.0
 
-
 var _main: Control = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
