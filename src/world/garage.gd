@@ -584,25 +584,6 @@ const NO_SIDE_TO_IT: float = 0.35
 ## anything to make a noise with at all, rather than muting one it built anyway.
 @export var noisy: bool = false
 
-## Whether every tool wears the plain crosshair instead of the effect it draws for
-## itself. Off by default, so what ships is the water, the product and the foam:
-## they are the things a player is meant to be looking at. Switched on —
-## [code]src/screens/play_screen.gd[/code] wires this to the "~" panel's "Debug
-## Tools" button — all three are stowed and the bare crosshair shows through under
-## every tool, which is the developer's view of where the aim landed with nothing
-## drawn over it.
-##
-## [b]This is the only place the ring is drawn now[/b], which makes it more useful
-## rather than less. Every tool shows where it is working by working there, so the
-## question "is the effect in the wrong place, or is the mud" has no other way of
-## being asked — see [method ToolSight.sight], which has the argument for retiring
-## it from play.
-##
-## Only the sight changes. [method _spend_the_trigger] still spends the same
-## water on the same patch either way, so a bug chased with this on is the same
-## bug with it off.
-var debug_tools: bool = false
-
 ## What the car's grounding shadow is drawn with: one unshaded texture, darkest
 ## under the middle and faded to nothing by the edge. Lives in
 ## [code]src/world/garage.tscn[/code] beside the sky and the lights, the way
@@ -633,6 +614,25 @@ var debug_tools: bool = false
 ## same pixel. A centimetre is enough to always win that draw order without
 ## reading as a shadow that has lifted off the tarmac.
 @export var shadow_lift_metres: float = 0.01
+
+## Whether every tool wears the plain crosshair instead of the effect it draws for
+## itself. Off by default, so what ships is the water, the product and the foam:
+## they are the things a player is meant to be looking at. Switched on —
+## [code]src/screens/play_screen.gd[/code] wires this to the "~" panel's "Debug
+## Tools" button — all three are stowed and the bare crosshair shows through under
+## every tool, which is the developer's view of where the aim landed with nothing
+## drawn over it.
+##
+## [b]This is the only place the ring is drawn now[/b], which makes it more useful
+## rather than less. Every tool shows where it is working by working there, so the
+## question "is the effect in the wrong place, or is the mud" has no other way of
+## being asked — see [method ToolSight.sight], which has the argument for retiring
+## it from play.
+##
+## Only the sight changes. [method _spend_the_trigger] still spends the same
+## water on the same patch either way, so a bug chased with this on is the same
+## bug with it off.
+var debug_tools: bool = false
 
 var _orbit: CameraOrbit = null
 var _drive: OrbitDrive = null
