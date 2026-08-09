@@ -22,18 +22,47 @@ const TOLERANCE: float = 0.0001
 var _garage: Garage = null
 
 
-func before_each() -> void:
+## One room for the whole file. Every rule below reads where the trees ended up
+## and none of them moves one — the wood is planted in [method Node._ready] and
+## then stands there — so fourteen identical rooms were fourteen copies of the
+## same answer.
+##
+## [b]Two tests do write to it, and both put it back where they found it.[/b]
+## That is the condition on sharing a fixture at all: a suite whose tests leave
+## the room changed is an order-dependent suite, which passes in file order and
+## fails in any other.
+## [method test_the_wood_is_the_same_wood_every_load] stands a second grove in
+## the room and frees it on the way out;
+## [method test_replanting_a_bigger_wood_keeps_every_promise] replants the wood
+## bigger and replants it back. Checked by running the file with its tests in
+## reverse.
+##
+## Measured on a four-core box with this suite run on its own: 7.6 s to 1.8 s,
+## of which about 0.9 s is Godot starting up either way.
+##
+## [method add_child] rather than [method GutTest.add_child_autofree], and
+## [method after_all] to free: GUT empties its autofree list after every *test*,
+## so a fixture registered with it here would be freed out from under test two.
+func before_all() -> void:
 	var packed: PackedScene = load(GARAGE) as PackedScene
 	assert_not_null(packed, "could not load %s" % GARAGE)
 	if packed == null:
 		return
 	# Into a typed local first, for the reason tests/integration/test_garage.gd
-	# gives: add_child_autofree is untyped, and autofree is what stops a failure
-	# here being reported as a leak against the next test.
+	# gives: add_child is untyped.
 	var garage: Garage = packed.instantiate() as Garage
 	_garage = garage
-	add_child_autofree(_garage)
+	add_child(_garage)
 	await wait_process_frames(1)
+
+
+## [method Node.free] and not [method Node.queue_free]: GUT counts the test
+## script's children the moment `after_all` returns, and a queued free has not
+## happened yet — the room would be reported as a leak on its way out.
+func after_all() -> void:
+	if _garage != null:
+		_garage.free()
+		_garage = null
 
 
 func _grove() -> Grove:
@@ -230,6 +259,10 @@ func test_the_wood_is_the_same_wood_every_load() -> void:
 		return
 	var again: Grove = packed.instantiate() as Grove
 	again.ground = NodePath("../Ground")
+	# Freed at the end of this test rather than with the room, because the room
+	# outlives this test now — see [method before_all]. `autofree` frees it
+	# wherever it is parented, which is inside the room and not under this script.
+	autofree(again)
 	_garage.get_node("View/World").add_child(again)
 	await wait_process_frames(1)
 	var planted: Array[Vector3] = _standing()
@@ -260,6 +293,12 @@ func test_replanting_a_bigger_wood_keeps_every_promise() -> void:
 	# trees that ship. Fifteen is more than TreeShape.SEEDS has twice over, so
 	# this also exercises the wrap that lets a shape be planted again.
 	var grove: Grove = _grove()
+	# The only test in this file that writes to the shared wood, so it is also the
+	# one that puts it back — see [method before_all]. The shipped counts are read
+	# off the scene rather than written down here, so the restore stays true if
+	# they are ever retuned.
+	var per_side: int = grove.trees_per_side
+	var across_back: int = grove.trees_across_back
 	grove.trees_per_side = 5
 	grove.trees_across_back = 5
 	grove.plant()
@@ -275,3 +314,11 @@ func test_replanting_a_bigger_wood_keeps_every_promise() -> void:
 		var leaf: float = flat - TreeShape.MAX_REACH - _garage.orbit_radius
 		assert_gte(leaf, Grove.MARGIN, "a tree %.2f m into the camera's circle" % -leaf)
 		assert_almost_eq(spot.y, grass[tree], TOLERANCE, "a tree that missed the ground")
+	# Put back, and after the asserts rather than in an `after_each`: a failing
+	# GUT assert does not stop the test, so this runs whether or not the run above
+	# went green — and it is this file's own mess to clear up rather than
+	# something every other test in it should pay a replant for.
+	grove.trees_per_side = per_side
+	grove.trees_across_back = across_back
+	grove.plant()
+	await wait_process_frames(1)

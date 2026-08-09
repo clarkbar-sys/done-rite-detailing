@@ -46,18 +46,48 @@ const WIDEST_CAR: float = 2.07
 var _garage: Garage = null
 
 
-func before_each() -> void:
+## One room for the whole file, because not one test below writes to it.
+##
+## [b]That is the safety condition, and it is the whole of it.[/b] A shared
+## fixture is only shareable while every test that reads it leaves it exactly as
+## it found it — press a button, spend a second, move a camera, and the suite
+## quietly becomes order-dependent, which passes in file order and fails in any
+## other. Everything here asks the ground how big it is and where its concrete
+## stands; nothing here moves anything. Checked by running the file with its
+## tests in reverse — see the note in [method after_all].
+##
+## What it buys, measured on a four-core box with this suite run on its own:
+## 7.3 s to 1.8 s, of which about 0.9 s is Godot starting up either way. The room
+## is `garage.tscn` entire — a driveway's worth of imported mesh, a wood, a car
+## out of the pack — and building it fourteen times to ask fourteen questions
+## about a driveway that never changes was the whole of the difference.
+##
+## [method add_child] rather than [method GutTest.add_child_autofree]: GUT's
+## autofree list is emptied after every *test*, so a fixture registered with it
+## in `before_all` is freed out from under test two. [method after_all] is where
+## a fixture of this lifetime is freed, and it has to be — GUT warns about a test
+## script that still has children when the file is done.
+func before_all() -> void:
 	var packed: PackedScene = load(GARAGE) as PackedScene
 	assert_not_null(packed, "could not load %s" % GARAGE)
 	if packed == null:
 		return
 	# Into a typed local first, for the reason tests/integration/test_garage.gd
-	# gives: add_child_autofree is untyped, and autofree is what stops a failure
-	# here being reported as a leak against the next test.
+	# gives: add_child is untyped.
 	var garage: Garage = packed.instantiate() as Garage
 	_garage = garage
-	add_child_autofree(_garage)
+	add_child(_garage)
 	await wait_process_frames(1)
+
+
+## [method Node.free] and not [method Node.queue_free]: GUT counts the test
+## script's children the moment `after_all` returns, and a queued free has not
+## happened yet — the room would be reported as a leak on its way out. This is
+## the same call GUT's own autofree makes.
+func after_all() -> void:
+	if _garage != null:
+		_garage.free()
+		_garage = null
 
 
 func _ground() -> Ground:
