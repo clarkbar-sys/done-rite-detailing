@@ -299,14 +299,23 @@ func test_the_same_spot_marks_higher_up_the_car_for_a_thumb_than_for_a_mouse() -
 	assert_gt(_marker().marked_point().y, clicked.y, "the thumb's mark sits above the pointer's")
 
 
-func test_a_thumb_at_the_very_top_of_the_glass_still_marks_something() -> void:
+func test_a_thumb_high_in_the_ease_strip_still_marks_something() -> void:
 	# The top strip, where the lift eases off — see [method ThumbLift.raised]. The
-	# claim here is only that the aim survives the ease: it is a press against the
-	# top edge, it aims somewhere well above the car, and the nearest-point fallback
-	# answers it like any other miss rather than the whole thing collapsing into a
-	# zero or a negative screen coordinate.
+	# claim here is only that the aim survives the ease: it is a press up where
+	# the ease is active, it aims somewhere well above the car, and the
+	# nearest-point fallback answers it like any other miss rather than the whole
+	# thing collapsing into a zero or a negative screen coordinate.
+	#
+	# High in the strip rather than on the top edge itself, because since #179
+	# the very top of the glass is out past the walk band and a press there walks
+	# instead of aiming — the walk suite owns that press now. The point below is
+	# the highest this screen can aim from: just inside the band on the short
+	# axis, which at the design shape is still inside the ease's join
+	# ([constant ThumbLift.EASE_SPAN] lifts), so the ease is what answers it.
 	await _settle()
-	_touch(Vector2(Vector2(_view().size).x * 0.5, 1.0), true)
+	var frame: Vector2 = Vector2(_view().size)
+	var high: Vector2 = Vector2(frame.x * 0.5, frame.y * 0.5 * (1.0 - ThumbWalk.WALK_ENTER) + 1.0)
+	_touch(high, true)
 	await wait_physics_frames(RESOLVE_FRAMES)
-	assert_true(_marker().is_marking(), "a press on the top edge still marks the car")
+	assert_true(_marker().is_marking(), "a press high in the ease strip still marks the car")
 	assert_has(_panel_names(), _readout().text, "and names a real panel")

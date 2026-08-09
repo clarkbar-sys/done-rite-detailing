@@ -86,16 +86,20 @@ const NEAR_MISS_METRES: float = 0.25
 ## is then a box corner out in open air, and the probe misses on all ten with the
 ## aim passing 1.88 m (compact) to 2.32 m (wagon) from the middle of the car.
 ##
-## Far enough up and across to be plainly not the car, and near enough in that
-## the [i]finger[/i] — a thumb-lift below the aim — stays inside the walk band:
-## since #179 a press out past [constant ThumbWalk.WALK_ENTER] is a walk, not
-## an aim, so a "well clear" point that hugged a corner would never cast a ray
-## at all. It used to be a fifth across and a seventh down for exactly that
-## cropped-letterbox reason; the fractions moved inboard when the band arrived,
-## and [method _the_sweep_missed] / [method _the_post_missed] go on asserting
-## on every use that the point still misses by every tier.
-const WELL_CLEAR_ACROSS: float = 0.3
-const WELL_CLEAR_DOWN: float = 0.2
+## A fifth across and a seventh down, so the press is well inside the picture
+## rather than hugging an edge a letterbox could crop. Measured there on all ten:
+## the exact ray misses, a 0.4 m sweep misses, a 0.6 m sweep misses, the probe
+## misses — and a 1.2 m sphere does reach, which is what says this is a bounded
+## margin and not an aim pointed at nothing.
+##
+## [b]The presses that ask about this point are a mouse since #179[/b]: a thumb
+## here is out past the walk band, so it walks instead of aiming — and moving
+## the point inboard of the band was measured to put it within a 0.6 m sweep of
+## the car on one style in ten. A mouse aims exactly where it clicks, no lift
+## and no band, so the fallback tier goes on being asked at the point whose
+## clearances were measured.
+const WELL_CLEAR_ACROSS: float = 0.2
+const WELL_CLEAR_DOWN: float = 0.15
 
 ## A sphere far too small to bridge [constant NEAR_MISS_METRES], and one
 ## comfortably wide enough. Neither is any tool's real radius on purpose: what is
@@ -346,25 +350,37 @@ func _press(at: Vector2) -> void:
 	await wait_physics_frames(WASH_FRAMES)
 
 
-## Slides the aiming finger to [param at] without letting go — an
-## [InputEventScreenDrag] on the same index [method _touch] presses with, which is
-## what [method PlayScreen._finger_dragged] routes to [method Garage.aim_at].
-##
-## [b]A drag and not a second press[/b], because a second press is not what a
-## sliding thumb produces and the play screen would ignore it anyway: the first
-## finger down claims the aim and holds it until it lifts, so a fresh
-## [InputEventScreenTouch] arriving while one is down goes nowhere. Anything
-## testing what happens to a held press when the aim moves has to move it this way.
-func _drag(at: Vector2) -> void:
-	var dragged: InputEventScreenDrag = InputEventScreenDrag.new()
-	dragged.position = _thumb_for(at)
-	Input.parse_input_event(dragged)
-	Input.flush_buffered_events()
+func _lift() -> void:
+	_touch(Vector2.ZERO, false)
+	_click(Vector2.ZERO, false)
 	await wait_physics_frames(RESOLVE_FRAMES)
 
 
-func _lift() -> void:
-	_touch(Vector2.ZERO, false)
+## A mouse button going down or coming up at [param at] — the desk's press, no
+## thumb lift and no walk band, for the tests whose points sit where a thumb
+## would walk instead of aim.
+func _click(at: Vector2, pressed: bool) -> void:
+	var click: InputEventMouseButton = InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.position = at
+	click.pressed = pressed
+	Input.parse_input_event(click)
+	Input.flush_buffered_events()
+
+
+## Holds the trigger at [param at] with a mouse for a second, without letting
+## go. [method _lift] releases the button too.
+func _click_and_hold(at: Vector2) -> void:
+	_click(at, true)
+	await wait_physics_frames(WASH_FRAMES)
+
+
+## Slides the held mouse to [param at] without releasing the button.
+func _slide(at: Vector2) -> void:
+	var moved: InputEventMouseMotion = InputEventMouseMotion.new()
+	moved.position = at
+	Input.parse_input_event(moved)
+	Input.flush_buffered_events()
 	await wait_physics_frames(RESOLVE_FRAMES)
 
 
@@ -492,11 +508,13 @@ func test_a_press_well_clear_of_the_car_is_still_the_nearest_panel_and_still_dry
 	# is far enough off the car's centreline that the fallback's own probe declines
 	# too — leaving a box corner faced at the player. A mark, because "nothing" is
 	# not a useful thing to mark, and no water, because that normal was invented.
+	# A mouse press — see [constant WELL_CLEAR_ACROSS] for why a thumb cannot ask
+	# this question any more.
 	await _settle()
 	var at: Vector2 = _well_clear_of_the_car()
 	_the_sweep_missed(at)
 	_the_post_missed(at)
-	await _press(at)
+	await _click_and_hold(at)
 	assert_true(_marker().is_marking(), "the press still marks the nearest bodywork")
 	assert_almost_eq(_grime().remaining(), 1.0, TOLERANCE, "a box corner spent water")
 
@@ -548,10 +566,14 @@ func test_an_aim_that_slides_off_the_car_stops_working_the_paint() -> void:
 	# of them catches it loudly: a spot that has already had a second of water on it
 	# has almost no mud left to lose, so the same regression shows up as a couple of
 	# ten-thousandths instead of as a visible hole in the roof.
+	# A mouse throughout, because the slide's destination is out past the walk
+	# band — see [constant WELL_CLEAR_ACROSS] — and this test is about the tiers,
+	# not about the gesture: a thumb making this same slide stops the jet too,
+	# but by lowering the tool for a walk, which is the walk suite's subject.
 	await _settle()
 	var near: Vector2 = _over_the_roof(NEAR_MISS_METRES)
 	_the_ray_missed(near)
-	_touch(_thumb_for(near), true)
+	_click(near, true)
 	await wait_physics_frames(RESOLVE_FRAMES)
 	assert_true(_marker().is_marking(), "the near miss marked nothing, so nothing was swept")
 	var washed: float = _grime().remaining()
@@ -564,7 +586,7 @@ func test_an_aim_that_slides_off_the_car_stops_working_the_paint() -> void:
 	var away: Vector2 = _well_clear_of_the_car()
 	_the_sweep_missed(away)
 	_the_post_missed(away)
-	await _drag(away)
+	await _slide(away)
 	await wait_physics_frames(WASH_FRAMES)
 	assert_almost_eq(
 		_grime().remaining(),

@@ -75,6 +75,7 @@ const SKY_STEPS: int = 80
 ## being a press, and this suite has already been round that loop once.
 const INSIDE_THE_FRAME: float = 8.0
 
+
 var _main: Control = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
@@ -221,6 +222,10 @@ func _at_the_car() -> Vector2:
 ## point that did. Measured over the ten, that lands 0.75 m (sport) to 1.20 m
 ## (wagon) over the roofline, 9 to 20 px inside the top of the frame, and spends
 ## no water on any of them.
+##
+## [b]The press that asks about this point is a mouse since #179[/b] — see the
+## note on the box-corner test — so no thumb lift and no walk band applies to
+## it: the click aims exactly here.
 func _at_the_sky() -> Vector2:
 	var middle: Vector3 = _car().global_position
 	var view: SubViewport = _camera().get_viewport() as SubViewport
@@ -275,7 +280,26 @@ func _press_button(button: Button) -> void:
 
 func _lift() -> void:
 	_touch(Vector2.ZERO, false)
+	_click(Vector2.ZERO, false)
 	await wait_physics_frames(RESOLVE_FRAMES)
+
+
+## A mouse button going down or coming up at [param at] — the desk's press, for
+## the one test whose point sits where a thumb would walk instead of aim.
+func _click(at: Vector2, pressed: bool) -> void:
+	var click: InputEventMouseButton = InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.position = at
+	click.pressed = pressed
+	Input.parse_input_event(click)
+	Input.flush_buffered_events()
+
+
+## Holds the trigger at [param at] with a mouse for a second, without letting
+## go. [method after_each] releases the button with the finger.
+func _click_and_hold(at: Vector2) -> void:
+	_click(at, true)
+	await wait_physics_frames(WASH_FRAMES)
 
 
 func _settle() -> void:
@@ -355,8 +379,18 @@ func test_a_mark_on_a_bounding_box_is_not_somewhere_water_can_go() -> void:
 	#
 	# Held rather than held-and-released: letting go puts the mark away, so a test
 	# that lifted first would be asserting on an empty crosshair.
+	#
+	# A mouse and not a thumb since #179, and the swap is what keeps the test's
+	# subject reachable at all: a thumb this high on the glass is out past the
+	# walk band, so it walks instead of aiming — and capped at the band, the
+	# press sits low enough that on three of the ten styles the fallback's probe
+	# ray finds real paint, which rightly washes. A mouse aims exactly where it
+	# clicks, no lift and no band, so the box-corner case is asked at the same
+	# top-of-frame point it always was, on every style. The thumb's own half of
+	# the tiering — a touch inside the band answered by the fallback — is the
+	# sweep suite's well-clear test.
 	await _settle()
-	await _press(_at_the_sky())
+	await _click_and_hold(_at_the_sky())
 	assert_true(_marker().is_marking(), "the press still marked the nearest bodywork")
 	assert_almost_eq(_grime().remaining(), 1.0, 0.0001, "and a box corner spent water")
 
