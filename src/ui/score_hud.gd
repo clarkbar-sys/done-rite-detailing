@@ -304,8 +304,10 @@ func tick(reached: int) -> void:
 	_roll = maxf(float(_total) - _shown, 1.0) / ROLL_SECONDS
 
 
-## How much of the car is finished, as [code]0..1[/code] — [method Grime.shine],
-## printed as a percentage.
+## How far through the job the car is, as [code]0..1[/code] —
+## [method Grime.progress], printed as a percentage. All three passes count, so
+## the number climbs from the first jet of water rather than waiting for the
+## rag; that method has why, and why the shine alone was the wrong feed.
 ##
 ## [b]Why this can exist at all is the whole of [code]#144[/code].[/b] Until the
 ## grime was seeded only where a player can reach, the shine could not pass about

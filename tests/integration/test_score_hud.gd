@@ -344,8 +344,8 @@ func test_a_settled_scoreboard_stays_where_it_is() -> void:
 	assert_eq(_hud.flash(), 0.0, "an idle scoreboard re-lit itself")
 
 
-## The done percentage — [method Grime.shine] printed in the corner, and the only
-## number on this HUD that is true continuously rather than at a moment.
+## The done percentage — [method Grime.progress] printed in the corner, and the
+## only number on this HUD that is true continuously rather than at a moment.
 ##
 ## Its own group of tests rather than folded in above, because everything it is
 ## checked against is different: it does not roll, does not flash and does not
@@ -354,7 +354,7 @@ func test_the_done_readout_starts_at_nothing() -> void:
 	assert_eq(_hud.done_shown(), 0, "a car nobody has touched is not partly done")
 
 
-func test_the_done_readout_follows_the_shine() -> void:
+func test_the_done_readout_follows_the_fraction_it_is_fed() -> void:
 	_hud.done(0.42)
 	assert_eq(_hud.done_shown(), 42)
 	_hud.done(1.0)

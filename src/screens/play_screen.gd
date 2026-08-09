@@ -541,11 +541,19 @@ func _on_patch_finished(_panel: String, _patch: int, stage: GrimeMap.Stage) -> v
 ## docs make the same distinction three times already and this is its fourth
 ## instance.
 ##
-## [method Grime.shine] rather than [method Grime.remaining], because the mud
-## coming off is the first third of the job and a bar that read "done" at that
-## point would be lying about two passes. Shine is the one reading that only ever
-## rises and reaches one exactly when the car is finished — see its docs, and
-## [PanelReach] for what had to change before it could.
+## [method Grime.progress] rather than [method Grime.shine], and the swap is
+## deliberate in both directions. Shine only rises under the rag, so a readout on
+## it sat at zero through the washing and the foaming — two thirds of the job in
+## which the corner told a player holding the jet that nothing was happening.
+## Progress counts the three passes equally, so it climbs under every tool in the
+## belt; and it still only ever rises and still reaches one on exactly the stroke
+## that finishes the car, so nothing the shine reading promised the readout has
+## been given up. Not [method Grime.remaining] for the old reason either way: a
+## bar that read "done" when the mud came off would be lying about two passes.
+##
+## The run's end stays on [method Grime.shine] — see [method _hand_in_the_job] —
+## because "finished" is every unit in the last bucket and nothing less, and the
+## two numbers agree at exactly that moment.
 ##
 ## The cost is a walk over the car's seven maps adding seven floats, which is why
 ## it is not gated behind the debug view the way the mask report above it is: this
@@ -553,7 +561,7 @@ func _on_patch_finished(_panel: String, _patch: int, stage: GrimeMap.Stage) -> v
 func _show_how_far_along(grime: Grime) -> void:
 	if grime == null:
 		return
-	_scoreboard.done(grime.shine())
+	_scoreboard.done(grime.progress())
 
 
 ## Ends the run if the clock is out or [param grime] says the car is finished:

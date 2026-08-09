@@ -287,11 +287,36 @@ func product() -> float:
 	return _fraction(_product_total)
 
 
-## How much of this panel is buffed to a shine, as [code]0..1[/code]. The
-## progress number: it only ever goes up, and it reaches one exactly when the
-## panel is done.
+## How much of this panel is buffed to a shine, as [code]0..1[/code]. The finish
+## line: it only ever goes up, and it reaches one exactly when the panel is done.
+## [method progress] is the number that also credits the first two passes.
 func shine() -> float:
 	return _fraction(_shine_total)
+
+
+## How far through the whole job this panel is, as [code]0..1[/code] — the
+## three passes counted equally, so a third of it arrives with the water rather
+## than all of it waiting on the rag.
+##
+## [b]Three fractions averaged, and every one of them only rises.[/b] Washed is
+## the mud that has gone. Covered is everything a bottle has ever laid product
+## on — what is still sitting there plus the shine the rag has since made of
+## it, which is why the rag taking product off does not walk this backwards;
+## the same reading [method _stage_finished] uses for the middle pass, for the
+## same reason. Buffed is the shine itself. No tool lowers any of the three —
+## [method worked] has the argument — so this climbs under every tool in the
+## belt where [method shine] climbs only under the last one.
+##
+## [b]And it reaches one exactly when [method is_finished] does.[/b] Every unit
+## in shine means no mud, no product and no bare paint left, so all three
+## fractions fill at once — integer totals over an integer capacity, the same
+## exactness the class docs demand of every threshold here.
+func progress() -> float:
+	if _full <= 0:
+		return 0.0
+	var washed: int = _full - _mud_total
+	var covered: int = _product_total + _shine_total
+	return float(washed + covered + _shine_total) / float(3 * _full)
 
 
 ## How much work this panel has had done on it in [param stage], ever, measured

@@ -124,7 +124,7 @@ func _skin_of(panel: Node3D) -> GeometryInstance3D:
 	return _car().skin_of(panel)
 
 
-## Runs every pass of the job over every face of [param panel], in the room's own
+## Runs one pass of the job over every face of [param panel], in the room's own
 ## coordinates and through [Grime] rather than into a [GrimeMap] directly, so the
 ## world-to-panel conversion the game does on every press is part of what is being
 ## tested.
@@ -134,7 +134,7 @@ func _skin_of(panel: Node3D) -> GeometryInstance3D:
 ## each, which is what makes finishing a panel affordable here. The mask is what
 ## decides which of those texels move, and that is the whole point — nothing here
 ## knows which they are.
-func _do_the_whole_job(panel: Node3D) -> void:
+func _run_a_pass(panel: Node3D, stage: GrimeMap.Stage) -> void:
 	var skin: GeometryInstance3D = _skin_of(panel)
 	var box: AABB = skin.get_aabb()
 	var middle: Vector3 = skin.global_transform * box.get_center()
@@ -142,19 +142,24 @@ func _do_the_whole_job(panel: Node3D) -> void:
 	var faces: Array[Vector3] = [
 		Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.BACK, Vector3.FORWARD
 	]
+	for axis: Vector3 in faces:
+		var facing: Vector3 = (skin.global_basis * axis).normalized()
+		for _press: int in PRESSES:
+			match stage:
+				GrimeMap.Stage.WASHED:
+					_grime().wash(panel, middle, facing, wide, 1.0)
+				GrimeMap.Stage.FOAMED:
+					_grime().foam(panel, middle, facing, wide, 1.0)
+				_:
+					_grime().buff(panel, middle, facing, wide, 1.0)
+
+
+## All three passes of [method _run_a_pass], in the order the job goes.
+func _do_the_whole_job(panel: Node3D) -> void:
 	for stage: GrimeMap.Stage in [
 		GrimeMap.Stage.WASHED, GrimeMap.Stage.FOAMED, GrimeMap.Stage.BUFFED
 	]:
-		for axis: Vector3 in faces:
-			var facing: Vector3 = (skin.global_basis * axis).normalized()
-			for _press: int in PRESSES:
-				match stage:
-					GrimeMap.Stage.WASHED:
-						_grime().wash(panel, middle, facing, wide, 1.0)
-					GrimeMap.Stage.FOAMED:
-						_grime().foam(panel, middle, facing, wide, 1.0)
-					_:
-						_grime().buff(panel, middle, facing, wide, 1.0)
+		_run_a_pass(panel, stage)
 
 
 # ---- the mud ------------------------------------------------------------------
@@ -210,6 +215,22 @@ func test_every_panel_has_somewhere_the_player_can_reach() -> void:
 func test_the_corner_says_how_far_along_the_job_is() -> void:
 	assert_not_null(_scoreboard(), "the play screen has no scoreboard")
 	assert_eq(_scoreboard().done_shown(), 0, "a car nobody has touched is not partly done")
+
+
+func test_washing_alone_moves_the_readout_off_zero() -> void:
+	# The readout is [method Grime.progress] rather than [method Grime.shine], so
+	# the corner climbs from the first pass of the jet — a done number that sat at
+	# zero until the rag came out told the player the wash was doing nothing. The
+	# shine assertion is what makes this a test of that and not of the whole job:
+	# nothing here has been buffed, so the old feed would still read zero.
+	var wheel: Node3D = _panel_named(MeshCar.WHEEL_PART)
+	assert_not_null(wheel, "the car has no wheels")
+	if wheel == null:
+		return
+	_run_a_pass(wheel, GrimeMap.Stage.WASHED)
+	await wait_process_frames(1)
+	assert_almost_eq(_grime().shine(), 0.0, TOLERANCE, "something buffed, so this proves nothing")
+	assert_gt(_scoreboard().done_shown(), 0, "a washed wheel left the corner reading zero")
 
 
 func test_finishing_a_panel_moves_the_readout_off_zero() -> void:
