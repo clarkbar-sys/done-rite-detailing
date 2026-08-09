@@ -50,19 +50,71 @@ const METAL_STRIDE: int = 8
 
 var _garage: Garage = null
 
+## What the belt was holding before any test touched it, so [method before_each]
+## can put it back — see there.
+var _equipped_before: DetailingTool.Id = DetailingTool.Id.POWER_WASH
 
+
+## One room for the whole file. Nothing here presses anything — the class docs
+## say so, and it is why this suite is measurements of a resting pose — so
+## twenty-one first-person rooms were twenty-one copies of one arrangement of
+## five meshes hanging off a camera.
+##
+## [b]The one thing that moves is which tool is held, and [method before_each]
+## puts it back.[/b] That is the condition on sharing a fixture: a test that
+## leaves the room changed couples the suite into an order-dependent one, which
+## passes in file order and fails in any other. Two tests below walk the belt end
+## to end on purpose, and the walk is the whole assertion. Checked by running the
+## file with its tests in reverse.
+##
+## Measured on a four-core box with this suite run on its own: 14.9 s to 2.3 s,
+## of which about 0.9 s is Godot starting up either way.
+##
+## [method add_child] rather than [method GutTest.add_child_autofree]: GUT empties
+## its autofree list after every *test*, so a fixture registered with it here
+## would be freed out from under test two.
+func before_all() -> void:
+	_garage = _a_first_person_room()
+	if _garage == null:
+		return
+	add_child(_garage)
+	await wait_process_frames(1)
+	_equipped_before = _view_model().belt().equipped().id
+
+
+## [method Node.free] and not [method Node.queue_free]: GUT counts the test
+## script's children the moment `after_all` returns, and a queued free has not
+## happened yet — the room would be reported as a leak on its way out.
+func after_all() -> void:
+	if _garage != null:
+		_garage.free()
+		_garage = null
+
+
+## The explicit reset the shared room is worth, and deliberately only this: the
+## belt is the whole of what the tests below write to it.
 func before_each() -> void:
+	if _garage != null:
+		_view_model().belt().equip(_equipped_before)
+
+
+## A first-person room, instanced but not yet in a tree — the caller adds it and
+## decides how long it lives, which is the whole reason this hands one back
+## rather than parenting it. [method before_all]'s room outlives every test in
+## the file and so cannot go through GUT's autofree; the one test that builds its
+## own wants exactly the opposite.
+##
+## [member Garage.first_person] is set before the node is added, because
+## `_ready()` is what reads it — the same switch the play screen throws in its
+## own scene file.
+func _a_first_person_room() -> Garage:
 	var packed: PackedScene = load(GARAGE) as PackedScene
 	assert_not_null(packed, "could not load %s" % GARAGE)
 	if packed == null:
-		return
-	# Set before `add_child`, because `_ready()` is what reads it — this is the
-	# same switch the play screen throws in its own scene file.
+		return null
 	var garage: Garage = packed.instantiate() as Garage
 	garage.first_person = true
-	_garage = garage
-	add_child_autofree(_garage)
-	await wait_process_frames(1)
+	return garage
 
 
 func _view_model() -> ViewModel:
@@ -151,11 +203,16 @@ func _channel(texel: Color, channel: BaseMaterial3D.TextureChannel) -> float:
 	return texel.v
 
 
-## Every proxy that is currently drawing. The list, not the count, so a failure
-## says which two are on screen together rather than just that two are.
-func _showing() -> Array[MeshInstance3D]:
+## Every proxy of [param view_model] that is currently drawing. The list, not the
+## count, so a failure says which two are on screen together rather than just
+## that two are.
+##
+## Takes the viewmodel rather than reaching for the shared room's, because one
+## test below runs on a room of its own — see
+## [method test_something_is_already_in_your_hands_before_anything_is_equipped].
+func _showing_in(view_model: ViewModel) -> Array[MeshInstance3D]:
 	var showing: Array[MeshInstance3D] = []
-	for child: Node in _view_model().get_children():
+	for child: Node in view_model.get_children():
 		var proxy: MeshInstance3D = child as MeshInstance3D
 		if proxy != null and proxy.visible:
 			showing.append(proxy)
@@ -200,12 +257,27 @@ func test_something_is_already_in_your_hands_before_anything_is_equipped() -> vo
 	# empty-handed state precisely so this frame exists, and a viewmodel that
 	# waited for `equipped_changed` before showing anything would open the game
 	# with five invisible tools and no error anywhere.
-	var showing: Array[MeshInstance3D] = _showing()
+	#
+	# ON A ROOM OF ITS OWN, and it is the only test in this file that gets one.
+	# "Before anything is equipped" is a claim about a belt nobody has touched, and
+	# the shared room's belt is walked end to end by the two tests below — a reset
+	# in [method before_each] puts the right tool back in its hands but cannot make
+	# it untouched again. One extra room out of twenty-one is what the claim costs,
+	# and a claim about a first frame that is not made on a first frame is not the
+	# claim.
+	var fresh: Garage = _a_first_person_room()
+	assert_not_null(fresh, "could not build a room nobody has touched")
+	if fresh == null:
+		return
+	add_child_autofree(fresh)
+	await wait_process_frames(1)
+	var view_model: ViewModel = fresh.get_node("%ViewModel") as ViewModel
+	var showing: Array[MeshInstance3D] = _showing_in(view_model)
 	assert_eq(showing.size(), 1, "exactly one tool is held before anything is equipped")
 	if showing.size() != 1:
 		return
-	var held: DetailingTool = _view_model().belt().equipped()
-	assert_eq(showing[0], _view_model().proxy_for(held.id), "and it is the one the belt says")
+	var held: DetailingTool = view_model.belt().equipped()
+	assert_eq(showing[0], view_model.proxy_for(held.id), "and it is the one the belt says")
 
 
 func test_equipping_each_tool_in_turn_shows_exactly_that_one() -> void:
@@ -216,7 +288,7 @@ func test_equipping_each_tool_in_turn_shows_exactly_that_one() -> void:
 	var view_model: ViewModel = _view_model()
 	for tool: DetailingTool in view_model.belt().tools():
 		view_model.belt().equip(tool.id)
-		var showing: Array[MeshInstance3D] = _showing()
+		var showing: Array[MeshInstance3D] = _showing_in(view_model)
 		assert_eq(showing.size(), 1, "%s: exactly one tool is held" % tool.display_name)
 		if showing.size() != 1:
 			continue
@@ -231,7 +303,7 @@ func test_equipping_backwards_down_the_belt_swaps_just_as_cleanly() -> void:
 	for step: int in tools.size():
 		var tool: DetailingTool = tools[tools.size() - 1 - step]
 		view_model.belt().equip(tool.id)
-		var showing: Array[MeshInstance3D] = _showing()
+		var showing: Array[MeshInstance3D] = _showing_in(view_model)
 		assert_eq(showing.size(), 1, "%s: exactly one tool is held" % tool.display_name)
 		if showing.size() != 1:
 			continue

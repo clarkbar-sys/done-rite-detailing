@@ -53,6 +53,57 @@ const HEIGHT_M: Vector2 = Vector2(0.9, 2.2)
 
 var _chosen_before: String = ""
 
+## The ten, built once and parked for the whole file — see [method before_all].
+var _fleet: Dictionary[String, MeshCar] = {}
+
+
+## The ten cars of the pack, built once and shared by every test that only looks
+## at one.
+##
+## [b]This is the file where that mattered most.[/b] Fourteen of the tests below
+## are a loop over [constant MeshCar.STYLES] — that is the whole point of the
+## file, see the class docs — so the suite was building and throwing away about a
+## hundred and sixty cars to ask a hundred and sixty questions of ten. Each one is
+## a glTF scene of some seven thousand triangles wrapped into seven panels by
+## [method MeshCar._build].
+##
+## [b]The condition on sharing them is that a test only reads.[/b] A car that has
+## been restyled or repainted under the next test is an order-dependent suite,
+## which passes in file order and fails in any other — so everything that writes
+## to a car goes through [method _a_car_of] and gets one nobody else is holding.
+## The two accessors say which is which, and the tests that write are the ones
+## about restyling, about repainting, and about which car turns up when nobody
+## asked for a style. Checked by running the file with its tests in reverse.
+##
+## Built with the style set explicitly, so what [CarChoice] happens to hold when
+## this runs decides nothing: the export beats the player's pick, which is its
+## own test below.
+##
+## Measured on a four-core box with this suite run on its own: 18.0 s to 2.7 s,
+## of which about 0.9 s is Godot starting up either way — the largest saving in
+## tests/integration/, and it came from a file with no `before_each` fixture in it
+## at all.
+##
+## [method add_child] rather than [method GutTest.add_child_autofree]: GUT empties
+## its autofree list after every *test*, so a fleet registered with it here would
+## be freed out from under test two.
+func before_all() -> void:
+	for style: String in MeshCar.STYLES:
+		var car: MeshCar = _build(style)
+		if car == null:
+			return
+		add_child(car)
+		_fleet[style] = car
+
+
+## [method Node.free] and not [method Node.queue_free]: GUT counts the test
+## script's children the moment `after_all` returns, and a queued free has not
+## happened yet — ten cars would be reported as leaks on their way out.
+func after_all() -> void:
+	for style: String in _fleet:
+		_fleet[style].free()
+	_fleet.clear()
+
 
 func before_each() -> void:
 	# Every car built here with an empty style asks [CarChoice] what the player
@@ -68,17 +119,42 @@ func after_each() -> void:
 	CarChoice.choose(_chosen_before)
 
 
-## One car of [param style], in the tree and building itself on the way in.
+## One car of [param style], instanced and built but not yet in a tree — the
+## caller adds it and decides how long it lives.
 ##
 ## [member MeshCar.style] is set before the node is added, which is the whole of
 ## the injection: a test asks for the pickup instead of instantiating cars until
 ## one turns up.
-func _car_of(style: String) -> MeshCar:
+func _build(style: String) -> MeshCar:
 	var packed: PackedScene = load(SCENE) as PackedScene
 	assert_not_null(packed, "could not load %s" % SCENE)
-	# Into a typed local first: GUT's add_child_autofree is untyped.
+	if packed == null:
+		return null
+	# Into a typed local first: the `add_child*` calls both callers make are untyped.
 	var car: MeshCar = packed.instantiate() as MeshCar
 	car.style = style
+	return car
+
+
+## The shared car of [param style] — one of the ten [method before_all] parked.
+##
+## [b]Read from it and do not write to it.[/b] Every test in this file that
+## restyles, repaints or otherwise changes a car calls [method _a_car_of]
+## instead, and the reason is in [method before_all]: a car left changed here is
+## left changed for every test after it.
+func _car_of(style: String) -> MeshCar:
+	return _fleet[style]
+
+
+## A car of [param style] nobody else is holding, freed at the end of the test —
+## which is what a test that writes to one needs. [param style] may be empty, and
+## for the tests about which car turns up when nobody asked, it is: the shared
+## fleet has no such car, because "whichever one [CarChoice] draws" is a
+## different answer every time it is asked.
+func _a_car_of(style: String) -> MeshCar:
+	var car: MeshCar = _build(style)
+	if car == null:
+		return null
 	add_child_autofree(car)
 	return car
 
@@ -245,7 +321,12 @@ func test_the_bounds_are_exact_on_the_frame_the_car_arrives() -> void:
 	# contract's, and that a panel skinned with a MeshInstance3D is exact
 	# immediately. That claim has been held by a fixture of four boxes since #136;
 	# here it is against a real car with 7,000 triangles in it.
-	var car: MeshCar = _car_of("sedan")
+	#
+	# A CAR OF ITS OWN, and not one of the ten [method before_all] parked, for the
+	# same reason there is no await: "on the frame it arrives" is a claim about a
+	# car that has just arrived, and the shared fleet has been standing there since
+	# the file started. Measuring one of those would be measuring nothing.
+	var car: MeshCar = _a_car_of("sedan")
 	assert_gt(car.bounds().size.length(), 0.0, "the car reported no size at all")
 	assert_between(car.bounds().size.z, LENGTH_M.x, LENGTH_M.y, "and it is car-length immediately")
 
@@ -370,8 +451,8 @@ func test_two_cars_do_not_share_one_paint_job() -> void:
 	# the copy MeshCar takes of the pack's material. Same guarantee, and it has to be
 	# tested the same way, because the failure looks identical: repaint one car in the
 	# driveway and every car in the game changes colour with it.
-	var one: MeshCar = _car_of("sedan")
-	var other: MeshCar = _car_of("sedan")
+	var one: MeshCar = _a_car_of("sedan")
+	var other: MeshCar = _a_car_of("sedan")
 	one.paint.albedo_color = Color(0.5, 0.5, 0.5)
 	assert_ne(one.paint, other.paint, "two cars must not share one material")
 	assert_ne(one.paint.albedo_color, other.paint.albedo_color, "or one paint job")
@@ -429,9 +510,16 @@ func test_the_lamps_keep_their_own_lenses() -> void:
 
 func test_a_test_can_ask_for_the_style_it_wants() -> void:
 	# The injection, which is the whole reason every other test in this file can loop
-	# over ten cars rather than instantiate until the one it wanted arrived.
+	# over ten cars rather than instantiate until the one it wanted arrived — and,
+	# since #186, the reason [method before_all] can park exactly the ten it means
+	# to.
+	#
+	# Ten cars of its own rather than the parked ten, because it is the injection
+	# itself being asserted: reading the style back off a car this file has been
+	# holding since it started would be asserting on the dictionary key it was
+	# filed under.
 	for style: String in MeshCar.STYLES:
-		assert_eq(_car_of(style).style, style, "asked for the %s and got something else" % style)
+		assert_eq(_a_car_of(style).style, style, "asked for the %s and got something else" % style)
 
 
 func test_a_car_nobody_chose_a_style_for_picks_one_of_the_ten() -> void:
@@ -446,7 +534,7 @@ func test_a_car_nobody_chose_a_style_for_picks_one_of_the_ten() -> void:
 	# twelve copies of one car, which is true and is not what this is asking.
 	for _each: int in range(12):
 		CarChoice.forget()
-		var car: MeshCar = _car_of("")
+		var car: MeshCar = _a_car_of("")
 		assert_has(MeshCar.STYLES, car.style, "an unasked-for car is not one of the ten")
 
 
@@ -454,7 +542,7 @@ func test_the_style_is_readable_after_the_car_is_built() -> void:
 	# The export is a door on the way in and a readout on the way out — which is what
 	# makes it the same shape as Car.paint, where the colour is picked in _ready and
 	# left where a test can find it.
-	var car: MeshCar = _car_of("")
+	var car: MeshCar = _a_car_of("")
 	assert_false(car.style.is_empty(), "a built car must say which style it is")
 	var skin: MeshInstance3D = car.skin_of(_panel(car, MeshCar.BODY_PART)) as MeshInstance3D
 	var livery: StandardMaterial3D = skin.mesh.surface_get_material(0) as StandardMaterial3D
@@ -470,7 +558,9 @@ func test_a_car_nobody_chose_a_style_for_is_the_one_the_player_picked() -> void:
 	# Every style, because the plumbing has no business caring which.
 	for style: String in MeshCar.STYLES:
 		CarChoice.choose(style)
-		assert_eq(_car_of("").style, style, "the bay ignored the player and parked something else")
+		assert_eq(
+			_a_car_of("").style, style, "the bay ignored the player and parked something else"
+		)
 
 
 func test_a_style_set_on_the_car_still_beats_the_player() -> void:
@@ -479,7 +569,7 @@ func test_a_style_set_on_the_car_still_beats_the_player() -> void:
 	# particular car — this one, test_garage_styles.gd, test_mesh_car_hits.gd —
 	# depends on the export winning.
 	CarChoice.choose("pickup")
-	assert_eq(_car_of("minivan").style, "minivan", "a car asked for by name must be that car")
+	assert_eq(_a_car_of("minivan").style, "minivan", "a car asked for by name must be that car")
 
 
 # ---- swapping one for another, in place ---------------------------------------
@@ -489,7 +579,7 @@ func test_a_car_can_be_restyled_where_it_stands() -> void:
 	# What the menu's arrows are made of. The car is already in a room by then —
 	# parked, aimed at, walked around — so the swap has to happen under all of that
 	# rather than by building a second car somewhere.
-	var car: MeshCar = _car_of("sedan")
+	var car: MeshCar = _a_car_of("sedan")
 	car.restyle("pickup")
 	assert_eq(car.style, "pickup", "the readout must agree with what was asked for")
 	var skin: MeshInstance3D = car.skin_of(_panel(car, MeshCar.BODY_PART)) as MeshInstance3D
@@ -506,7 +596,7 @@ func test_the_car_it_replaces_is_gone_the_same_frame() -> void:
 	# cars at once, and the room re-sits the car on the tarmac from that box on the
 	# very next line of Garage.show_style. No await, because the whole claim is
 	# that a frame is not needed.
-	var car: MeshCar = _car_of("compact")
+	var car: MeshCar = _a_car_of("compact")
 	var before: AABB = car.bounds()
 	car.restyle("pickup")
 	assert_eq(car.panels().size(), PARTS.size(), "the old car is still hanging off this one")
@@ -522,7 +612,7 @@ func test_a_restyled_car_keeps_the_colour_it_was_painted() -> void:
 	# that did nothing about it would come out unpainted — and re-rolling the colour
 	# instead would turn "look at the other nine" into a slot machine. What the
 	# player is comparing across a press is the shape.
-	var car: MeshCar = _car_of("sedan")
+	var car: MeshCar = _a_car_of("sedan")
 	var colour: Color = car.paint.albedo_color
 	car.restyle("minivan")
 	assert_eq(car.paint.albedo_color, colour, "the car was repainted for changing shape")
@@ -533,7 +623,7 @@ func test_a_restyled_car_is_painted_at_all() -> void:
 	# colour, and a rebuild that left `paint` pointing at the old car's material
 	# would pass it while every panel on screen stayed grey. Asserted through a
 	# panel's own override, which is what is actually drawn.
-	var car: MeshCar = _car_of("sedan")
+	var car: MeshCar = _a_car_of("sedan")
 	car.restyle("suv")
 	var skin: MeshInstance3D = car.skin_of(_panel(car, MeshCar.BODY_PART)) as MeshInstance3D
 	assert_eq(skin.get_surface_override_material(0), car.paint, "the new body is not this car's")
@@ -544,7 +634,7 @@ func test_restyling_to_the_car_that_is_already_there_does_nothing() -> void:
 	# runs on the way into every menu and must not rebuild a car that is already
 	# correct. Asserted on the panels themselves rather than on the style string,
 	# because the string would agree either way.
-	var car: MeshCar = _car_of("wagon")
+	var car: MeshCar = _a_car_of("wagon")
 	var panels: Array[Node3D] = car.panels()
 	car.restyle("wagon")
 	assert_eq(car.panels(), panels, "the car was rebuilt for no reason")
