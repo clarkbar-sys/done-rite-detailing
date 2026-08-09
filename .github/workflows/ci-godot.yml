@@ -75,19 +75,27 @@ env:
   # `actions-gh-pages` deploy actually serves and a raw byte is not what a
   # player's browser downloads. Measured with the exact command the step below
   # runs (`gzip -c <file> | wc -c` per file in build/web/, summed) against a
-  # clean `make build-web` on 2026-08-09, before #204/#206/#207 — the sibling
-  # load-time issues that each shrink this bundle — had landed:
+  # clean `make build-web`. When this budget was first set, on 2026-08-09 and
+  # before any of the load-time siblings had landed, that was:
   #
   #   index.pck   35,615,884 B raw -> 35,088,688 B gzip
   #   index.wasm  39,513,091 B raw -> 10,142,310 B gzip
   #   bundle total (every file in build/web/, gzip)     45,581,247 B
   #
-  # 47,000,000 is that 45,581,247 plus ~1.4 MB (~3%) of headroom — enough that
+  # It exists to catch GROWTH, not to bless today's size, so it is ratcheted
+  # down as those land rather than left with headroom nobody is using. After
+  # #213/#215/#212 and #205 (the texture import pass) it is:
+  #
+  #   index.pck    5,636,516 B raw ->  5,236,783 B gzip
+  #   index.wasm  39,513,091 B raw -> 10,142,310 B gzip
+  #   bundle total (every file in build/web/, gzip)     15,729,342 B
+  #
+  # 16,200,000 is that 15,729,342 plus ~470 KB (~3%) of headroom — enough that
   # a rebuild's changing build_stamp.json (commit + timestamp, always the same
-  # length) can't flip it, not enough to absorb a real art drop. It exists to
-  # catch GROWTH, not to bless today's size: ratchet it down as #204/#206/#207
-  # land, rather than leaving headroom nobody is using.
-  WEB_GZIP_BUDGET_BYTES: 47000000
+  # length) can't flip it, not enough to absorb a real art drop. Note what the
+  # remaining total is made of: the engine's own .wasm is now 64% of it, so the
+  # next real cut is not an art one.
+  WEB_GZIP_BUDGET_BYTES: 16200000
 
 jobs:
   lint:

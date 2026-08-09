@@ -18,7 +18,7 @@ dest_files=["res://.godot/imported/window_cleaner_nozzle_orm.png-72b31454c83713c
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
