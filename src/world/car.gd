@@ -132,35 +132,34 @@
 class_name Car
 extends Node3D
 
-## Six hot, saturated paint colours — arcade colours, the ones a Dodge Viper's
+## Five hot, saturated paint colours — arcade colours, the ones a Dodge Viper's
 ## build sheet would offer, not the range you would actually see on the
 ## street. [method _ready] picks one of these for every car.
 ##
 ## Cut down from the thirteen the game shipped with (#170): every muted or
 ## neutral entry — Pewter, Silver, Burgundy, Champagne Gold, Bronze, Sunflower
 ## Yellow, Ice Blue, Lime Green and the rest — is gone, and what is left is a
-## red, a green and a blue pulled off a Viper's options list, plus orange,
-## black and white.
+## red, a green and a blue pulled off a Viper's options list, plus orange and
+## white.
 ##
-## [b]Black is back, and it is not the black the original thirteen cut.[/b]
-## Jet Black, Gunmetal and Charcoal never made that list: mud is a dark brown
+## [b]Black went back out again, and this time it stays out.[/b] Jet Black,
+## Gunmetal and Charcoal never made the original cut, and Viper Black — lifted
+## well off true zero rather than sitting at it — was meant to be the version
+## that dodged their problem: mud is a dark brown
 ## ([code]mud_colour[/code] in [code]grime.gdshader[/code]), and on a
 ## near-black or near-grey panel it sits close enough in both hue and
-## lightness that a player cannot tell dirty paint from clean. Viper Black is
-## lifted well off true zero for a second reason as well as that one — a
-## colour multiplied by zero carries no shading no matter what the greyscale
-## map underneath it says, which is the same problem
-## [constant MeshCar.MAP_COMPENSATION] exists to solve at the other end of the
-## range — and that lift is what keeps it apart from mud in hue: neutral,
-## faintly blue-black paint against a warm brown is a difference the grime
-## still reads against, the way Deep Blue always managed it, even though
-## neither sits far from mud in lightness.
+## lightness that a player cannot tell dirty paint from clean. The lift bought
+## it some daylight — enough to matter to [constant MeshCar.MAP_COMPENSATION],
+## which needs the same headroom for the same reason, a colour multiplied by
+## zero carries no shading no matter what the greyscale map underneath it
+## says — but not enough of it: dark mud on a dark panel still read as more
+## paint than dirt. Rather than chase a lift that stops looking black to buy
+## contrast that still is not there, the colour is gone.
 const PAINT_COLORS: Array[Color] = [
 	Color(0.68, 0.03, 0.05),  # Viper Red
 	Color(0.04, 0.56, 0.15),  # Viper Green
 	Color(0.04, 0.24, 0.64),  # GTS Blue
 	Color(0.92, 0.38, 0.02),  # Header Orange
-	Color(0.13, 0.13, 0.15),  # Viper Black
 	Color(0.92, 0.92, 0.90),  # Viper White
 ]
 

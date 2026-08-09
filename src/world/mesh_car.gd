@@ -169,8 +169,11 @@ const WHEEL_PART: String = "Wheel"
 ## [constant Car.PAINT_COLORS] carefully picks is not the palette that reaches
 ## the screen, and the loss is proportional — it squashes the top of the range
 ## (Viper White, and Header Orange's red channel, both authored at 0.92, same
-## as Alpine White was before #170) rather than the bottom (Viper Black,
-## deliberately lifted off zero for exactly this — see the class docs).
+## as Alpine White was before #170) harder than the bottom, where nothing left
+## in the palette sits close enough to true zero for the squash to erase it —
+## Viper Black once did, lifted deliberately to survive this same compression,
+## and it is gone from the palette now for a reason the class docs cover: the
+## lift was not enough to keep grime legible on it either.
 ##
 ## [b]And it is 1.25 rather than the 1.53 that would cancel the map outright.[/b]
 ## 1.53 does land Viper White back on its authored lightness, and it does it
