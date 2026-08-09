@@ -584,6 +584,37 @@ const NO_SIDE_TO_IT: float = 0.35
 ## anything to make a noise with at all, rather than muting one it built anyway.
 @export var noisy: bool = false
 
+## What the car's grounding shadow is drawn with: one unshaded texture, darkest
+## under the middle and faded to nothing by the edge. Lives in
+## [code]src/world/garage.tscn[/code] beside the sky and the lights, the way
+## every other look-and-feel resource in this room does — [code]null[/code]
+## leaves the car without one rather than crashing a fixture that never wired
+## one in.
+##
+## [b]Old-school and cheap on purpose[/b] (#171): a soft blob under the car reads
+## as grounded from every orbit angle for the cost of one draw call, which is the
+## whole of what a web export can spend on a shadow nothing else in the room
+## casts — the key light's docs in [code]src/world/garage.tscn[/code] already
+## turn a realtime one off for the same reason.
+@export var shadow_material: StandardMaterial3D
+
+## How much of the car's own footprint the shadow covers, as a fraction of
+## [method Car.bounds].
+##
+## Pulled in rather than matched to it: [method Car.bounds] is drawn round the
+## widest point of the doors — wider than the bodywork actually blocking the
+## light, as its own docs say — so a blob at 1.0 reads as a stain the car is
+## floating over. Four fifths of it sits under the paint and reads as the car's
+## own shadow instead.
+@export var shadow_footprint_scale: float = 0.82
+
+## How far above the car's own floor the shadow sits, in metres. That floor is
+## also the ground's surface once [method _park_the_car] has run, so a shadow
+## drawn exactly on it is one triangle away from fighting the concrete for the
+## same pixel. A centimetre is enough to always win that draw order without
+## reading as a shadow that has lifted off the tarmac.
+@export var shadow_lift_metres: float = 0.01
+
 ## Whether every tool wears the plain crosshair instead of the effect it draws for
 ## itself. Off by default, so what ships is the water, the product and the foam:
 ## they are the things a player is meant to be looking at. Switched on —
@@ -621,6 +652,12 @@ var _marked: String = ""
 ## that is plainly pointed somewhere else. See [method aim_on_panel].
 var _landed: bool = false
 
+## The shadow itself, or [code]null[/code] on a room whose [member shadow_material]
+## was never wired up. Built once in [method _ready] and resized in place by
+## [method _park_the_car] rather than rebuilt — a restyle changes the car's
+## footprint, not the fact that it has a shadow.
+var _shadow: MeshInstance3D = null
+
 @onready var _camera: Camera3D = %Camera
 @onready var _car: Car = %Car
 
@@ -647,6 +684,8 @@ var _landed: bool = false
 
 
 func _ready() -> void:
+	# Ahead of the park below, which is what sizes and places it the first time.
+	_build_the_shadow()
 	# Before anything is placed or pointed at it: every shot in this file is
 	# measured from the car's own position, so a car that has not been sat on the
 	# tarmac yet would be aimed at, walked around and stood off from the wrong
@@ -965,6 +1004,71 @@ func _park_the_car() -> void:
 	if is_nan(surface):
 		return
 	_car.global_position.y += surface - box.position.y
+	_lay_the_shadow(box, surface)
+
+
+## Builds the grounding shadow, on a room whose [member shadow_material] is
+## actually set — see the export's own docs for why a missing one is left
+## silent rather than reported.
+##
+## [b]A sibling of the car, not a child of it.[/b] The same split
+## [code]src/world/garage.tscn[/code] holds [Grove] to against [Ground]: [method
+## Car.panels] walks every child of the car looking for something a ray can hit,
+## and a shadow is neither a panel nor a thing a tool should ever be aimed at.
+## Parented under [code]%Car[/code]'s own parent, the way [member _sight] and
+## [member _grime] are, rather than under [code]%Car[/code] itself.
+##
+## [b]Built once and resized in place[/b], unlike the panels a restyle throws
+## away and rebuilds. [method MeshCar.restyle] changes which ten models the car
+## is; it does not change the fact that whichever one it is casts a shadow, so
+## [method _park_the_car] only ever has to ask this to change size.
+##
+## Hidden until the first successful [method _park_the_car]: a shadow shown
+## before there is a footprint or a floor to measure would sit at the origin,
+## which is a fact about there being nothing to measure yet rather than about
+## where the car actually is.
+func _build_the_shadow() -> void:
+	if shadow_material == null:
+		return
+	_shadow = MeshInstance3D.new()
+	_shadow.name = "Shadow"
+	var footprint: QuadMesh = QuadMesh.new()
+	# FACE_Y and not the class default: a QuadMesh is a PlaneMesh that starts out
+	# facing the camera rather than the sky, because most quads are a card and not
+	# a floor decal. This one is the floor decal.
+	footprint.orientation = PlaneMesh.FACE_Y
+	_shadow.mesh = footprint
+	_shadow.material_override = shadow_material
+	_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_shadow.visible = false
+	_car.get_parent().add_child(_shadow)
+
+
+## Sizes and places the shadow against [param box] — the car's own bounds,
+## measured before [method _park_the_car] moved it — and [param surface], the
+## ground height that call just sat the car on.
+##
+## [b]The box's width and depth, not its height.[/b] A blob is drawn on the
+## ground plane, so what it needs from the car is the footprint [method
+## Car.bounds] already reports, pulled in by [member shadow_footprint_scale].
+##
+## [b]Centred on the box, not on the car's own origin.[/b] [Car]'s docs put that
+## origin at mid-height and say nothing about where it sits between nose and
+## tail, so the box's own centre is the one point guaranteed to be in the middle
+## of whichever of the ten happens to be parked.
+##
+## [b]Placed at [param surface] rather than read off the car a second time[/b],
+## because [method _park_the_car] already paid for that measurement and the
+## car's own Y has just moved to sit on it — asking again would answer the same
+## number through an extra frame of indirection for no reason.
+func _lay_the_shadow(box: AABB, surface: float) -> void:
+	if _shadow == null:
+		return
+	var quad: QuadMesh = _shadow.mesh as QuadMesh
+	quad.size = Vector2(box.size.x, box.size.z) * shadow_footprint_scale
+	var middle: Vector3 = box.get_center()
+	_shadow.global_position = Vector3(middle.x, surface + shadow_lift_metres, middle.z)
+	_shadow.visible = true
 
 
 ## Puts the camera where the orbit says it should be, looking at the car.
