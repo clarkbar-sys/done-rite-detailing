@@ -205,6 +205,24 @@ const SPRAY_TILT: float = 150.0
 ## flat on the panel.
 const ON_THE_PAINT: float = 0.0
 
+## How much further right and lower the rag sits than the other four tools while
+## idle, in the anchor's own space — [code]+X[/code] right of frame,
+## [code]-Y[/code] down, [code]0[/code] of depth so the near-plane and car
+## clearances below are untouched.
+##
+## The rag is the one tool whose resting pose put it dead on the hand (a grip of
+## [code]0.0[/code] in [method _held_pose]), so at rest it was the biggest thing
+## in the bottom-right corner of the frame — see #176. Applied with
+## [method Transform3D.translated] rather than [method Transform3D.translated_local]
+## so it lands in screen space and does not turn with the rag's own tilted
+## rotation: "lower and to the right" has to mean the same thing regardless of
+## which way [method _held_pose]'s angle happens to point the cloth's own axes.
+##
+## Only the rag's rest pose moves. [method ReachCarry.worked] — the pose while
+## buffing — never reads [member _rest]'s origin at all, so this changes where
+## the cloth starts and not what raising it to buff looks like.
+const RAG_STOW: Vector3 = Vector3(0.08, -0.09, 0.0)
+
 ## How much clear air to leave under a tool pressed against the paint, in metres.
 ## Half a centimetre — enough that a sponge sits on a door rather than z-fighting
 ## it, and far too little to read as hovering.
@@ -690,8 +708,9 @@ func _held_pose(id: DetailingTool.Id) -> Transform3D:
 			# 65° from flat, which lands its normal 47° off face-on — a long way
 			# from the edge-on angle that would render it as nothing at all, and
 			# far enough off square that it reads as cloth in a hand rather than
-			# as a poster stuck to the lens.
-			return _pose(Vector3(65.0, -25.0, 15.0), 0.0)
+			# as a poster stuck to the lens. Stowed lower and further right than a
+			# grip of 0.0 would otherwise leave it — see [constant RAG_STOW].
+			return _pose(Vector3(65.0, -25.0, 15.0), 0.0, RAG_STOW)
 		DetailingTool.Id.WINDOW_CLEANER:
 			# A bottle held near its base and tilted left, so the two blue tools
 			# differ in silhouette and posture as well as in colour.
@@ -711,9 +730,18 @@ func _held_pose(id: DetailingTool.Id) -> Transform3D:
 
 ## One entry of [method _held_pose]'s table: [param euler_degrees] of rotation,
 ## then slid [param grip] metres along the tool's [i]own[/i] `+Y` — which is the
-## long axis of a cylinder and the height of a box. Local rather than in the
-## anchor's space so a pose stays meaningful after its angle is retuned; in the
-## anchor's space, changing the angle would silently move the tool as well.
-func _pose(euler_degrees: Vector3, grip: float) -> Transform3D:
+## long axis of a cylinder and the height of a box — and finally, for a tool
+## that wants to sit somewhere other than dead on the hand, [param stow] metres
+## in the anchor's own space. Local rather than in the anchor's space so a pose
+## stays meaningful after its angle is retuned; in the anchor's space, changing
+## the angle would silently move the tool as well. [param stow] is the one
+## exception, and is [method Transform3D.translated] rather than
+## [method Transform3D.translated_local] for exactly that reason: it is a
+## position in the frame, not a fact about the tool's own axes, so it must not
+## turn with them.
+func _pose(euler_degrees: Vector3, grip: float, stow: Vector3 = Vector3.ZERO) -> Transform3D:
 	var orientation: Basis = Basis.from_euler(euler_degrees * PER_DEGREE)
-	return Transform3D(orientation, Vector3.ZERO).translated_local(Vector3(0.0, grip, 0.0))
+	var gripped: Transform3D = Transform3D(orientation, Vector3.ZERO).translated_local(
+		Vector3(0.0, grip, 0.0)
+	)
+	return gripped.translated(stow)
