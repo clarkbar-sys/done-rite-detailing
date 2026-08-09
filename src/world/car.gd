@@ -325,11 +325,26 @@ func bounds() -> AABB:
 	var box: AABB = AABB()
 	var found: bool = false
 	for panel: Node3D in panels():
-		var skin: GeometryInstance3D = skin_of(panel)
-		var painted: AABB = skin.global_transform * skin.get_aabb()
+		var painted: AABB = box_around(panel)
 		box = painted if not found else box.merge(painted)
 		found = true
 	return box
+
+
+## The world-space box around one [param panel], read off its skin — the single
+## panel [method bounds] merges every one of, and the answer to "where is this
+## panel, roughly" for everything that asks about one rather than about the car.
+##
+## Here rather than at each caller because the arithmetic is the same paragraph
+## [method bounds] carries above: measured off the skin and moved by the skin's
+## own transform, not the root's, because an [AABB] read from one node and placed
+## by another is the kind of wrong that looks right until somebody moves a wheel.
+## It got one node longer the day a panel stopped having to be its own geometry
+## ([method skin_of]), and that is exactly the sort of change that should not have
+## to be made in three places.
+func box_around(panel: Node) -> AABB:
+	var skin: GeometryInstance3D = skin_of(panel)
+	return skin.global_transform * skin.get_aabb()
 
 
 ## Depth-first for panels, descending through anything that is not one so they can

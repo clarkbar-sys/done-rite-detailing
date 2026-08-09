@@ -13,7 +13,7 @@
 ## bigger than the wheel — most of it is the empty corners of the arch. So the
 ## point this returns is close to the car rather than on it, and the room casts
 ## one more ray at it to land the mark on a real surface with a real normal — see
-## [method Garage._nearest_on_the_car]. The boxes only have to be right about
+## [method AimProbe._nearest_on_the_car]. The boxes only have to be right about
 ## [i]which panel[/i] and roughly where, and for that they are exact enough while
 ## costing a clamp per panel instead of a mesh query per panel.
 ##

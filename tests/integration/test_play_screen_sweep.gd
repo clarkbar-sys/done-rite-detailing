@@ -69,7 +69,7 @@ const NEAR_MISS_METRES: float = 0.25
 ## [b]Not "N metres over the roofline", which is what this was until
 ## [code]#139[/code].[/b] A press straight over the middle of the car is the worst
 ## place in the frame to put this one, and the reason is
-## [method Garage._nearest_on_the_car]: the fallback plants a post at the nearest
+## [method AimProbe._nearest_on_the_car]: the fallback plants a post at the nearest
 ## point on the nearest panel's box and casts a second ray a tenth past it, so an
 ## aim that comes down the car's own centreline has a post directly over the roof
 ## and a probe that runs straight into it. That probe hitting is a mark off real
@@ -272,9 +272,9 @@ func _the_sweep_missed(at: Vector2) -> void:
 ## the one answer in the whole room that is allowed to be approximate.
 ##
 ## [b]The tier below the two above, restated the way they are.[/b]
-## [method Garage._nearest_on_the_car] does not simply hand back a box corner: it
+## [method AimProbe._nearest_on_the_car] does not simply hand back a box corner: it
 ## plants a post at the nearest point on the nearest panel's box and casts a
-## second ray a [constant Garage.PAST_THE_POST] fraction past it, and if that
+## second ray a [constant AimProbe.PAST_THE_POST] fraction past it, and if that
 ## finds paint the mark is real, the normal is measured and a tool pressed there
 ## works. Only when the probe misses too is the mark the invented one this test is
 ## named for.
@@ -296,7 +296,7 @@ func _the_post_missed(at: Vector2) -> void:
 	var post: Vector3 = NearestPoint.in_box_from_ray(boxes[nearest], ray[0], ray[1])
 	var reach: Vector3 = post - ray[0]
 	var probe: Dictionary = _space().intersect_ray(
-		PhysicsRayQueryParameters3D.create(ray[0], ray[0] + reach * Garage.PAST_THE_POST)
+		PhysicsRayQueryParameters3D.create(ray[0], ray[0] + reach * AimProbe.PAST_THE_POST)
 	)
 	assert_true(
 		probe.is_empty(),
