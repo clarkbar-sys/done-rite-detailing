@@ -340,15 +340,16 @@ func product() -> float:
 
 ## How much of the car is buffed to a shine, as [code]0..1[/code].
 ##
-## The progress number, and the one a bar should be reading: it only ever rises,
-## and unlike [method remaining] it does not call a car finished when the mud
-## comes off. Unweighted, and blind to panels with nothing reachable on them, for
-## the reasons [method remaining] gives.
+## The finish line: it only ever rises, and unlike [method remaining] it does not
+## call a car finished when the mud comes off. Unweighted, and blind to panels
+## with nothing reachable on them, for the reasons [method remaining] gives. It is
+## what ends the run — [code]src/screens/play_screen.gd[/code] watches it against
+## its [code]FINISHED[/code] line — while the done readout prints
+## [method progress], which counts the two passes this is still blind to.
 ##
 ## [b]It reaches one now.[/b] Before [PanelReach] there was no way to buff the
 ## underside of a shell or the air inside a panel's box, so this asymptoted
-## somewhere under a half and there was no honest percentage to show anybody. It is
-## what [code]src/ui/score_hud.gd[/code] prints as the done readout.
+## somewhere under a half and there was no honest percentage to show anybody.
 func shine() -> float:
 	var buffed: float = 0.0
 	var counted: int = 0
@@ -360,6 +361,31 @@ func shine() -> float:
 	if counted == 0:
 		return 0.0
 	return buffed / float(counted)
+
+
+## How far through the whole job the car is, as [code]0..1[/code] — the three
+## passes counted equally. Panel-averaged the way [method shine] is, and blind
+## to panels with nothing reachable on them for the reasons
+## [method remaining] gives.
+##
+## [b]This is what the done readout prints, and [method shine] is what ends the
+## run.[/b] Shine sits at zero through the washing and the foaming — the first
+## two thirds of the job, in which a readout on it told the player the jet was
+## doing nothing. This climbs from the first pass of the water, still only ever
+## rises, and still reaches one on exactly the stroke that finishes the car —
+## [method GrimeMap.progress] has the arithmetic, and
+## [code]src/screens/play_screen.gd[/code] the split between the two numbers.
+func progress() -> float:
+	var along: float = 0.0
+	var counted: int = 0
+	for map: GrimeMap in _maps:
+		if not map.has_reach():
+			continue
+		along += map.progress()
+		counted += 1
+	if counted == 0:
+		return 0.0
+	return along / float(counted)
 
 
 ## How much work the whole car has had done on it in [param stage], ever,
