@@ -67,7 +67,7 @@ func _ready() -> void:
 ## The picture for this corner: the speaker's outline, plus either the two
 ## waves or the mark that crosses them out.
 ##
-## Static and public for the reason [method ToolBeltHud.BeltMark.glyph] is: a
+## Static and public for the reason [method ToolBeltHud.BeltMark.sprite] is: a
 ## test can ask what the two states look like without a [SceneTree] to draw
 ## either of them into.
 static func glyph(muted: bool) -> Array[PackedVector2Array]:

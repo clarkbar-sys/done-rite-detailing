@@ -49,6 +49,29 @@ const SECONDS: float = 0.3
 ## thresholds.
 const LAST_STAGE: float = 2.0
 
+## What a patch coming clean under the jet flashes:
+## [code]grime.gdshader[/code]'s own [code]wash_flash_colour[/code] default,
+## transcribed.
+##
+## [b]It lives here because the water belongs to the pass rather than to the
+## tool that threw it.[/b] The shader lights the paint with it, [ScoreHud] throws
+## its [code]+250[/code] in it, and the belt's power-wash and tyre badges draw
+## their spray in it — three places that have to agree, and the day they do not
+## is the day the corner of the screen and the panel under it are two different
+## blues. A [Color] cannot be read out of a [code].gdshader[/code], so this is
+## the transcription every GDScript caller reads instead of writing its own.
+##
+## [b]Not [constant WashJet.TIP].[/b] The jet's ramp is water in flight, lit and
+## at pressure; this is water having landed and the surface underneath having
+## come clean. They are deliberately different blues, and the belt draws this one
+## because a badge is a picture of a finished pass rather than of a droplet.
+const WASH_TINT: Color = Color(0.55, 0.90, 1.0)
+
+## What the rag's pass flashes: the shader's [code]buff_flash_colour[/code], and
+## the only one of the three that is warm. Here for [constant WASH_TINT]'s
+## reasons.
+const BUFF_TINT: Color = Color(1.0, 0.86, 0.42)
+
 var _across: int
 var _down: int
 var _image: Image = null

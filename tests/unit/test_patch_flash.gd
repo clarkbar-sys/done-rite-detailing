@@ -39,6 +39,12 @@ const TOLERANCE: float = 0.0001
 ## — sit nowhere near a channel step of any of the three values it separates.
 const CHANNEL: float = 1.0 / 255.0
 
+## The shader the two flash tints are transcribed out of. Read at run time rather
+## than `preload`ed as a [Shader]: what is being checked is the number written in
+## the source, and a compiled shader hands back no uniform defaults to compare
+## against.
+const SHADER: String = "res://src/world/grime.gdshader"
+
 var _flash: PatchFlash = null
 
 
@@ -217,3 +223,61 @@ func test_the_texture_is_the_same_one_for_the_life_of_the_panel() -> void:
 	_flash.flare(6, GrimeMap.Stage.WASHED)
 	_flash.fade(PatchFlash.SECONDS * 0.5)
 	assert_eq(_flash.texture().get_rid(), first)
+
+
+# ---- the colours the flash is drawn in -----------------------------------------
+
+
+func test_the_flash_tints_are_the_ones_the_shader_declares() -> void:
+	# These two are a transcription of `grime.gdshader`'s own `wash_flash_colour`
+	# and `buff_flash_colour` defaults, and a [Color] cannot be read out of a
+	# .gdshader from GDScript — so the transcription is checked against the shader
+	# source itself rather than against a second copy of the same numbers sitting
+	# in this file, which would go stale in exactly the same silence.
+	var shader: String = FileAccess.get_file_as_string(SHADER)
+	assert_false(shader.is_empty(), "could not read %s" % SHADER)
+	_assert_same_colour(
+		_declared(shader, "wash_flash_colour"), PatchFlash.WASH_TINT, "wash_flash_colour"
+	)
+	_assert_same_colour(
+		_declared(shader, "buff_flash_colour"), PatchFlash.BUFF_TINT, "buff_flash_colour"
+	)
+
+
+func test_the_wash_tint_reads_as_water_and_the_buff_tint_does_not() -> void:
+	# What stops somebody answering a contrast complaint by pushing the wash tint
+	# grey: it is the blue every caller draws water in — the paint under the jet,
+	# the score corner's pop, and the spray in a tool badge — and a wash that
+	# stopped being blue would say the same thing as a buff.
+	assert_gt(PatchFlash.WASH_TINT.b, PatchFlash.WASH_TINT.r, "a wash is water")
+	assert_gt(PatchFlash.BUFF_TINT.r, PatchFlash.BUFF_TINT.b, "and a buff is warm")
+	assert_gte(
+		Brand.contrast_ratio(PatchFlash.WASH_TINT, Brand.PANEL),
+		Brand.BADGE_CONTRAST,
+		"and the water has to be visible on the darkest plate a badge draws it on"
+	)
+
+
+## The colour [param shader] declares [param uniform] to default to, read out of
+## the source. A fully transparent black for a uniform that is not there, which is
+## a value no [code]source_color[/code] in that file has and therefore fails the
+## comparison rather than passing it by accident.
+func _declared(shader: String, uniform: String) -> Color:
+	var finder: RegEx = RegEx.new()
+	finder.compile("uniform\\s+vec4\\s+%s\\s*:[^=]*=\\s*vec4\\(([^)]*)\\)" % uniform)
+	var found: RegExMatch = finder.search(shader)
+	if found == null:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var channels: PackedStringArray = found.get_string(1).split(",")
+	if channels.size() < 3:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	return Color(channels[0].to_float(), channels[1].to_float(), channels[2].to_float())
+
+
+## Asserts [param declared] and [param here] are the same colour, channel by
+## channel, to a tolerance well inside one step of the eight-bit channel either
+## would end up in. [param uniform] names it in the failure.
+func _assert_same_colour(declared: Color, here: Color, uniform: String) -> void:
+	assert_almost_eq(declared.r, here.r, CHANNEL, "%s red" % uniform)
+	assert_almost_eq(declared.g, here.g, CHANNEL, "%s green" % uniform)
+	assert_almost_eq(declared.b, here.b, CHANNEL, "%s blue" % uniform)

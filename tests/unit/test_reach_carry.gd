@@ -241,7 +241,7 @@ func test_the_raise_is_read_as_a_fraction_of_the_way_up() -> void:
 
 
 func test_a_mark_with_no_measured_normal_faces_the_tool_back_at_the_hand() -> void:
-	# What [method Garage._nearest_on_the_car] produces when even its second ray
+	# What [method AimProbe._nearest_on_the_car] produces when even its second ray
 	# misses: a point on the car with nothing to measure a facing from. Rather than
 	# refuse, the tool is turned back toward the hand — which is the same answer the
 	# room invents for itself, and is never wrong by more than the angle the panel

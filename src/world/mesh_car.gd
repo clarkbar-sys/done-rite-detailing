@@ -167,28 +167,29 @@ const WHEEL_PART: String = "Wheel"
 ## sedan at the showcase angle, it multiplies the paint by 0.653. So a colour
 ## lands at about two thirds of the value it names, and the palette
 ## [constant Car.PAINT_COLORS] carefully picks is not the palette that reaches
-## the screen. Rendered, the thirteen average [code]L* 35.0[/code] against the
-## [code]L* 54.2[/code] they are authored at, and the loss is proportional —
-## it takes 13 lightness steps off Alpine White and 3.5 off Burgundy, so it
-## squashes the top of the range rather than the bottom.
+## the screen, and the loss is proportional — it squashes the top of the range
+## (Viper White, and Header Orange's red channel, both authored at 0.92, same
+## as Alpine White was before #170) rather than the bottom (Viper Black,
+## deliberately lifted off zero for exactly this — see the class docs).
 ##
 ## [b]And it is 1.25 rather than the 1.53 that would cancel the map outright.[/b]
-## 1.53 does land the thirteen back on their authored lightness, and it does it
-## by blowing 49% of Alpine White's bodywork to flat 255. The bay's
-## [Environment] sets no tonemap — linear, exposure 1.0 — so anything over 1.0
-## hard-clips, and what the greyscale map has quietly been doing all along is
-## keeping the brightest panels underneath that ceiling. Take the darkening away
-## without putting a highlight rolloff in its place and the light half of the
-## palette stops being too dark and starts being blown out, which is the worse
-## of the two: a dark car is still a car, and a bonnet at flat white has no shape
-## on it at all.
+## 1.53 does land Viper White back on its authored lightness, and it does it
+## by blowing 49% of its bodywork to flat 255 — unchanged by #170, since the
+## colour itself did not move. The bay's [Environment] sets no tonemap —
+## linear, exposure 1.0 — so anything over 1.0 hard-clips, and what the
+## greyscale map has quietly been doing all along is keeping the brightest
+## panels underneath that ceiling. Take the darkening away without putting a
+## highlight rolloff in its place and the light half of the palette stops
+## being too dark and starts being blown out, which is the worse of the two:
+## a dark car is still a car, and a bonnet at flat white has no shape on it
+## at all.
 ##
-## So this is the most lift there is before that starts. Measured over the
-## thirteen colours, at the same angle, counting body pixels at 254/255 or
-## above: 1.15, 1.20 and 1.25 clip nothing whatsoever, and 1.30 puts 28.7% of
-## Alpine White's body at the ceiling. It buys [code]L* 35.0 → 43.9[/code],
-## which is a little over half the deficit, and it costs the room nothing — the
-## tarmac, the grass and the sky move by 0.2/255, which is bounce.
+## So this is the most lift there is before that starts. Measured on Viper
+## White, at the same angle, counting body pixels at 254/255 or above: 1.15,
+## 1.20 and 1.25 clip nothing whatsoever, and 1.30 puts 28.7% of its body at
+## the ceiling. It buys [code]L* 35.0 → 43.9[/code] on that panel, which is a
+## little over half the deficit, and it costs the room nothing — the tarmac,
+## the grass and the sky move by 0.2/255, which is bounce.
 ##
 ## [b]The other half needs a tonemap and is deliberately not here.[/b] A filmic
 ## or ACES curve has the rolloff this wants and would let the paint come all the

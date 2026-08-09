@@ -103,6 +103,27 @@ max-line-length: 100
 #   of anything else in the repo. This is the last time it gets a bigger
 #   allowance. The next thing that does not fit splits the room instead.
 #
+#   AND THE NEXT THING DID NOT FIT, SO THE ROOM WAS SPLIT. #171 hangs a blob
+#   shadow under the car, garage.gd went to 1759 of 1700, and the promise above
+#   was kept rather than renegotiated: the aiming came out into
+#   src/world/aim_probe.gd — the three-tier "what is under the finger" stack and
+#   the nearest-panel fallback under it — and the per-panel box those tiers share
+#   with the attract loop moved onto Car, next to Car.bounds, which was already
+#   doing the same arithmetic one panel at a time. That is 132 lines off
+#   garage.gd for no behaviour change: 1388 tests, unmodified, still pass.
+#
+#   The number stayed at 1700, deliberately. Lowering it to whatever garage.gd
+#   happens to measure today would be the same mistake in the other direction —
+#   a file sitting on its own limit again, where the next sentence is a lint
+#   failure whatever the sentence is. 1700 against a 1523-line garage.gd is a
+#   check with room to do its job, which is what it was raised for.
+#
+#   Five to go, if it comes to that: the driveway, the camera, the walk, the mud
+#   and the attract loop are all still in there. The aiming was the one that came
+#   off cleanest, because it already composed units that lived elsewhere. Take
+#   the next one the same way — a concern that is a question asked of the world,
+#   not a slice of lines that happened to be adjacent.
+#
 #   max-public-methods was 20, and four test suites sat on exactly 20 —
 #   test_play_screen_wash, test_view_model, test_tool_belt_hud, test_car. A
 #   GUT test case *is* a public method, so on a suite this check counts test

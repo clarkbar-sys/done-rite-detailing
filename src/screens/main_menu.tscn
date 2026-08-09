@@ -96,10 +96,12 @@ script = ExtResource("5_arrow")
 ; third line costs at the size 16 px type sets on. The remaining 21 is spent on
 ; something two lines only just had: the credit cleared the last row of ink in
 ; "How to Play" by 37 px rather than by 16 — 78 px since #174 took the credit's
-; type down to 12 and the pill's to 32, and it is
-; tests/integration/test_main_menu.gd that measures the clearance off the font
-; rather than off these offsets, which is why a change of face did not need a
-; change of number here.
+; type down to 12 and the pill's to 32, and 94 px since #162 took the fifth work
+; off the list again. It is tests/integration/test_main_menu.gd that measures the
+; clearance off the font rather than off these offsets, which is why neither a
+; change of face nor a credit going away needed a change of number here — and why
+; the 44 px this line is about has not been handed back, which is the same
+; argument the credit's own comment makes below.
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -194,12 +196,13 @@ text = "How to Play"
 ; The credits for the borrowed models, along the bottom of the menu.
 ;
 ; CC-BY 4.0 is the licence the ten models in assets/models/cars/ arrive under —
-; and the licence the tyre cleaner's bottle, the sponge, the pressure washer and
-; the driveway all five of them are used on arrive under too — and attribution is
-; a condition of it, not a courtesy. So it has to be somewhere a player can
-; actually read, and this is the screen every player passes through on the way to
-; the bay. The same lines are in README.md and in the five ATTRIBUTION.txt files
-; beside the assets; this is the copy the licence is actually satisfied by,
+; and the licence the tyre cleaner's bottle, the sponge and the driveway all four
+; of them are used on arrive under too — and attribution is a condition of it, not
+; a courtesy. So it has to be somewhere a player can actually read, and this is
+; the screen every player passes through on the way to the bay. The same lines are
+; in README.md and in the ATTRIBUTION.txt files beside the assets — five of those,
+; because the wand keeps one saying that nothing about it is borrowed; this is the
+; copy the licence is actually satisfied by,
 ; because the others ship to whoever clones the repo rather than to whoever plays
 ; the game.
 ;
@@ -261,7 +264,21 @@ text = "How to Play"
 ; because the menu is not crowded now and un-picking that would move both pills
 ; for no reason a player could see.
 ;
-; None of the three lines wraps on any screen shape: the design width is a floor
+; AND BACK TO TWO LINES (#162), BECAUSE THE FIFTH WORK STOPPED BEING BORROWED.
+; The power wash was drawn from a downloaded flamethrower and is now drawn by
+; scripts/build-pressure-washer.py, so there is no licence to satisfy for it and
+; its line comes off. Four works, 2 + 2, and the driveway joins the sponge on the
+; second line rather than the list keeping a line to itself: measured, that line
+; is 1,185 px against the 1,168 of the first, so the pair fit the label with 63 px
+; to spare and neither wraps. The block is 32 px in y = 676 .. 708 and clears the
+; pill's last row of ink by 94 px.
+;
+; The type stays at 12 rather than going back up. 16 does not fit — see the
+; paragraph above, where that is measured rather than assumed — and it is the
+; longest line that decides, which is still the one about the cars and the
+; bottles and is unchanged by any of this.
+;
+; None of the lines wraps on any screen shape: the design width is a floor
 ; rather than a target (window/stretch/aspect is "expand"), so 1,248 px is the
 ; least this label is ever given.
 ;
@@ -300,7 +317,7 @@ offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_font_sizes/font_size = 12
-text = "Cars: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) · Bottles: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nSponge: “Sponge” by Aullwen (sketchfab.com/Aullwen) · Washer: “homemade flamethrower” by excellenthe (sketchfab.com/excellenthe) — CC BY 4.0\nDriveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0"
+text = "Cars: “Generic passenger car pack” by Comrade1280 (skfb.ly/6sUFy) · Bottles: “Kitchen Spray” by Jesus Osco (sketchfab.com/gsus.vfx) — CC BY 4.0\nSponge: “Sponge” by Aullwen (sketchfab.com/Aullwen) · Driveway: “Sunken Driveway Parking Spot” by jimbogies (sketchfab.com/jimbogies) — CC BY 4.0"
 vertical_alignment = 2
 autowrap_mode = 3
 

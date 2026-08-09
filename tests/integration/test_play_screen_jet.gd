@@ -75,6 +75,18 @@ const SWING_FRAMES: int = 30
 ## sky, in pixels on the glass.
 const SKY_MARGIN: float = 60.0
 
+## How thin a slice off the top of the wand's mesh counts as the end face of its
+## nozzle, in metres. A millimetre, for
+## [code]tests/integration/test_tool_model.gd[/code]'s reason: enough to take a
+## whole ring rather than the one vertex that happens to be highest.
+const END_FACE: float = 0.001
+
+## How far into the car's own height to press for a shot that is certainly high
+## bodywork and one that is certainly low, as a fraction of that height. A
+## tenth in from each end: past the glass at the top and above the shadow under
+## the sill at the bottom, on every one of the ten pack styles.
+const OFF_THE_EDGE: float = 0.1
+
 var _screen: GameScreen = null
 var _window_size_before: Vector2i = Vector2i.ZERO
 
@@ -165,6 +177,30 @@ func _nozzle() -> Vector3:
 	return _view_model().muzzle().global_position
 
 
+## The middle of the end face of the wand the player can see, in the world.
+##
+## Measured off the mesh rather than off the marker, which is the whole point of
+## the one test that uses it: the marker says where the game thinks the nozzle is
+## and this says where it actually is on the model. The topmost [constant
+## END_FACE] of the mesh and not its single highest vertex, because the end of a
+## round nozzle is a ring and any one of its vertices is a nozzle radius off the
+## middle.
+func _wand_tip() -> Vector3:
+	var proxy: MeshInstance3D = _view_model().proxy_for(DetailingTool.Id.POWER_WASH)
+	var mesh: Mesh = proxy.mesh
+	var top: float = mesh.get_aabb().end.y - END_FACE
+	var face: AABB = AABB()
+	var found: bool = false
+	for surface: int in mesh.get_surface_count():
+		var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		for vertex: Vector3 in vertices:
+			if vertex.y < top:
+				continue
+			face = face.expand(vertex) if found else AABB(vertex, Vector3.ZERO)
+			found = true
+	return proxy.global_transform * face.get_center()
+
+
 func _crosshair() -> Vector3:
 	return _marker().marked_point()
 
@@ -191,6 +227,27 @@ func _at_the_sky() -> Vector2:
 		"the sky press at %v is off the picture and would not be a press at all" % sky
 	)
 	return sky
+
+
+## A press high on the car and a press low on it, on the glass — the two ends of
+## the swing a player actually uses, and what "at every aim angle" means for the
+## wand: pointed up at the roof it is nearly along the eye's own line, and pointed
+## down at the rockers it is swung as far off it as the pitch fence allows.
+func _up_and_down() -> Array[Vector2]:
+	var bounds: AABB = _car().bounds()
+	var high: Vector3 = Vector3(
+		_car().global_position.x,
+		bounds.end.y - bounds.size.y * OFF_THE_EDGE,
+		_car().global_position.z
+	)
+	var low: Vector3 = Vector3(high.x, bounds.position.y + bounds.size.y * OFF_THE_EDGE, high.z)
+	var presses: Array[Vector2] = [_on_screen(high), _on_screen(low)]
+	for at: Vector2 in presses:
+		assert_true(
+			Rect2(Vector2.ZERO, Vector2(_view().size)).has_point(at),
+			"the press at %v is off the picture and would not be a press at all" % at
+		)
+	return presses
 
 
 func _touch(at: Vector2, pressed: bool) -> void:
@@ -261,6 +318,40 @@ func test_the_water_is_thrown_from_the_nozzle_at_the_mark() -> void:
 	var along: Vector3 = _jet().global_position.direction_to(_jet().landing())
 	assert_almost_eq(along.dot(_nozzle().direction_to(_crosshair())), 1.0, 0.001, "down the line")
 	assert_eq(_flight().direction, WashJet.FAR_END, "which is the axis the droplets are fired on")
+
+
+func test_the_water_leaves_the_end_of_the_wand_the_player_can_see() -> void:
+	# Issue #162: "water must leave from the nozzle tip (it starts too low)". Every
+	# assertion in this file passed while that was happening, and the test above is
+	# why — it measures the water against the nozzle [i]marker[/i], and the marker
+	# was exactly where it was supposed to be. What was wrong was the model under
+	# it: the wand was a Sketchfab flamethrower whose box was sized by the gas
+	# bottle strapped across it, so the barrel's own tip sat 12 cm off the marker
+	# and the jet left a point in mid-air beside the wand.
+	#
+	# So this one goes around the marker entirely and reads the drawn mesh: the
+	# middle of the topmost face of the thing in the player's hands, in world
+	# coordinates, against where the emitter was actually put. The two are the same
+	# claim the player makes with their eyes.
+	#
+	# [b]At both ends of the swing[/b], because that is the acceptance the issue
+	# asked for and because a wand is posed by a rotation about the hand — an
+	# origin that agreed with the model at one angle and not another would be an
+	# offset in the wrong frame, which is a different bug that would look identical
+	# in one screenshot.
+	await _settle()
+	for at: Vector2 in _up_and_down():
+		await _press(at)
+		var off: float = _jet().global_position.distance_to(_wand_tip())
+		assert_lt(off, ON_THE_NOZZLE, "the water starts %.3f m from the end of the nozzle" % off)
+		# And the marker is on the model, which is the same fact from the other
+		# side and the one a new model could quietly break: it is what says the
+		# catalogue's box and the mesh inside it still agree about which point is
+		# the business end.
+		assert_lt(
+			_nozzle().distance_to(_wand_tip()), ON_THE_NOZZLE, "and the marker is on the wand"
+		)
+		await _lift()
 
 
 func test_the_water_flies_at_one_speed_and_lives_as_long_as_the_throw_takes() -> void:

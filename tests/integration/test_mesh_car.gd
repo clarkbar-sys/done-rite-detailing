@@ -374,7 +374,7 @@ func test_the_wheels_reach_the_ground_the_car_is_parked_on() -> void:
 # ---- paint --------------------------------------------------------------------
 
 
-func test_the_car_starts_painted_one_of_the_thirteen_colors() -> void:
+func test_the_car_starts_painted_one_of_the_six_colors() -> void:
 	# Which colour is still Car's to pick — MeshCar picks a style and hands that
 	# question straight back. What it adds is MeshCar.MAP_COMPENSATION, so the value
 	# on the material is a colour off the list driven up to survive the pack's
@@ -413,10 +413,10 @@ func test_the_paint_is_driven_up_to_survive_the_packs_greyscale_map() -> void:
 func test_the_compensation_stays_under_what_the_bay_can_show() -> void:
 	# The ceiling MAP_COMPENSATION's docs are about, pinned so that raising it comes
 	# with re-measuring rather than by feel. The bay sets no tonemap, so a channel
-	# driven past 1.0 is one the renderer flattens to white, and Alpine White is the
-	# brightest thing on the list and hits it first. Measured over the thirteen at
-	# the showcase angle: 1.25 puts no body pixel at 255, and 1.30 puts 28.7% of
-	# Alpine White's there.
+	# driven past 1.0 is one the renderer flattens to white, and Viper White is the
+	# brightest thing on the list and hits it first. Measured at the showcase
+	# angle: 1.25 puts no body pixel at 255, and 1.30 puts 28.7% of Viper White's
+	# there.
 	assert_lte(
 		MeshCar.MAP_COMPENSATION,
 		1.25,
@@ -523,7 +523,7 @@ func test_a_test_can_ask_for_the_style_it_wants() -> void:
 
 
 func test_a_car_nobody_chose_a_style_for_picks_one_of_the_ten() -> void:
-	# The game's own path: a car per game, one of ten, alongside one of thirteen
+	# The game's own path: a car per game, one of ten, alongside one of six
 	# colours. Asserted as membership rather than as a distribution — the pick is one
 	# draw from a list and a test that demanded variety would be a test that fails
 	# once in ten thousand runs for no reason.
