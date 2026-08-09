@@ -85,22 +85,22 @@ theme_override_constants/v_separation = 2
 [node name="Title" type="Label" parent="Frame/Sheet/Card/Column/Header"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 32
 text = "HOW TO"
 
 [node name="TitleAccent" type="Label" parent="Frame/Sheet/Card/Column/Header"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 32
 text = "PLAY"
 
-; Baseline-ish rather than top-aligned: a 20 px caption hung off the top of a
-; 38 px heading reads as a mistake.
+; Baseline-ish rather than top-aligned: a 16 px caption hung off the top of a
+; 32 px heading reads as a mistake.
 [node name="Subtitle" type="Label" parent="Frame/Sheet/Card/Column/Header"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 6
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "one screen, no scrolling — read it, then press Play"
 
 [node name="Rule" type="ColorRect" parent="Frame/Sheet/Card/Column"]
@@ -125,12 +125,12 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Walk"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 24
 text = "WALK ROUND THE CAR"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Walk"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "Push the stick, bottom right, and you move at the speed you push it — let go and you stop. It raises and lowers your eye too. W/A/S/D or the arrow keys at a desk."
 autowrap_mode = 3
 
@@ -141,12 +141,12 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Press"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 24
 text = "PRESS THE PAINT"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Press"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "Press anywhere on the car and the tool in your hand swings to point at it, red crosshair where it lands. Holding is working, letting go stops. On a phone the aim sits a thumb's width above your finger, so you can see it."
 autowrap_mode = 3
 
@@ -157,12 +157,12 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Belt"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 24
 text = "FIVE TOOLS ON THE BELT"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Belt"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "Tap T, bottom left, to roll the belt out: power wash, sponge, window cleaner, tyre & engine cleaner, drying rag. The wrong bottle for a surface does nothing at all."
 autowrap_mode = 3
 
@@ -173,12 +173,12 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Paid"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 24
 text = "GET PAID FOR IT"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Paid"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "Every scrap of dirt pays the moment it comes off, and finishing a patch pays a bonus on top. Keep cleaning without a pause and the bonus multiplies — the ding climbs with it."
 autowrap_mode = 3
 
@@ -197,12 +197,12 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Water"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 16
 text = "1. WATER"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Water"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 16
 text = "takes the mud off — any panel, one patch at a time."
 autowrap_mode = 3
 
@@ -213,12 +213,12 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Bottle"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 16
 text = "2. BOTTLE"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Bottle"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 16
 text = "onto the bare paint: sponge on body, cleaner on glass, tyre cleaner on wheels."
 autowrap_mode = 3
 
@@ -229,12 +229,12 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Rag"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 16
 text = "3. RAG"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Rag"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 16
 text = "buffs the product out, which is the only way a panel is finished."
 autowrap_mode = 3
 
@@ -251,14 +251,30 @@ theme_override_constants/margin_right = 10
 ; Both exits on one row, at opposite ends, so the screen can be left either way
 ; round without either button being the one you find by accident.
 ;
-; Guillemets and not the mockup's ◀ / ▶. This project ships no font of its own,
-; so every label is drawn in Godot's built-in Open Sans, and Open Sans has no
-; geometric shapes block — U+25C0 and U+25B6 come out as tofu boxes, which is
-; what shipped and what test_the_font_can_draw_every_word pins. U+00AB and
-; U+00BB are Latin-1, present in anything, and point the same way. Both are held
-; at 164 design px in their short dimension — TouchTarget.min_design_size() for
-; this design on a 375 px screen — which is what stops the layout borrowing
-; height from them when the copy above wants more.
+; Guillemets and not the mockup's ◀ / ▶. Written when the project shipped no
+; font of its own and every label was drawn in Godot's built-in Open Sans, which
+; has no geometric shapes block — U+25C0 and U+25B6 came out as tofu boxes,
+; which is what shipped and what test_the_font_can_draw_every_word pins. U+00AB
+; and U+00BB are Latin-1, present in anything, and point the same way.
+;
+; They stay after #174 gave the game its own two faces, and not out of inertia:
+; Brand.DISPLAY_FACE (what a Button wears) does have the triangles, but
+; Brand.BODY_FACE does not, and a pair of marks that reads correctly in only one
+; of the project's two faces is a pair of marks waiting to be moved onto a label.
+; The guillemets are in both. src/ui/car_arrow.gd reaches the same conclusion
+; about the same expired reason.
+;
+; Both buttons are held at 164 design px in their short dimension —
+; TouchTarget.min_design_size() for this design on a 375 px screen — which is
+; what stops the layout borrowing height from them when the copy above wants
+; more.
+;
+; The two type sizes are 24 and 32 where they were 36 and 44, and the drop is
+; arithmetic rather than taste: the display face advances a whole em per
+; character, so "«  Main Menu" is 12 x size wide and nothing else. 24 puts it at
+; 288 px inside a 340 px pill; 32 would put it at 384 and grow the button past
+; the width the row was laid out for. Play is the larger of the two for the same
+; reason it is the red one.
 [node name="Buttons" type="HBoxContainer" parent="Frame/Sheet/Card/Column/ButtonRow"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -267,7 +283,7 @@ layout_mode = 2
 unique_name_in_owner = true
 custom_minimum_size = Vector2(340, 164)
 layout_mode = 2
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 24
 text = "«  Main Menu"
 
 [node name="Spacer" type="Control" parent="Frame/Sheet/Card/Column/ButtonRow/Buttons"]
@@ -278,5 +294,5 @@ size_flags_horizontal = 3
 unique_name_in_owner = true
 custom_minimum_size = Vector2(300, 164)
 layout_mode = 2
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 32
 text = "Play  »"

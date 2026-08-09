@@ -30,6 +30,12 @@ const HUD: String = "res://src/ui/score_hud.tscn"
 ## of the three is [constant ScoreHud.POP_SECONDS].
 const SETTLE_SECONDS: float = 1.0
 
+## How long a test that watches the flash all the way down will wait for it
+## before giving up. A hang guard rather than a duration: the fade itself is
+## [constant PatchFlash.SECONDS], and anything past this many milliseconds means
+## it is not fading at all.
+const FADE_TIMEOUT_MSEC: int = 3000
+
 var _hud: ScoreHud = null
 
 
@@ -215,6 +221,85 @@ func test_nothing_in_the_corner_can_be_pressed() -> void:
 			"%s would swallow a press meant for the car" % control.name
 		)
 	assert_eq(_hud.mouse_filter, Control.MOUSE_FILTER_IGNORE, "the scoreboard itself stops presses")
+
+
+## The type. This corner is the hero use of the display face — issue #174's
+## words — and it is also the only place in the game where a font size is
+## computed at runtime rather than written in a scene file, which is where the
+## pixel grid can quietly stop being true.
+func test_every_row_of_the_corner_is_in_the_display_face() -> void:
+	_award(100, 100)
+	for node: Node in _hud.find_children("*", "Label", true, false):
+		var label: Label = node as Label
+		assert_eq(
+			label.get_theme_font("font"),
+			Brand.DISPLAY_FACE,
+			"%s is not in the face the rest of the score is" % label.name
+		)
+
+
+func test_every_resting_size_is_on_the_faces_own_grid() -> void:
+	# A size off the grid gives some of a digit's strokes three screen pixels and
+	# others four — see Brand.crisp. That is a thing to get wrong once, in a diff
+	# where somebody nudges a readout by two, and it sits in the corner of every
+	# frame of the game afterwards.
+	for size: int in [
+		ScoreHud.TOTAL_FONT, ScoreHud.RUN_FONT, ScoreHud.DONE_FONT, ScoreHud.POP_FONT
+	]:
+		assert_eq(size % Brand.TYPE_GRID, 0, "%d is not a multiple of the type grid" % size)
+
+
+func test_the_punch_steps_between_two_grid_sizes_and_never_lands_between_them() -> void:
+	# The flash punches the total larger and fades back over PatchFlash.SECONDS,
+	# so the size is recomputed on every frame of the fade. Sampled across a whole
+	# fade rather than at its two ends, because the failure this pins is a frame
+	# in the middle at 61 px.
+	#
+	# Driven by the flash rather than by a frame count, and that is not fussiness:
+	# `_process` runs on the engine's own delta, and a headless run has no vsync
+	# to pace it — thirty frames is half a second on a monitor and a few
+	# milliseconds here, which would sample the punch and never see it come back
+	# down. The deadline is a hang guard, not the exit.
+	var total: Label = _hud.get_node("%Total") as Label
+	var seen: Dictionary[int, bool] = {}
+	var deadline: int = Time.get_ticks_msec() + FADE_TIMEOUT_MSEC
+	_award(1000, 1000)
+	while _hud.flash() > 0.0 and Time.get_ticks_msec() < deadline:
+		seen[total.get_theme_font_size("font_size")] = true
+		await wait_process_frames(1)
+	seen[total.get_theme_font_size("font_size")] = true
+	assert_eq(_hud.flash(), 0.0, "the flash never went out, so the fade was never sampled")
+	for size: int in seen:
+		assert_eq(size % Brand.TYPE_GRID, 0, "the punch drew the total at %d px" % size)
+	assert_true(
+		seen.has(Brand.crisp(roundi(float(ScoreHud.TOTAL_FONT) * (1.0 + ScoreHud.PUNCH)))),
+		"the punch never reached the size above the resting one"
+	)
+	assert_true(seen.has(ScoreHud.TOTAL_FONT), "the punch never came back down")
+
+
+func test_the_widest_reading_still_fits_the_column_it_is_right_aligned_in() -> void:
+	# The display face advances a whole em per character, so six digits are
+	# exactly 6 x size wide — which is how the old 76 px total came to be 456 px
+	# inside a 426 px column, and why this is a test rather than a comment.
+	#
+	# The column is a third of the screen (`_row_width` in score_hud.gd) and the
+	# screen is the design width, read off project.godot rather than typed here
+	# for TouchTarget.design_width's reason. The `/ 3.0` is transcribed and is
+	# meant to be: a test that asked the HUD for its own answer would agree with
+	# it however wrong it was.
+	var punched: int = Brand.crisp(roundi(float(ScoreHud.TOTAL_FONT) * (1.0 + ScoreHud.PUNCH)))
+	var widest: float = (
+		Brand
+		. DISPLAY_FACE
+		. get_string_size("".lpad(ScoreHud.DIGITS, "0"), HORIZONTAL_ALIGNMENT_LEFT, -1, punched)
+		. x
+	)
+	assert_lte(
+		widest,
+		TouchTarget.design_width() / 3.0,
+		"a full score at full punch is wider than the column it sits in"
+	)
 
 
 ## A game nobody is playing costs nothing to draw. Not a benchmark — the early

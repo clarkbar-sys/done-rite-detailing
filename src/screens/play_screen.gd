@@ -224,6 +224,11 @@ func _ready() -> void:
 	_garage.aimed.connect(_on_aimed)
 	_garage.grimed.connect(_on_grimed)
 	_masks.debug_tools_toggled.connect(_on_debug_tools_toggled)
+	# In the same face as the score in the opposite corner. It is scaffolding, but
+	# it is scaffolding a player can see, and one label in the project's default
+	# readable face beside a HUD that is not would read as the one thing on the
+	# screen that had been forgotten — which is exactly what it would be.
+	_readout.add_theme_font_override("font", Brand.DISPLAY_FACE)
 	_readout.text = ""
 
 

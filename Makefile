@@ -44,6 +44,15 @@ WEB_DIR    := build/web
 WEB_TARGET := $(WEB_DIR)/index.html
 WEB_PRESET := Web
 
+# The one file the bundle needs that the exporter does not write: the reading
+# face, copied in beside index.html so web/shell.html can @font-face it. The
+# loading screen is a plain HTML page and cannot reach into the .pck, so the
+# alternative is a base64 copy of the font pasted into the shell — a second
+# home for an asset that already has one, which is the thing
+# tests/unit/test_web_shell.gd exists to forbid about the logo. 32 KB, from the
+# same origin, on a page already downloading a 39 MB bundle.
+WEB_FONT   := assets/brand/fonts/Silkscreen-Regular.ttf
+
 # Godot resolves export templates under $XDG_DATA_HOME/godot; pointing it at the
 # SDK keeps the pinned templates out of the developer's real ~/.local/share.
 export XDG_DATA_HOME := $(abspath $(SDK)/data)
@@ -315,12 +324,17 @@ build: check stamp sdk
 # emptied first makes "what is in build/web/" mean one export and no other, and
 # the check then says that export was complete. index.pck is in the list on its
 # own account: a bundle whose pack is missing still has a perfectly good
-# index.html that boots to a blank canvas.
+# index.html that boots to a blank canvas. $(WEB_FONT)'s basename is in the same
+# list for the same reason and one more: it is the only file in the bundle this
+# recipe puts there itself, so it is the only one an export that changed shape
+# could silently stop carrying — and the way that shows is a loading screen that
+# looks fine, in the wrong typeface, to somebody who is not looking for it.
 build-web: check stamp sdk
 	@rm -rf $(WEB_DIR)
 	@mkdir -p $(WEB_DIR)
 	$(GODOT) --headless --path . --export-release "$(WEB_PRESET)" $(abspath $(WEB_TARGET))
-	@for f in index.html index.js index.wasm index.pck; do \
+	@cp $(WEB_FONT) $(WEB_DIR)/
+	@for f in index.html index.js index.wasm index.pck $(notdir $(WEB_FONT)); do \
 	  [ -s "$(WEB_DIR)/$$f" ] || { echo "Web export FAILED — $(WEB_DIR)/$$f is missing or empty."; exit 1; }; \
 	done
 	@echo ">> $(WEB_DIR)/ ($$(du -sh $(WEB_DIR) | cut -f1))"

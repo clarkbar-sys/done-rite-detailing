@@ -269,6 +269,7 @@ top of that script, then re-run `make test build` before pushing.
 project.godot          engine + project settings (typed-GDScript gates live here)
 export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make build-web`
 assets/brand/          the logo the game shares with the business it is named after
+assets/brand/fonts/    the two pixel faces the game is set in, with their licences
 assets/models/cars/    the ten cars the bay parks, baked out of the pack credited below
 assets/models/cleaning_spray/  the two spray bottles the belt carries — one sprayer, two liveries
 assets/models/sponge/  the sponge the belt carries, baked out of the model credited below
@@ -353,8 +354,28 @@ The driveway the car is parked on is
 (https://sketchfab.com/3d-models/sunken-driveway-parking-spot-2cffc511a53641a6a0f46133f85989c6)
 by **jimbogies**, under the same licence once more.
 
-Attribution is a condition of that licence rather than a courtesy, so the same
-credits are in three places: in the game, along the bottom of the main menu;
+The game is set in two pixel typefaces, both under the
+[SIL Open Font Licence 1.1](https://openfontlicense.org/) and both committed to
+this repository — a web export cannot fetch a font at runtime, so a typeface
+named rather than shipped is a typeface that can fail to arrive:
+
+- **"Press Start 2P"** (https://fonts.google.com/specimen/Press+Start+2P) by
+  **CodeMan38** — the display face. Headings, buttons, the car's name and the
+  score.
+- **"Silkscreen"** (https://fonts.google.com/specimen/Silkscreen) by
+  **Jason Kottke** — the reading face, and the project's default. Body copy,
+  captions, the build stamp and the credit line above.
+
+Both licences are in
+[`assets/brand/fonts/`](./assets/brand/fonts/) beside the fonts, which is what
+the OFL asks for; neither asks for a credit in the running game, which is why
+those two are not on the menu's credit line and the models are.
+[`Brand`](./src/core/brand.gd) is where both faces are named, and
+`gui/theme/custom_font` in `project.godot` is what makes the second one the
+default so an unstyled label cannot quietly come out in the engine's Open Sans.
+
+Attribution is a condition of the models' licence rather than a courtesy, so the
+same credits are in three places: in the game, along the bottom of the main menu;
 beside the assets, in
 [`assets/models/cars/ATTRIBUTION.txt`](./assets/models/cars/ATTRIBUTION.txt),
 [`assets/models/cleaning_spray/ATTRIBUTION.txt`](./assets/models/cleaning_spray/ATTRIBUTION.txt),
