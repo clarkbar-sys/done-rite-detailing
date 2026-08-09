@@ -73,3 +73,22 @@ func test_it_is_drawn_with_an_edge_on_it() -> void:
 	# tarmac, and type with no outline disappears into one of them.
 	assert_eq(_hud.get_theme_constant("outline_size"), TimeHud.OUTLINE)
 	assert_eq(_hud.get_theme_font_size("font_size"), TimeHud.FONT)
+
+
+## The clock and the score are the two numbers of a run, so they are one
+## decision: same face, same size. The size is asserted as an identity rather
+## than as a number because that is the bug it is for — TimeHud.FONT was a
+## copied 76 and stayed there when #174 moved the score to 56, which is two
+## constants meant to be equal disagreeing within a commit of being written.
+func test_the_clock_matches_the_score_it_sits_opposite() -> void:
+	assert_eq(
+		_hud.get_theme_font("font"),
+		Brand.DISPLAY_FACE,
+		"the clock must be in the face the score is"
+	)
+	assert_eq(
+		_hud.get_theme_font_size("font_size"),
+		ScoreHud.TOTAL_FONT,
+		"the clock and the score must be the same size"
+	)
+	assert_eq(TimeHud.FONT % Brand.TYPE_GRID, 0, "and that size must be on the face's own grid")

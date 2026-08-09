@@ -18,14 +18,19 @@
 ## string and an index.
 ##
 ## [b]The buttons say words rather than showing arrows, and that is a font
-## decision.[/b] This project ships no font of its own, so every caption is drawn
-## in Godot's built-in Open Sans, and [code]▲[/code] is a glyph Open Sans has no
-## business having — a blank rectangle in a released build, which is exactly what
-## [CarArrow] exists to avoid and what
+## decision whose reason expired without changing the answer.[/b] It was written
+## while the project shipped no font of its own and every caption was drawn in
+## Godot's built-in Open Sans, which has no [code]▲[/code] — a blank rectangle in
+## a released build, which is exactly what [CarArrow] exists to avoid and what
 ## [code]tests/integration/test_main_menu.gd[/code] gates the credit line
-## against. [CarArrow] answers that by drawing its chevron; four drawn controls
-## for one screen would be four more icons to keep at one weight, and "Up" and
-## "Down" are two words a cabinet's instruction card would have used anyway.
+## against. Since #174 the game has its own type and
+## [constant Brand.DISPLAY_FACE] does have the triangles, so the tofu is gone.
+## The words stay for the two reasons that are left: [constant Brand.BODY_FACE]
+## still has no geometric shapes block, so a caption that reads correctly in only
+## one of the project's two faces is one waiting to be moved; and four drawn
+## controls for one screen would be four more icons to keep at one weight, where
+## "Up" and "Down" are two words a cabinet's instruction card would have used
+## anyway.
 ##
 ## [b]The arrow keys are claimed in [method Node._input], above the focus
 ## system.[/b] Godot's own focus navigation eats [code]ui_up[/code] and friends
@@ -85,20 +90,30 @@ const BLINK_SECONDS: float = 0.5
 ## "this one", not to hide it.
 const BLINK_DIM: float = 0.35
 
-## Point size of a place on the board, and of the rank beside it.
-const ROW_FONT: int = 28
+## Point size of a place on the board, and of the rank beside it. A multiple of
+## [constant Brand.TYPE_GRID], like every other size in this project — a board is
+## thirty short strings of digits and capitals read as a block, which is exactly
+## where one stroke three pixels wide next to one four pixels wide shows.
+const ROW_FONT: int = 24
 
 ## How wide the three cells of a place are, in design pixels: the rank, the
 ## initials, and the score.
 ##
 ## Written here rather than in the scene because the cells are built here — the
 ## scene owns that the grid is six columns and this owns what is in them, which
-## is the same line [method _build_the_board] draws for the rest of the row. Wide
-## enough for the longest thing each can hold at [constant ROW_FONT]: two digits,
-## three capitals, and six.
+## is the same line [method _build_the_board] draws for the rest of the row.
+##
+## [b]Each is the longest thing it can hold plus one gutter, and since #174 that
+## is arithmetic rather than an eyeball.[/b] [constant Brand.DISPLAY_FACE]
+## advances a whole em per character, so at [constant ROW_FONT] two digits are
+## exactly 48 px, three capitals exactly 72 and six digits exactly 144 — the
+## widest a rank, an initial and a score can ever be, with no measuring and no
+## slack for a wider glyph, because there is no wider glyph. The 24 px each one
+## adds is the gutter, the same [code]h_separation[/code] the grid already puts
+## between the two halves.
 const RANK_WIDTH: float = 72.0
-const INITIALS_WIDTH: float = 170.0
-const SCORE_WIDTH: float = 200.0
+const INITIALS_WIDTH: float = 96.0
+const SCORE_WIDTH: float = 168.0
 
 ## Where the board is read from and written to.
 ##
@@ -170,6 +185,16 @@ func _ready() -> void:
 	_card.add_theme_stylebox_override("panel", Brand.card())
 	_heading.add_theme_color_override("font_color", Brand.WHITE)
 	_total.add_theme_color_override("font_color", Brand.MUTED)
+	# Every word on this screen is in the display face, and it is the one screen in
+	# the game where that is true of all of it rather than of the headings. A high
+	# score table signed with three letters is the thing a cabinet is *for* — issue
+	# #174 names it as the hero use — so there is nothing on the card that wants
+	# the reading face. The pills get theirs from GameScreen._wear; these three
+	# rows and the board's thirty cells are asked for by name.
+	for shown: Control in [_heading, _total]:
+		shown.add_theme_font_override("font", Brand.DISPLAY_FACE)
+	for index: int in Initials.LENGTH:
+		_letter_at(index).add_theme_font_override("font", Brand.DISPLAY_FACE)
 	for button: Button in [_up, _down, _next, _main_menu]:
 		dress_quiet(button)
 	for button: Button in [_enter, _play_again]:
@@ -281,6 +306,14 @@ func _build_the_board() -> void:
 					HORIZONTAL_ALIGNMENT_CENTER if column == 1 else HORIZONTAL_ALIGNMENT_RIGHT
 				)
 				cell.add_theme_font_size_override("font_size", ROW_FONT)
+				# In the face the rest of the card is in — and here it is doing
+				# work beyond looking right: the display face is monospaced, so
+				# the ranks line up under each other and every score is the same
+				# six-digit width, which is what makes thirty numbers read as a
+				# table rather than as a list. A proportional face would need the
+				# right-alignment above to fake that and would still stagger the
+				# digits inside each cell.
+				cell.add_theme_font_override("font", Brand.DISPLAY_FACE)
 				_cells[at] = cell
 				_board.add_child(cell)
 

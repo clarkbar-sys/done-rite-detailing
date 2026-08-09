@@ -109,6 +109,41 @@ func _assert_drawn_in(colour: Color, what: String) -> void:
 	)
 
 
+## The loading screen is the first player-facing surface in the whole project,
+## and until #174 it was the last one still printed in a web sans. It cannot
+## reach into the [code].pck[/code] for the game's own type, so the [Makefile]
+## copies [constant Brand.BODY_FACE] in beside [code]index.html[/code] and the
+## shell names it by filename.
+##
+## Three things have to stay true together for that to work, and none of them
+## is visible in the other two files: the shell has to declare the face, it has
+## to name the file the Makefile actually copies, and the game has to still be
+## set in the same one. Asserted off [constant Brand.BODY_FACE] rather than
+## against a string typed here, so repointing the game's reading face fails
+## here instead of leaving the loading screen quietly on the old one.
+func test_the_loading_screen_is_set_in_the_games_own_reading_face() -> void:
+	var file_name: String = Brand.BODY_FACE.resource_path.get_file()
+	assert_true(
+		_shell.contains("@font-face"),
+		"%s must declare the game's face rather than fall back to a web sans" % SHELL_PATH
+	)
+	assert_true(
+		_shell.contains("url('%s')" % file_name),
+		"%s must name %s — the file `make build-web` copies in" % [SHELL_PATH, file_name]
+	)
+	assert_true(
+		_shell.contains("font-family: 'Silkscreen', "),
+		"%s must put the face in front of the fallback stack, not beside it" % SHELL_PATH
+	)
+	# Same rule as the logo below: one home for the asset. A base64 copy here
+	# would be a second one, and the only thing that would notice it had drifted
+	# is a person looking at a loading screen.
+	assert_false(_shell.contains("data:font"), "%s must not inline the typeface" % SHELL_PATH)
+	assert_false(
+		_shell.contains("data:application/font"), "%s must not inline the typeface" % SHELL_PATH
+	)
+
+
 ## The one style rule with a behaviour behind it rather than a look.
 ##
 ## The engine hands [code]onProgress[/code] a total of 0 when it cannot work
