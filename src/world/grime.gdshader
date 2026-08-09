@@ -153,7 +153,23 @@ uniform float band_relief : hint_range(0.0, 0.6) = 0.2;
 // The lit line along the leading edge of each band — the edge the jet is cutting
 // along, and the thing that makes washing feel like taking territory rather than
 // like rubbing out.
-uniform vec4 terrace_colour : source_color = vec4(0.62, 0.92, 1.0, 1.0);
+//
+// [b]It is the mud's own colour driven hot, and it used to be cyan.[/b] A cold
+// blue line is the obvious choice for water and it is the wrong one, because it
+// is the only thing on a half-washed panel that is not made of anything in the
+// scene: it reads as a light switching on over the car rather than as the mud
+// giving way, and it is on screen continuously for the whole of the wash rather
+// than for an instant. Taking `mud_colour`'s hue and driving it to full
+// brightness — (0.26, 0.19, 0.12) normalised is (1.0, 0.73, 0.46) — makes the
+// same line say "this is where the dirt ends", in the dirt's own colour.
+//
+// Pushed a step further toward red than that normalisation lands, and that is
+// the one number here chosen against something rather than for it:
+// `buff_flash_colour` is a pale gold, the tan the mud normalises to is very
+// nearly the same hue, and the three passes have to stay tellable apart (see
+// `flash_tint`). An ember is unmistakably not a gold, and it is still the mud's
+// colour rather than a fourth one invented for the purpose.
+uniform vec4 terrace_colour : source_color = vec4(1.0, 0.58, 0.26, 1.0);
 
 // How bright that line burns.
 uniform float terrace_glow : hint_range(0.0, 4.0) = 1.1;
@@ -177,10 +193,23 @@ uniform float terrace_lip : hint_range(0.0, 1.0) = 0.45;
 // material built by anything that does not know to, would not degrade quietly.
 uniform sampler2D patch_flash : hint_default_black, filter_nearest, repeat_disable;
 
-// What a patch throws when the water finishes it. The rag's is below; the
-// cleaner's is the panel's own `product_colour`, which is already here — see
-// `flash_tint`.
-uniform vec4 wash_flash_colour : source_color = vec4(0.55, 0.90, 1.0, 1.0);
+// What a patch throws when the water finishes it: [b]this car's own paint,
+// lit[/b]. The rag's is below; the cleaner's is the panel's own
+// `product_colour`, which is already here — see `flash_tint`.
+//
+// [b]Set per car by `Grime.lay_on` and not tuned here.[/b] It was a fixed cyan,
+// which is the same mistake `terrace_colour` above was making and for the same
+// reason — a colour with nothing in the scene behind it. What is actually
+// happening at the instant a patch comes clean is that a piece of the car's
+// paint has appeared from under the mud, so that is what the pop says: the
+// reward for washing is seeing your car's colour. `Car.flash_colour` does the
+// arithmetic and its docs carry why the paint is lit rather than used raw —
+// most of the palette is far too dark to read as a flash at its own value.
+//
+// The default is white rather than a paint colour because there is no such thing
+// as the right one to guess: white is what an unset flash should look like, and
+// every path that draws this sets it.
+uniform vec4 wash_flash_colour : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 
 // What a patch throws when the rag finishes it: the end of the job for that
 // square, and the only one of the three that is warm.
@@ -338,7 +367,7 @@ float banded(float amount, float steps) {
 // `pattern_bite` of triplanar noise in it — so `fract` of it is testing the
 // fractional part of a *noise field*, and lighting up where that is near zero
 // draws the field's iso-contours. Level sets of smooth 2D noise are closed
-// squiggling loops, which is exactly what it looked like: nested cyan
+// squiggling loops, which is exactly what it looked like: nested lit
 // tracery over every panel the jet had half finished. Worse, the ±45% swing
 // spans up to four band boundaries at once, so several contour families stacked
 // in the same place — better than half the fragments at a mask of 0.95 lit,
@@ -384,6 +413,16 @@ float travelling(vec3 at, float scale, float speed, float width) {
 // order faster than a bell that does not. The middle one is the panel's own
 // `product_colour`, which is already a uniform here and is already white on
 // paint, blue on glass and green on tyres.
+//
+// [b]Two of the three are fixed and the first one is the car's, which is a real
+// cost on exactly one paint.[/b] `wash_flash_colour` is this car's paint lit, so
+// on Alpine White the wash throws very nearly the white the bodywork's product
+// throws — the two ends of the family collapse together on the palest car in the
+// palette. That is accepted rather than worked around: the wash's job is to say
+// "the paint is back", and it says it against the brown mud it just replaced,
+// which is the contrast that has to hold. Tinting the reveal away from the
+// paint to keep a gap from the suds would be showing the player a colour their
+// car is not.
 vec3 flash_tint(float stage) {
 	if (stage < 0.25) {
 		return wash_flash_colour.rgb;

@@ -38,14 +38,21 @@
 ## flash", which holds, rather than "every flash has a ding", which cannot.
 ##
 ## [b]Why it rests in [constant Brand.MUTED] rather than white, which took two
-## goes.[/b] The three tints below are the shader's own flash family so the
-## corner and the car agree about what a pass looks like — and the middle one is
-## a product colour, which for bodywork is [constant Surface.BODY_PRODUCT], very
-## nearly white. Against a white readout the foam flash is invisible: the pass
-## that has its own tool, its own sound and its own square on the car would be
-## the one pass the score does not appear to notice. Resting a shade down means
-## all three read, and the one that reads as "brighter" rather than as "bluer" or
-## "warmer" is the one whose product really is white suds.
+## goes.[/b] The three tints are the shader's own flash family so the corner and
+## the car agree about what a pass looks like — and the middle one is a product
+## colour, which for bodywork is [constant Surface.BODY_PRODUCT], very nearly
+## white. Against a white readout the foam flash is invisible: the pass that has
+## its own tool, its own sound and its own square on the car would be the one
+## pass the score does not appear to notice. Resting a shade down means all three
+## read, and the one that reads as "brighter" rather than as "bluer" or "warmer"
+## is the one whose product really is white suds.
+##
+## That argument only got stronger when the wash stopped being a constant. It is
+## now the car's own paint lit ([method Car.flash_colour], and
+## [code]grime.gdshader[/code]'s [code]wash_flash_colour[/code] is the same sum),
+## which on Alpine White is another near-white — so two of the three would be
+## invisible against a white readout rather than one. Resting at
+## [constant Brand.MUTED] is what keeps a pale car's wash a flash.
 ##
 ## The punch is the belt-and-braces half of that. Colour alone has to carry the
 ## whole message on a phone in daylight, through a thumb, over a lit garage; a
@@ -101,10 +108,13 @@ const POP_SECONDS: float = 0.75
 ## overlap than of the sound.
 const POPS: int = 8
 
-## What a patch coming clean under the jet flashes: [code]grime.gdshader[/code]'s
-## own [code]wash_flash_colour[/code], so the corner and the car throw the same
-## water.
-const WASH_TINT: Color = Color(0.55, 0.90, 1.0)
+## What a patch coming clean under the jet flashes before anybody has said what
+## the car is painted: [code]grime.gdshader[/code]'s own default for
+## [code]wash_flash_colour[/code], which means the same thing there — a flash
+## with no car behind it. [method set_paint_colour] is how the corner is told,
+## and it is told on [signal Garage.grimed], which is before the first patch can
+## possibly have been washed.
+const UNPAINTED_TINT: Color = Color.WHITE
 
 ## What the rag's pass flashes: the shader's [code]buff_flash_colour[/code], and
 ## the only one of the three that is warm.
@@ -154,6 +164,11 @@ var _flying: int = 0
 ## be called every frame — which is what a number read off a running total has to
 ## be — without building a string sixty times a second to say the same thing.
 var _done: int = 0
+## What a wash throws, which is this car's paint lit — see [method
+## set_paint_colour]. Held rather than asked for on each award because
+## [signal Grime.patch_finished] carries a panel and a stage and no car, and the
+## corner has no business reaching across the room to find one mid-sweep.
+var _washed: Color = UNPAINTED_TINT
 
 @onready var _total_label: Label = %Total
 @onready var _run_label: Label = %Multiplier
@@ -239,7 +254,7 @@ func score(reached: int, award: int, stage: GrimeMap.Stage, multiplier: int) -> 
 	# decelerating forever into a total that keeps moving.
 	_roll = maxf(float(_total) - _shown, 1.0) / ROLL_SECONDS
 	_flash = 1.0
-	_tint = tint_for(stage)
+	_tint = tint_for(stage, _washed)
 	_run_label.visible = multiplier > SHOW_RUN_ABOVE
 	_run_label.text = "×%d" % multiplier
 	_pop(award)
@@ -305,7 +320,8 @@ func done_shown() -> int:
 	return _done
 
 
-## The colour the score throws for a patch that finished [param stage].
+## The colour the score throws for a patch that finished [param stage] on a car
+## whose wash flashes [param washed].
 ##
 ## The middle one is asked of [Surface] rather than written here, so the corner
 ## cannot drift from the paint. It is the bodywork's product and not the panel's
@@ -314,13 +330,43 @@ func done_shown() -> int:
 ## corner of the screen would be a change to the thing the whole game's scoring,
 ## sound and lighting hang off, to answer a question about glass that the player
 ## is not looking at while they are cleaning it.
-static func tint_for(stage: GrimeMap.Stage) -> Color:
+##
+## [b]The first one is handed in rather than looked up, which is the same split
+## one step further.[/b] A wash now throws the car's own paint rather than a
+## constant ([method Car.flash_colour]), and this class does not know a car
+## exists — it is a corner of the screen that is told numbers. So the colour
+## arrives through [method set_paint_colour] and is passed back in here, which
+## keeps this function what it was: the one place that maps a stage onto a
+## colour, with nothing to reach for and nothing to remember.
+##
+## Still static, so a test can ask what a stage throws on a given paint without
+## standing a HUD up in a tree.
+static func tint_for(stage: GrimeMap.Stage, washed: Color) -> Color:
 	match stage:
 		GrimeMap.Stage.FOAMED:
 			return Surface.product_colour(Surface.Kind.BODY)
 		GrimeMap.Stage.BUFFED:
 			return BUFF_TINT
-	return WASH_TINT
+	return washed
+
+
+## The car in the bay is painted [param colour], so a wash flashes what
+## [method Car.flash_colour] makes of it — the same sum the overlay on the car
+## does, so the corner and the paint throw one colour rather than two that agree
+## by hand.
+##
+## [b]Given the paint rather than the flash[/b], so the caller does not have to
+## know there is a sum in the way. The one place that calls this
+## ([code]src/screens/play_screen.gd[/code]) has a car and its material; what it
+## should not have to hold is this class's idea of what a flash looks like.
+func set_paint_colour(colour: Color) -> void:
+	_washed = Car.flash_colour(colour)
+
+
+## What a wash currently throws in the corner. What a test asserts instead of
+## reading a colour back off a label mid-fade.
+func wash_tint() -> Color:
+	return _washed
 
 
 ## What the digits currently read, which during a roll is behind the real total.

@@ -490,6 +490,14 @@ func _on_grimed() -> void:
 	# grime does not exist until this fires, so there is nothing to listen to
 	# before it.
 	grime.patch_finished.connect(_on_patch_finished)
+	# What a wash throws is the car's own paint lit ([method Car.flash_colour]),
+	# and this is where the corner is told which car it is standing in front of.
+	# Here rather than in `_ready()` for a third reason of the same shape: the car
+	# is parked and painted by the time the mud is on it, and asked any earlier the
+	# answer is whatever colour the scene file happened to save.
+	var car: Car = _garage.car()
+	if car != null and car.paint != null:
+		_scoreboard.set_paint_colour(car.paint.albedo_color)
 	# And this is the first instant there is anything to clean, which is the first
 	# instant the meter should be running. See the class docs.
 	_clock.start()

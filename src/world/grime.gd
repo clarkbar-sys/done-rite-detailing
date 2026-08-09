@@ -159,6 +159,12 @@ func lay_on(
 	_maps = []
 	_flashes = []
 	var shader: Shader = load(SHADER) as Shader
+	# What every panel of this car flashes when the water finishes a patch. Taken
+	# once here rather than per panel because it is a fact about the car and not
+	# about the panel — the bodywork shares one material ([member Car.paint]) — and
+	# the wheels and the glass throw it too: what a wash announces is the car
+	# appearing from under the mud, whichever part of it came clean.
+	var washed: Color = _wash_flash(car)
 	for index: int in _panels.size():
 		var skin: GeometryInstance3D = _skins[index]
 		var box: AABB = skin.get_aabb()
@@ -171,7 +177,9 @@ func lay_on(
 		var flash: PatchFlash = PatchFlash.new(map.patch_grid())
 		_maps.append(map)
 		_flashes.append(flash)
-		skin.material_overlay = _overlay(shader, map, flash, box, car.kind_of(_panels[index]))
+		skin.material_overlay = _overlay(
+			shader, map, flash, box, car.kind_of(_panels[index]), washed
+		)
 
 
 ## Where a tool can be got onto each panel of [param car], measured by looking at
@@ -489,8 +497,14 @@ func _work(
 ## green on the tyres without the mask having anywhere to record which. A panel
 ## does not change what it is made of. [method Surface.product_colour] has the
 ## argument at length.
+##
+## [param washed] is the same story a step out: what a patch throws when the
+## water finishes it is this car's paint rather than a colour the shader picked,
+## and a car does not change what it is painted either — so it is set once here
+## too. [method Car.flash_colour] has why it is the paint driven up rather than
+## the paint.
 func _overlay(
-	shader: Shader, map: GrimeMap, flash: PatchFlash, box: AABB, kind: Surface.Kind
+	shader: Shader, map: GrimeMap, flash: PatchFlash, box: AABB, kind: Surface.Kind, washed: Color
 ) -> ShaderMaterial:
 	var paint: ShaderMaterial = ShaderMaterial.new()
 	paint.shader = shader
@@ -499,4 +513,22 @@ func _overlay(
 	paint.set_shader_parameter("box_origin", box.position)
 	paint.set_shader_parameter("box_size", box.size)
 	paint.set_shader_parameter("product_colour", Surface.product_colour(kind))
+	paint.set_shader_parameter("wash_flash_colour", washed)
 	return paint
+
+
+## What [param car] flashes where the water finishes a patch — its own paint, lit
+## by [method Car.flash_colour].
+##
+## [b]A car with no paint gets white, and that is not a defensive habit.[/b]
+## [member Car.paint] is an export, and a [MeshCar] whose model failed to load
+## has none at all and says so — [method MeshCar._ready] returns early rather
+## than crashing, and the fixtures under [code]tests/fixtures/[/code] are free to
+## leave it unset for the same reason. Mud on an unpainted car is still worth
+## drawing, so the one thing that must not happen here is the grime declining to
+## exist over a colour. White is what the shader's own default is and means the
+## same thing there: a flash with no car behind it.
+func _wash_flash(car: Car) -> Color:
+	if car.paint == null:
+		return Color.WHITE
+	return Car.flash_colour(car.paint.albedo_color)

@@ -54,6 +54,13 @@ func _award(total: int, award: int, multiplier: int = 1) -> void:
 	_hud.score(total, award, GrimeMap.Stage.WASHED, multiplier)
 
 
+## How far apart [param one] and [param other] are as colours, ignoring alpha.
+## Plain RGB distance rather than a perceptual space: what the tests below need is
+## an ordering and a floor, and nothing here is fine enough to want a Lab.
+func _apart(one: Color, other: Color) -> float:
+	return Vector3(one.r, one.g, one.b).distance_to(Vector3(other.r, other.g, other.b))
+
+
 func test_starts_at_nothing() -> void:
 	assert_eq(_hud.total(), 0, "a fresh scoreboard is not at zero")
 	assert_eq(_hud.shown(), 0, "and its digits do not read zero")
@@ -142,10 +149,17 @@ func test_the_multiplier_is_hidden_at_one_and_shown_above_it() -> void:
 
 ## Three passes, three colours, and no two of them the same — the corner has to
 ## be able to say which pass paid.
+##
+## Asked on a paint that is none of the other two rather than on every colour in
+## the palette: the wash is the car's now, and Alpine White really does throw very
+## nearly what the bodywork's product throws. That collapse is documented and
+## accepted in [code]grime.gdshader[/code], so pinning "no two the same" across
+## all thirteen would be pinning a thing the feature does not claim.
 func test_each_stage_throws_its_own_colour() -> void:
-	var wash: Color = ScoreHud.tint_for(GrimeMap.Stage.WASHED)
-	var foam: Color = ScoreHud.tint_for(GrimeMap.Stage.FOAMED)
-	var buff: Color = ScoreHud.tint_for(GrimeMap.Stage.BUFFED)
+	var washed: Color = Car.flash_colour(Color(0.62, 0.05, 0.08))
+	var wash: Color = ScoreHud.tint_for(GrimeMap.Stage.WASHED, washed)
+	var foam: Color = ScoreHud.tint_for(GrimeMap.Stage.FOAMED, washed)
+	var buff: Color = ScoreHud.tint_for(GrimeMap.Stage.BUFFED, washed)
 	assert_ne(wash, foam, "a wash and a foam flash the same colour")
 	assert_ne(foam, buff, "a foam and a buff flash the same colour")
 	assert_ne(wash, buff, "a wash and a buff flash the same colour")
@@ -156,9 +170,48 @@ func test_each_stage_throws_its_own_colour() -> void:
 ## a distance rather than as an exact pair of colours, so retuning either end
 ## stays free and closing the gap does not.
 func test_the_foam_flash_is_visible_against_the_resting_colour() -> void:
-	var foam: Color = ScoreHud.tint_for(GrimeMap.Stage.FOAMED)
+	var foam: Color = ScoreHud.tint_for(GrimeMap.Stage.FOAMED, ScoreHud.UNPAINTED_TINT)
 	var apart: float = absf(foam.get_luminance() - Brand.MUTED.get_luminance())
 	assert_gt(apart, 0.1, "the foam flash is too close to the resting colour to see")
+
+
+## The other half of that argument, and the reason it had to be re-made: the wash
+## tint is thirteen colours now rather than one, so "the flash reads against the
+## resting colour" is thirteen claims and the weakest of them is the one that
+## matters.
+##
+## [b]Measured as a distance in colour and not in lightness, which the foam test
+## above can afford to do and this cannot.[/b] The foam tint is very nearly
+## neutral, so how far it is from [constant Brand.MUTED] is a question about
+## lightness alone. A wash tint is not: Bronze lights to a saturated orange that
+## sits within 0.01 of the resting colour's luminance and is unmistakable next to
+## it, and a lightness test would call that invisible. The floor is 0.25 against a
+## measured worst case of 0.29 (Ice Blue, the palest tint with a hue) and a foam
+## flash at 0.38 — so this is "no wash is meaningfully closer than the foam
+## already is", which is the claim the class docs actually make.
+func test_every_paint_in_the_palette_flashes_against_the_resting_colour() -> void:
+	for colour: Color in Car.PAINT_COLORS:
+		var wash: Color = ScoreHud.tint_for(GrimeMap.Stage.WASHED, Car.flash_colour(colour))
+		var apart: float = _apart(wash, Brand.MUTED)
+		assert_gt(apart, 0.25, "%s flashes too close to the resting colour to see" % colour)
+
+
+## The corner is told the paint and works out the flash itself, with the same sum
+## the car does — a HUD handed a raw paint colour that stored it raw would be a
+## corner quietly disagreeing with the panel it is reporting on.
+func test_the_corner_lights_the_paint_it_is_given() -> void:
+	var burgundy: Color = Color(0.35, 0.05, 0.10)
+	_hud.set_paint_colour(burgundy)
+	assert_eq(
+		_hud.wash_tint(), Car.flash_colour(burgundy), "the corner kept its own idea of a wash"
+	)
+	assert_ne(_hud.wash_tint(), burgundy, "the corner threw the paint unlit")
+
+
+## Nobody has said what the car is painted yet, which is true of every frame
+## before [signal Garage.grimed] — and of a fixture with no paint at all.
+func test_an_unpainted_corner_falls_back_to_white() -> void:
+	assert_eq(_hud.wash_tint(), ScoreHud.UNPAINTED_TINT, "a fresh corner invented a paint colour")
 
 
 # ---- the quiet half: work coming in between events ---------------------------

@@ -186,6 +186,46 @@ func _ready() -> void:
 	paint.albedo_color = PAINT_COLORS.pick_random()
 
 
+## What a patch of paint in [param colour] throws when the water finishes it: the
+## same colour, driven up until its brightest channel is full.
+##
+## [b]The wash flash is the paint, and this is why it is not the paint
+## verbatim.[/b] What happens when a patch comes clean is that a piece of the car
+## appears from under the mud, so the pop that announces it is the car's own
+## colour — the reward for washing is seeing what you are washing. Used raw that
+## fails on most of [constant PAINT_COLORS]: the flash is drawn as emission
+## ([code]grime.gdshader[/code]'s [code]flash_tint[/code]) and Deep Blue at
+## [code]0.08, 0.20, 0.42[/code] emits almost nothing, so the darker half of the
+## palette would announce a finished patch with a barely visible smudge while
+## Alpine White announced one with a flash. Scaling to the peak channel keeps the
+## hue exactly and lets every car pop equally hard.
+##
+## [b]Peak-scaled rather than lightened toward white[/b], because a lift toward
+## white is a lift toward *no hue*, and the hue is the entire message. Burgundy
+## comes out a hot red and Deep Blue a hot blue; neither comes out pink.
+##
+## [b]And it is the same answer either side of [method MeshCar.compensated].[/b]
+## That is a flat multiply on all three channels, so a colour and its compensated
+## self normalise to the same place — the flash a car throws does not depend on
+## whether the caller caught the paint before or after the pack's greyscale map
+## was accounted for. It is read off [member paint] in practice, which is after.
+##
+## Black is the one colour with no hue to scale — every channel is zero and there
+## is nothing to divide by — so it comes back white, which is what a flash with
+## no colour of its own should look like. No car in the palette is black (see
+## [constant PAINT_COLORS]); a fixture painted by hand can be.
+##
+## Static and public for the reason [method MeshCar.compensated] is: two places
+## need the sum — [method Grime.lay_on], which hands it to the shader, and
+## [method ScoreHud.tint_for], which throws the same colour in the corner — and a
+## corner that worked it out separately is a corner free to disagree with the car.
+static func flash_colour(colour: Color) -> Color:
+	var peak: float = maxf(colour.r, maxf(colour.g, colour.b))
+	if peak <= 0.0:
+		return Color.WHITE
+	return Color(colour.r / peak, colour.g / peak, colour.b / peak)
+
+
 ## Every panel of the car: the roots a ray can hand back, each one with a skin
 ## under it — the class docs have the full shape of that.
 ##

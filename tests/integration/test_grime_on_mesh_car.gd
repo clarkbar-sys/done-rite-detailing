@@ -100,6 +100,58 @@ func test_the_overlay_s_parameters_agree_with_the_map_it_was_built_from() -> voi
 			)
 
 
+## What a wash flashes is this car's own paint lit, so it is a fact about the car
+## and has to be on every panel of it — the glass and the wheels announce the car
+## coming clean the same way the bonnet does.
+##
+## Asserted against [method Car.flash_colour] of the paint the car is actually
+## wearing rather than against a colour written down here: the paint is picked at
+## random from [constant Car.PAINT_COLORS] and then driven through
+## [method MeshCar.compensated], and a test that named a colour would be pinning
+## the draw instead of the wiring.
+func test_every_panel_flashes_the_car_s_own_paint_when_it_is_washed() -> void:
+	for style: String in MeshCar.STYLES:
+		var car: MeshCar = _car_of(style)
+		_laid_grime(car)
+		assert_not_null(car.paint, "%s: no paint to flash" % style)
+		if car.paint == null:
+			continue
+		var expected: Color = Car.flash_colour(car.paint.albedo_color)
+		for panel: Node3D in car.panels():
+			var overlay: ShaderMaterial = _overlay_of(car, panel)
+			if overlay == null:
+				continue
+			var washed: Color = overlay.get_shader_parameter("wash_flash_colour")
+			assert_eq(washed, expected, "%s: %s flashes something else" % [style, panel.name])
+
+
+## And it is read at the moment the mud goes on rather than baked into the
+## material once. [method Grime.lay_on] is called again every time the room
+## re-dirties a car ([method Garage._lay_on_the_grime]), which is also the path a
+## car that has been repainted comes back through — so a second lay has to arrive
+## at the colour the car is wearing now.
+##
+## Repainted by hand rather than by [method MeshCar.restyle], which deliberately
+## carries the paint across a change of model: what needs proving here is that the
+## overlay follows the paint, and restyling holds the paint still.
+func test_a_second_lay_takes_the_paint_the_car_is_wearing_now() -> void:
+	var car: MeshCar = _car_of(MeshCar.STYLES[0])
+	var grime: Grime = _laid_grime(car)
+	assert_not_null(car.paint, "the car has no paint")
+	if car.paint == null:
+		return
+	var repainted: Color = Color(0.08, 0.20, 0.42)
+	car.paint.albedo_color = repainted
+	grime.lay_on(car)
+	var expected: Color = Car.flash_colour(repainted)
+	for panel: Node3D in car.panels():
+		var overlay: ShaderMaterial = _overlay_of(car, panel)
+		if overlay == null:
+			continue
+		var washed: Color = overlay.get_shader_parameter("wash_flash_colour")
+		assert_eq(washed, expected, "%s kept the colour the car used to be" % panel.name)
+
+
 func test_the_double_sided_glass_still_carries_a_working_overlay() -> void:
 	# The concern #138 named by name: Glass and Optics ship with
 	# BaseMaterial3D.CULL_DISABLED, a setting that lives on the base material and
