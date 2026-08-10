@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.15.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.14.0...v1.15.0) (2026-08-10)
+
+
+### Features
+
+* **menu:** split Play into Arcade and Simulation, and make a run five minutes ([#218](https://github.com/clarkbar-sys/done-rite-detailing/issues/218)) ([b6ae223](https://github.com/clarkbar-sys/done-rite-detailing/commit/b6ae2237bfacda0c0f87b2f24024cb4928c88257))
+
+
+### Performance Improvements
+
+* **assets:** import the model textures lossy and at 512, -9.0 MB pck ([#217](https://github.com/clarkbar-sys/done-rite-detailing/issues/217)) ([3987d31](https://github.com/clarkbar-sys/done-rite-detailing/commit/3987d3197d858b92752a035e17ad9846003b83f1)), closes [#205](https://github.com/clarkbar-sys/done-rite-detailing/issues/205)
+* **assets:** share one Optics texture across all ten cars ([#215](https://github.com/clarkbar-sys/done-rite-detailing/issues/215)) ([056f8e9](https://github.com/clarkbar-sys/done-rite-detailing/commit/056f8e9c76a45a49db84e3aeb8ba54d895397288)), closes [#204](https://github.com/clarkbar-sys/done-rite-detailing/issues/204)
+* **assets:** slim the driveway pck by 2.3 MB via import settings ([#212](https://github.com/clarkbar-sys/done-rite-detailing/issues/212)) ([f31d1bf](https://github.com/clarkbar-sys/done-rite-detailing/commit/f31d1bfc269b9b2148d275082e53e1111762563d)), closes [#207](https://github.com/clarkbar-sys/done-rite-detailing/issues/207)
+* **models:** decimate the trigger-sprayer meshes ([#213](https://github.com/clarkbar-sys/done-rite-detailing/issues/213)) ([c73abce](https://github.com/clarkbar-sys/done-rite-detailing/commit/c73abcef987066655bbf3a910d43263a57c198fd)), closes [#206](https://github.com/clarkbar-sys/done-rite-detailing/issues/206)
+* **web:** build a size-trimmed export template, -3.3 MB over the wire ([#208](https://github.com/clarkbar-sys/done-rite-detailing/issues/208)) ([#219](https://github.com/clarkbar-sys/done-rite-detailing/issues/219)) ([0eb6028](https://github.com/clarkbar-sys/done-rite-detailing/commit/0eb60284e11e05233745000020bd59d59fe92ebd))
+
 ## [1.14.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.13.0...v1.14.0) (2026-08-09)
 
 
