@@ -463,6 +463,86 @@ the bell, which is played once at one volume. It is fatal to a fade, so
 looping title theme cannot notice. Per-player, not project-wide: the default is
 right for everything that answers a button press.
 
+### The engine itself: a template with the unused parts left out
+
+**Decided.** The web bundle is not built on the engine Godot ships. It is built
+on one this project compiles, from the same 4.7.1-stable source, with the
+modules the game never touches left out —
+[`web/build_profile.json`](./web/build_profile.json) is the list, with a line of
+reasoning per entry, and `scripts/build-web-template.sh` is the invocation.
+
+This is the last thing that was left to cut. Once the art passes had done their
+work the pack was 5.2 MB gzipped and the *engine* was 10.1 MB — 64% of what a
+player downloaded was Godot, and no amount of texture work was going to touch
+it.
+
+| | Raw | Gzip |
+| --- | ---: | ---: |
+| `index.wasm`, stock `web_nothreads_release` | 39,513,091 | 10,142,310 |
+| `index.wasm`, this profile | 28,141,460 | 6,815,150 |
+| `index.js`, stock / this profile | 279,815 / 251,073 | 68,666 / 62,599 |
+| **whole bundle**, before / after | 40.5 MB / 32.8 MB | **15,729,342 / 12,382,560** |
+
+Gzip because gzip is what Pages serves. **3,347,000 bytes off the wire, 21% of
+the download**, for an engine that is 9 modules instead of 50.
+
+**Two of the three levers the idea started with turned out to be nothing.**
+`optimize=size` is already the web platform's default — `platform/web/detect.py`
+sets it in `get_flags()`, with its own comment about `-Os` beating `-O3` by
+~5 MB — and `production=yes` is what the official templates are built with.
+Both are passed explicitly anyway so the build states its configuration rather
+than inheriting half of it, but neither is worth a byte over stock. Every
+number above comes from the module list.
+
+**What it costs, in the order the costs actually bite:**
+
+- **A module that is off is not a build error.** It is a class that fails to
+  instantiate on the line that reaches for it, in a browser, on a path CI never
+  takes. `tests/unit/test_web_build_profile.gd` is the answer: it reads the
+  profile, maps each disabled module to the classes it provides, and scans
+  `src/` for them. Adding `RegEx` to a script fails `make gut` with the reason,
+  rather than failing a player. It is the same shape as the loading screen's
+  test above and it exists for the same reason — a wiring gate for a wire
+  nothing else can see.
+- **Compiling it.** ~50-70 minutes on four cores, ~12 GB of scratch. CI pays it
+  only when the profile or the Godot pin changes (`ci-godot.yml`'s
+  `web-template` job caches on exactly those inputs); a person pays it once,
+  or not at all if a template has been published and pinned in
+  `scripts/fetch-web-template.sh`. This is the "highest ongoing cost" the work
+  was scoped with, and it is real.
+- **The fallback text server.** `text_server_adv` and its embedded ICU tables
+  are the largest single saving here, and `text_server_fb` is what replaces it:
+  FreeType, Latin, left to right. Complex-script shaping and bidirectional text
+  are gone, so **localising into a script that needs either means turning that
+  line back on**. Measured, at the same time: the fallback measures text
+  slightly differently, so wrapped paragraphs break at different points than
+  they do on stock — visible if you compare `how_to_play` side by side, and
+  invisible otherwise.
+
+**And one trap worth writing down, because it cost a build to find.**
+`text_server_fb` is disabled by default upstream — `modules/text_server_fb/
+config.py`'s `is_enabled()` returns `False` — so turning off the advanced
+server without explicitly turning on the fallback leaves a build with **no text
+server at all**. It compiles. It exports. It boots, renders the whole 3D bay
+correctly, and draws every label as nothing. Nothing between the profile and a
+screenshot noticed. `scripts/build-web-template.sh` now reads
+`modules/modules_enabled.gen.h` back after the compile and fails on a required
+module that did not survive, which is the gate that would have caught it.
+
+Two more things the profile is *not* allowed to cut, both of which a naive read
+of "what does this game use" gets wrong: **CSG**, because the entire 3D bay is
+`CSGCombiner3D`/`CSGBox3D` built at runtime rather than authored meshes, and
+**SVG**, because the default theme rasterises its icons through
+`ImageLoaderSVG` and the settings `CheckButton` is two of them. No class name
+points at the second one, so the scan cannot defend it — only the comment in
+the profile and a look at the screen can.
+
+**When to revisit.** When the game needs something the profile turned off — the
+profile is the first place to look, not the last. And on any Godot bump:
+`scripts/build-web-template.sh` pins the engine's commit as well as its
+version and refuses to compile a different one, so the bump fails loudly there
+rather than exporting against a stale template.
+
 ### The loading screen: one vendored file, re-diffed on every Godot bump
 
 **Decided.** `html/custom_html_shell` points the web export at

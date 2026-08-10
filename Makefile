@@ -14,6 +14,9 @@
 #   make format    gdformat every script in place
 #   make build     export the Linux release binary -> build/linux/
 #   make build-web export the web bundle            -> build/web/
+#   make web-template  the custom, size-trimmed web export template the bundle
+#                  is built from (a prerequisite of the two web targets above;
+#                  see scripts/fetch-web-template.sh for what it costs)
 #   make export-linux / export-web  the same two exports without re-running
 #                  `check` first — for CI, where `check` is already its own job
 #   make editor    open the project in the Godot editor
@@ -52,7 +55,7 @@ WEB_PRESET := Web
 # alternative is a base64 copy of the font pasted into the shell — a second
 # home for an asset that already has one, which is the thing
 # tests/unit/test_web_shell.gd exists to forbid about the logo. 32 KB, from the
-# same origin, on a page already downloading a 39 MB bundle.
+# same origin, on a page already downloading a 12 MB bundle.
 WEB_FONT   := assets/brand/fonts/Silkscreen-Regular.ttf
 
 # Godot resolves export templates under $XDG_DATA_HOME/godot; pointing it at the
@@ -71,7 +74,7 @@ SOURCES := $(shell find . -name '*.gd' \
              -not -path './.godot/*' -not -path './.godot-sdk/*' \
              -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-.PHONY: all sdk editor-sdk gut-sdk import check smoke gut tested lint format test build build-web export-linux export-web stamp run editor clean distclean
+.PHONY: all sdk editor-sdk gut-sdk web-template import check smoke gut tested lint format test build build-web export-linux export-web stamp run editor clean distclean
 
 all: check build
 
@@ -99,6 +102,26 @@ gut-sdk: $(GUT_PLUGIN)
 
 $(GUT_PLUGIN): scripts/fetch-gut.sh
 	@scripts/fetch-gut.sh $(GUT)
+
+# The project's own web export template — Godot with web/build_profile.json's
+# module list compiled out. export_presets.cfg's Web preset names the path this
+# writes to, and the export fails outright if it is not there, so this is a
+# prerequisite of `export-web` rather than a thing to remember.
+#
+# Phony, and the freshness check lives in the script rather than in a file
+# rule. What makes a template stale is not its mtime but the contents of the
+# profile and the two scripts that decide what goes into it, so
+# fetch-web-template.sh hashes those three into a build id, writes it beside
+# the zip and re-does the work when they disagree. A make prerequisite list
+# would rebuild on a whitespace change to the profile and, worse, not rebuild
+# at all after a `git checkout` that rewinds the mtimes.
+#
+# Cost: the first run on a machine with no published template pinned compiles
+# the engine, which is ~50-70 minutes on four cores. Every run after that is a
+# file comparison. See scripts/fetch-web-template.sh for the two routes and
+# scripts/build-web-template.sh for what the compile actually is.
+web-template:
+	@scripts/fetch-web-template.sh $(SDK)/web_nothreads_release.zip
 
 # ---- develop ---------------------------------------------------------------
 
@@ -390,7 +413,7 @@ export-linux: import stamp sdk
 # Split from the export for the reason `build` is — see the note there.
 build-web: check export-web
 
-export-web: import stamp sdk
+export-web: import stamp sdk web-template
 	@rm -rf $(WEB_DIR)
 	@mkdir -p $(WEB_DIR)
 	$(GODOT) --headless --path . --export-release "$(WEB_PRESET)" $(abspath $(WEB_TARGET))
