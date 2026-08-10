@@ -235,11 +235,11 @@ installed system-wide — it all lands in `.godot-sdk/`. The
 ### 👉 [clarkbar-sys.github.io/done-rite-detailing](https://clarkbar-sys.github.io/done-rite-detailing/)
 
 That's the current `main`, in your browser, republished by CI on every push. No
-download, no `chmod`, nothing to install. It needs WebGL 2 and about 40 MB on
+download, no `chmod`, nothing to install. It needs WebGL 2 and about 12 MB on
 the first load; there is no service worker, so a refresh always gets the newest
 build rather than a cached one.
 
-Those 40 MB are the first thing the game asks of anybody, so they are spent
+Those 12 MB are the first thing the game asks of anybody, so they are spent
 looking at the business rather than at the engine. The page you wait on is the
 start menu's own lockup — the logo in its dark card, the name under it, and a
 red bar filling where the Start button will be — instead of Godot's grey
@@ -293,16 +293,35 @@ make lint      # gdformat --check + gdlint — a separate, faster CI gate
 make format    # gdformat, rewrites in place
 make build     # export the Linux release binary -> build/linux/
 make build-web # export the web bundle           -> build/web/
+make web-template  # the custom engine the web bundle is built from
 make editor    # open the project in the Godot editor
 make run       # run the game
 make clean     # remove build outputs (keeps the downloaded toolchains)
 make distclean # also drop .godot-sdk/, .venv-lint/ and addons/gut/
 ```
 
+`make build-web` needs one thing the others don't: the **web export template,
+which this project compiles itself** — Godot with the ~40 modules the game
+never uses left out, which is 3.2 MB off what a player downloads. `make
+web-template` is that step, and `make build-web` depends on it, so it happens
+whether or not you ask for it. If a template has been published (see
+[Releases](https://github.com/clarkbar-sys/done-rite-detailing/releases)) and
+pinned in `scripts/fetch-web-template.sh`, it is a 7 MB download; if not, it
+compiles the engine, which is **50–70 minutes on four cores** and about 12 GB
+of scratch space, once, cached in `.godot-sdk/` afterwards. There is no
+fallback to the stock engine — [Coding
+Standards](./STANDARDS.md#the-engine-itself-a-template-with-the-unused-parts-left-out)
+says why, and `web/build_profile.json` lists what comes out with a line of
+reasoning each. Publishing a template so nobody else has to compile one is the
+**Publish the web export template** workflow on the Actions tab.
+
 To move to a newer Godot, run `scripts/fetch-godot.sh --update`. It prints the
 latest upstream stable version and its checksums; update the three pins at the
 top of that script, then re-run `make test build` before pushing.
-`scripts/fetch-gut.sh --update` does the same for the test addon.
+`scripts/fetch-gut.sh --update` does the same for the test addon. A Godot bump
+also invalidates the web template: `scripts/build-web-template.sh` pins the
+engine's commit as well as its version and stops rather than compile a
+different one, so bump `GODOT_COMMIT` there in the same change.
 
 ### Layout
 

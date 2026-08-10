@@ -84,18 +84,31 @@ env:
   #
   # It exists to catch GROWTH, not to bless today's size, so it is ratcheted
   # down as those land rather than left with headroom nobody is using. After
-  # #213/#215/#212 and #205 (the texture import pass) it is:
+  # #213/#215/#212 and #205 (the texture import pass) it was:
   #
   #   index.pck    5,636,516 B raw ->  5,236,783 B gzip
   #   index.wasm  39,513,091 B raw -> 10,142,310 B gzip
   #   bundle total (every file in build/web/, gzip)     15,729,342 B
   #
-  # 16,200,000 is that 15,729,342 plus ~470 KB (~3%) of headroom — enough that
+  # ...at which point the engine's own .wasm was 64% of the total and the next
+  # real cut was not an art one. #208 made it: the bundle is now built on a
+  # template this project compiles, with the modules the game never touches
+  # left out (web/build_profile.json, and the `web-template` job below).
+  #
+  #   index.pck    5,652,008 B raw ->  5,223,232 B gzip
+  #   index.wasm  28,141,460 B raw ->  6,815,150 B gzip
+  #   bundle total (every file in build/web/, gzip)     12,382,560 B
+  #
+  # 12,800,000 is that 12,382,560 plus ~417 KB (~3%) of headroom — enough that
   # a rebuild's changing build_stamp.json (commit + timestamp, always the same
-  # length) can't flip it, not enough to absorb a real art drop. Note what the
-  # remaining total is made of: the engine's own .wasm is now 64% of it, so the
-  # next real cut is not an art one.
-  WEB_GZIP_BUDGET_BYTES: 16200000
+  # length) can't flip it, not enough to absorb a real art drop.
+  #
+  # It now gates two things rather than one, and the second is the reason
+  # export_presets.cfg's custom_template/release can be trusted. A bundle built
+  # against the STOCK template is ~3.3 MB heavier than this number allows, so
+  # emptying that setting — or restoring a stale template — fails here instead
+  # of quietly shipping the engine this project stopped shipping.
+  WEB_GZIP_BUDGET_BYTES: 12800000
 
 jobs:
   lint:
@@ -274,9 +287,92 @@ jobs:
           path: ${{ env.ARTIFACT }}
           if-no-files-found: error
 
+  # The engine the web bundle is built from, which this project compiles itself
+  # — see web/build_profile.json for what is left out and scripts/
+  # build-web-template.sh for how. It is a job rather than a step because it is
+  # the one thing here that can take an hour, and because "Web export template"
+  # going red says something completely different from "Export web bundle"
+  # going red.
+  #
+  # It almost never takes an hour. The cache key is the build id
+  # scripts/fetch-web-template.sh computes — the hash of the profile plus the
+  # two scripts that decide what goes into it — so a hit is every run that did
+  # not change one of those three files, which is very nearly every run. A miss
+  # is a deliberate change to what the engine contains, and paying a full
+  # compile for that is the correct price rather than an unfortunate one.
+  #
+  # The cache does not evict this out from under us: GitHub drops a cache after
+  # seven days without a read, and this one is read by every push and every PR.
+  #
+  # Deliberately NOT `needs: [check, test]`. It compiles C++ and knows nothing
+  # about the GDScript those jobs check, so making it wait would add its
+  # runtime to the critical path on exactly the runs where it has work to do.
+  web-template:
+    name: Web export template
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      # The id is a hash of three files, computed by the script that also
+      # enforces it — read here rather than re-derived with hashFiles(), so the
+      # cache key and the staleness check can never disagree about what a
+      # template is made of.
+      - name: The template's build id
+        id: build-id
+        run: echo "id=$(scripts/fetch-web-template.sh --print-id)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the web export template
+        uses: actions/cache@v6
+        with:
+          path: |
+            .godot-sdk/web_nothreads_release.zip
+            .godot-sdk/web_nothreads_release.zip.build-id
+          key: web-template-${{ steps.build-id.outputs.id }}
+
+      # SCons is the build system; emscripten is fetched and pinned by
+      # build-web-template.sh itself, the same way the Godot SDK is. Both steps
+      # are cheap and unconditional — the expensive part is the compile below,
+      # which the script skips on its own when the cache restored a template
+      # whose build id still matches.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install SCons
+        run: pip install scons
+
+      - name: Build the template if the cache missed
+        run: scripts/fetch-web-template.sh .godot-sdk/web_nothreads_release.zip
+
+      - name: Summarise
+        shell: bash
+        run: |
+          tmp="$(mktemp -d)"
+          unzip -oq .godot-sdk/web_nothreads_release.zip godot.wasm -d "$tmp"
+          {
+            echo "### Web export template"
+            echo
+            echo "| | |"
+            echo "|---|---:|"
+            echo "| \`godot.wasm\` raw | $(stat -c%s "$tmp/godot.wasm") B |"
+            echo "| \`godot.wasm\` gzip | $(gzip -c "$tmp/godot.wasm" | wc -c) B |"
+            echo "| sha256 | \`$(sha256sum .godot-sdk/web_nothreads_release.zip | cut -d' ' -f1)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # `build-web` takes it from here rather than restoring the same cache, so
+      # what the bundle is built from is provably the file this job produced.
+      - name: Upload the template
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-export-template
+          path: .godot-sdk/web_nothreads_release.zip
+          if-no-files-found: error
+          retention-days: 1
+
   build-web:
     name: Export web bundle
-    needs: [check, test]
+    needs: [check, test, web-template]
     runs-on: ubuntu-latest
 
     # The workflow-wide grant is `contents: read`; a job-level block REPLACES
@@ -308,6 +404,27 @@ jobs:
         with:
           path: addons/gut
           key: gut-${{ hashFiles('scripts/fetch-gut.sh') }}
+
+      # The engine, from the job above. export_presets.cfg's Web preset names
+      # this exact path in custom_template/release and the export stops without
+      # it — see that file, and STANDARDS.md "The engine itself".
+      #
+      # Downloaded rather than restored from the same cache, for the reason
+      # `pages` downloads this job's bundle instead of re-exporting: what the
+      # game is built on is then provably the file `web-template` measured,
+      # not a second copy that happened to share a key.
+      - name: Download the web export template
+        uses: actions/download-artifact@v8
+        with:
+          name: web-export-template
+          path: .godot-sdk
+
+      # The build id `web-template` computed is written beside the template by
+      # the fetch script, and the artifact does not carry it — so write it here
+      # rather than let `export-web`'s dependency decide the file is stale and
+      # start a 50-minute compile inside the export job.
+      - name: Mark it current
+        run: scripts/fetch-web-template.sh --print-id > .godot-sdk/web_nothreads_release.zip.build-id
 
       # Stamped exactly like the Linux export: the branch head, not the
       # synthetic merge commit — see the note on `build`. The web build prints

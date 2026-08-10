@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Godot 4 game (car-detailing arcade game) written in **statically typed GDScript**, exported to Linux and the web from CI. The Godot editor, export templates, the GUT test addon and the lint venv are all fetched on demand and pinned by sha256 — nothing is vendored or installed system-wide. They land in `.godot-sdk/`, `addons/gut/` and `.venv-lint/` (all gitignored).
 
+The one exception is the **web export template, which this project compiles itself**: `web/build_profile.json` lists the engine modules the game never uses, and `scripts/fetch-web-template.sh` either downloads a published build or compiles one (~50–70 min, once). It is worth 3.2 MB off what a player downloads; there is no fallback to the stock template, by design.
+
 **Never modify `src-models/`** — its `AGENTS.md` forbids agents from touching that folder (Blender source assets).
 
 ## Working agreements
@@ -25,6 +27,7 @@ make lint      # gdformat --check + gdlint (separate CI gate; run `make test lin
 make format    # gdformat, rewrites in place
 make build     # Linux binary  -> build/linux/
 make build-web # web bundle    -> build/web/
+make web-template # the custom web export template the bundle needs
 make run       # run the game
 make editor    # open the Godot editor
 ```
@@ -80,6 +83,7 @@ tests/integration/  anything needing a scene tree
 - Desktop renders Forward+, web renders Compatibility (engine-owned split, no config). **Anything visual must be checked in the web build, on a phone-shaped screen, before it's called done** — CI can't see pixels.
 - `web/shell.html` is the one vendored upstream file (Godot's HTML shell, branded). Bumping Godot means re-diffing it against upstream; `tests/unit/test_web_shell.gd` gates its placeholders.
 - Saves on web go through IndexedDB — writes to `user://` need an `FS.syncfs` flush or they vanish on reload (see `HighScores` / the sound toggle).
+- The web engine is **not the stock one**. `web/build_profile.json` compiles out ~40 modules; `tests/unit/test_web_build_profile.gd` scans `src/` for the classes they provide, so reaching for `RegEx`, a 2D physics body or anything glTF at runtime fails `make gut` rather than the published page. Adding an engine feature to `src/` may mean turning a line in that profile back on — and a module that is off shows up as a feature that silently does nothing, never as a compile or export error.
 
 ## Testing notes
 

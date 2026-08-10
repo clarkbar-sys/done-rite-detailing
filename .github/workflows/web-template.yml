@@ -1,0 +1,92 @@
+name: Publish the web export template
+
+# Compile the project's own web export template and publish it as a release
+# asset, so that every later build downloads it instead of compiling it.
+#
+# WHAT THIS IS FOR. `ci-godot.yml`'s `web-template` job already builds the
+# template and caches it, so CI does not need this workflow to stay green. A
+# person does. Without a published template, the first `make build-web` on any
+# machine compiles Godot — ~50-70 minutes on four cores — because
+# `scripts/fetch-web-template.sh` will not fall back to the stock engine, and
+# the reason it will not is that a stock bundle is 3 MB heavier than the budget
+# in `ci-godot.yml` expects. Running this once per profile change turns that
+# hour into a 7 MB download for everyone.
+#
+# MANUAL ONLY, and that is the whole design. It writes a release, which is the
+# one thing in this repository that is visible from outside it; `release.yml`
+# is otherwise the only workflow that does. Publishing on every push to
+# `web/build_profile.json` would mint a release for a profile edit that turned
+# out to be wrong — and the way you learn a profile edit was wrong is by
+# looking at the bundle it produces, which happens after the build, not before
+# the publish.
+#
+# AFTER IT RUNS: it prints two lines into the job summary. Paste them into
+# `scripts/fetch-web-template.sh`'s WEB_TEMPLATE_RELEASE / WEB_TEMPLATE_SHA256
+# and commit that. Until they are set, every machine takes the compile route —
+# which works, and is what makes the pins an optimisation rather than a
+# dependency.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    # The workflow-wide grant is `contents: read`; a job-level block REPLACES
+    # it. `contents: write` is `gh release create` below, and it is the only
+    # reason this job differs from `ci-godot.yml`'s `web-template`.
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install SCons
+        run: pip install scons
+
+      # No cache. A publish is rare and a stale byte in a published artifact is
+      # worse than fifty minutes: this compiles from the pinned Godot commit
+      # and the pinned emsdk every time, so what gets uploaded is what those
+      # inputs produce today.
+      - name: Build the template
+        run: scripts/build-web-template.sh web_nothreads_release.zip
+
+      # The tag names both halves of what the file is: which engine, and which
+      # profile. Two publishes of the same profile against the same Godot would
+      # collide, which is correct — that is the same template, and it is
+      # already published.
+      - name: Publish it
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          godot="$(sed -n 's/^GODOT_VERSION="\(.*\)"$/\1/p' scripts/fetch-godot.sh)"
+          id="$(scripts/fetch-web-template.sh --print-id)"
+          tag="web-template-${godot}-${id:0:12}"
+          sha="$(sha256sum web_nothreads_release.zip | cut -d' ' -f1)"
+
+          gh release create "$tag" web_nothreads_release.zip \
+            --title "Web export template — Godot $godot" \
+            --notes "Built by \`.github/workflows/web-template.yml\` from \`web/build_profile.json\` (build id \`$id\`). Pin it in \`scripts/fetch-web-template.sh\`." \
+            --latest=false
+
+          {
+            echo "### Published \`$tag\`"
+            echo
+            echo "Paste into \`scripts/fetch-web-template.sh\`:"
+            echo
+            echo '```bash'
+            echo "WEB_TEMPLATE_RELEASE=\"$tag\""
+            echo "WEB_TEMPLATE_SHA256=\"$sha\""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
