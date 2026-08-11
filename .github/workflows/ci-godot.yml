@@ -65,6 +65,13 @@ env:
   ARTIFACT: build/linux/done-rite-detailing.x86_64
   WEB_DIR: build/web
 
+  # What actually gets published: `site/` at the root, the web bundle under
+  # `play/`. Assembled rather than deployed straight from $WEB_DIR because the
+  # front door is the detailing business now and the game is a page off it —
+  # see `Assemble the published site` below, and site/README.md for why the
+  # site lives in this repo at all.
+  PAGES_DIR: build/pages
+
   # THE ONE PLACE THE WEB BUNDLE'S SIZE BUDGET LIVES. #209: the 35 MB pck grew
   # in a handful of art PRs (#140, #152, #164, #168) with no CI signal at all —
   # 16 MB of it was one duplicated texture nobody saw land. `build-web`'s
@@ -540,17 +547,36 @@ jobs:
           path: ${{ env.WEB_DIR }}
           if-no-files-found: error
 
-      # Live preview for a PR: pushes $WEB_DIR to gh-pages under
+      # `site/` at the root, this bundle under `play/`. The same three lines run
+      # in `pages` below; they are duplicated rather than factored into a
+      # composite action because four lines behind a `uses:` is harder to read
+      # than four lines, and what they produce is asserted by
+      # tests/unit/test_site_page.gd rather than by eye.
+      - name: Assemble the published site
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p "$PAGES_DIR/play"
+          cp -R site/. "$PAGES_DIR/"
+          # site/'s own housekeeping is not part of the published page.
+          rm -f "$PAGES_DIR/.gdignore" "$PAGES_DIR/README.md"
+          cp -R "$WEB_DIR/." "$PAGES_DIR/play/"
+
+      # Live preview for a PR: pushes $PAGES_DIR to gh-pages under
       # pr-preview/pr-<number>/ and drops/updates a sticky comment with the
       # link (rossjrw/pr-preview-action posts it). `action: deploy` rather than
       # the default `auto` because this job never runs on a `closed` PR event
       # in the first place — cleanup on close is pages-preview-cleanup.yml,
       # which doesn't need a build at all.
+      #
+      # It is $PAGES_DIR rather than $WEB_DIR since #220: a preview that served
+      # the bare game would no longer be a preview of what `main` publishes,
+      # and the site-at-root/game-at-play arrangement is exactly the part worth
+      # eyeballing before it merges.
       - name: Deploy the PR preview
         if: github.event_name == 'pull_request'
         uses: rossjrw/pr-preview-action@v1
         with:
-          source-dir: ${{ env.WEB_DIR }}
+          source-dir: ${{ env.PAGES_DIR }}
           action: deploy
 
   pages:
@@ -580,19 +606,40 @@ jobs:
           name: done-rite-detailing-web
           path: ${{ env.WEB_DIR }}
 
-      # Pushes $WEB_DIR to the root of `gh-pages`. `keep_files: true` is
+      # Same four lines as the preview's in `build-web` — see the note there.
+      - name: Assemble the published site
+        run: |
+          mkdir -p "$PAGES_DIR/play"
+          cp -R site/. "$PAGES_DIR/"
+          # site/'s own housekeeping is not part of the published page.
+          rm -f "$PAGES_DIR/.gdignore" "$PAGES_DIR/README.md"
+          cp -R "$WEB_DIR/." "$PAGES_DIR/play/"
+
+      # Pushes $PAGES_DIR to the root of `gh-pages`. `keep_files: true` is
       # load-bearing: without it this deploy wipes the whole branch first,
       # taking every PR's live pr-preview/pr-<number>/ subfolder with it. No
       # Jekyll (the action writes .nojekyll itself) — the bundle is served
       # exactly as built, which is what a .wasm/.pck needs.
+      #
+      # `keep_files: true` has one consequence worth knowing at the switchover
+      # in #220: the game used to be published at the root, so the root's old
+      # index.wasm/index.pck/index.js are NOT deleted by this deploy — the new
+      # site/index.html overwrites the game's index.html, so the front door is
+      # right, but the old bundle sits there unreferenced until somebody prunes
+      # the branch by hand. Dead weight on gh-pages, not a broken page.
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ${{ env.WEB_DIR }}
+          publish_dir: ${{ env.PAGES_DIR }}
           publish_branch: gh-pages
           keep_files: true
 
       - name: Summarise
         run: |
-          echo "### Playable at https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/" >> "$GITHUB_STEP_SUMMARY"
+          base="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
+          {
+            echo "### Done Rite is at ${base}/"
+            echo ""
+            echo "Playable at ${base}/play/"
+          } >> "$GITHUB_STEP_SUMMARY"
