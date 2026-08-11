@@ -125,17 +125,35 @@ func stage() -> GrimeMap.Stage:
 ## Surface.cleaner_for] gives this surface for the middle pass, and the rag for
 ## the shine.
 ##
+## An empty running order has no surface to ask about, and the class docs above
+## already allow one. [constant Surface.Kind.BODY] is what [method
+## Surface.cleaner_for] answers for anything it does not recognise anyway, so the
+## room with no car in it holds the sponge rather than reading past the end of a
+## list nobody filled in.
+func tool() -> DetailingTool.Id:
+	var kind: Surface.Kind = Surface.Kind.BODY if _kinds.is_empty() else _kinds[_stop]
+	return tool_for(stage(), kind)
+
+
+## The tool [param stage] is done with on a [param kind] of surface.
+##
 ## The middle one is asked of [Surface] rather than tabled here for that class's
 ## own reason — one direction, no second table — and it is the whole of why the
 ## demo swaps tools at all. A run down a car goes wash, sponge, rag, wash, window
 ## cleaner, rag, wash, tyre cleaner, rag, which is four of the five tools inside
 ## the first three panels without anybody scripting a tour of the belt.
-func tool() -> DetailingTool.Id:
-	match stage():
+##
+## [b]Static, because the demo is no longer the only thing that stands in for a
+## player.[/b] [TutorialTake] films one pass of one panel and needs exactly this
+## answer for it; a second copy of the three-way match would be a second place for
+## "which tool does this step of the job" to be written down, and the two would
+## agree until somebody added a bottle.
+static func tool_for(stage_wanted: GrimeMap.Stage, kind: Surface.Kind) -> DetailingTool.Id:
+	match stage_wanted:
 		GrimeMap.Stage.WASHED:
 			return DetailingTool.Id.POWER_WASH
 		GrimeMap.Stage.FOAMED:
-			return Surface.cleaner_for(_kinds[_stop])
+			return Surface.cleaner_for(kind)
 	return DetailingTool.Id.DRYING_RAG
 
 
@@ -161,9 +179,22 @@ func progress() -> float:
 ## stripe for the whole pass. Height is always [code]y[/code], because a car is
 ## never parked on its roof.
 func aim_over(box: AABB) -> Vector3:
+	return sweep_over(box, progress())
+
+
+## The same sweep, [param along] a pass rather than along this one's — the whole
+## of [method aim_over] with the clock taken out of it.
+##
+## [b]Static for [method tool_for]'s reason[/b], and it is the more valuable of
+## the two: the hand's motion is the part of this class a viewer actually watches,
+## and [TutorialTake] wants it over one panel for six seconds rather than over a
+## whole car for two minutes. Reimplemented there it would be a second sweep to
+## keep in step with this one, and the day they drifted the tutorial footage would
+## stop being of the demo everybody has already seen.
+static func sweep_over(box: AABB, along: float) -> Vector3:
 	var reach: Vector3 = box.size * 0.5 * REACH
-	var across: float = sin(TAU * CROSSINGS * progress())
-	var down: float = 1.0 - 2.0 * progress()
+	var across: float = sin(TAU * CROSSINGS * along)
+	var down: float = 1.0 - 2.0 * along
 	if box.size.x >= box.size.z:
 		return box.get_center() + Vector3(across * reach.x, down * reach.y, 0.0)
 	return box.get_center() + Vector3(0.0, down * reach.y, across * reach.z)

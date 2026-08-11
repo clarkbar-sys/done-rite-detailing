@@ -1,0 +1,43 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/screens/tutorial_take_screen.gd" id="1_take"]
+[ext_resource type="PackedScene" path="res://src/world/garage.tscn" id="2_garage"]
+
+[node name="TutorialTakeScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_take")
+
+; The same room the other three screens instance, on the switches that mean
+; "somebody is standing in the bay holding a tool":
+;
+;   first_person   there is a person, so there are hands and there is an aim
+;   walkaround     OFF, which is the difference between this and every other
+;                  screen: a take is filmed from one fixed spot, and a room with
+;                  a walk in it owns its own camera — see Garage.stand_at
+;   attracting     OFF, because the take is the stand-in here and two of them
+;                  would fight over the belt
+;   noisy          OFF, and this one is a measurement rather than a taste.
+;                  A take is a film of a tool working, so the ToolRacket
+;                  belongs in it on the face of it — and switching it on makes
+;                  every run of a take end with "2 ObjectDB instances were
+;                  leaked at exit", an AudioStreamWAV and its playback, on a
+;                  room that stopped its players a second and a half earlier
+;                  (TutorialTake.HOLD_SECONDS is longer than
+;                  ToolRacket.FADE_SECONDS by thirty times, so nothing was
+;                  still sounding). That is the engine tearing down an audio
+;                  server under a process that quit itself, and it is a warning
+;                  in the log of every clip the harness ever records. The
+;                  footage is silent instead, which is what the title screen's
+;                  identical room already is; sound over the tutorial is a
+;                  thing the capture step can lay on if it ever wants it.
+[node name="Garage" parent="." instance=ExtResource("2_garage")]
+orbiting = false
+first_person = true
+walkaround = false
+attracting = false
+noisy = false
