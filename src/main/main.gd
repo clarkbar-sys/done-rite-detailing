@@ -39,7 +39,43 @@ func _ready() -> void:
 	# from the very first frame, not just the flag.
 	Sound.set_muted(Settings.read_settings(Settings.SETTINGS_PATH)[Settings.KEY_MUTED])
 	_states.changed.connect(_on_state_changed)
-	_states.enter(TitleScreenGameState.new())
+	_states.enter(_boot_state())
+
+
+## Which state the game opens in: the title card, or — when the command line asked
+## for one — a tutorial take.
+##
+## [b]The one branch in the boot sequence, and it is on an argument nobody who is
+## playing the game will ever pass.[/b] [constant TutorialTake.ARG] after the
+## [code]--[/code] names a take ([code]--take=sponge[/code]), which is how the
+## capture harness behind [code]#175[/code] says "film the sponge clip and quit".
+## Reading it here rather than inside the screen is the same split every other
+## screen already lives under: this file is the only thing that decides what is on
+## screen, and a screen that chose whether to exist would be the first exception.
+##
+## [b]A name no take has is a mistake worth failing on.[/b] The alternative — fall
+## through to the title screen — would hand the harness a video of a title card and
+## a zero exit code, which is the one outcome nobody could debug from the artifact.
+## So it is printed, with the catalogue, and the process ends non-zero.
+##
+## The car is pinned on the way past for [constant TutorialTake.CAR_STYLE]'s reason,
+## and through [method CarChoice.choose] because that is the door the menu already
+## uses: the bay reads the choice when it parks a car, which is a frame from now.
+func _boot_state() -> GameState:
+	var asked: String = TutorialTake.asked_for(OS.get_cmdline_user_args())
+	if asked.is_empty():
+		return TitleScreenGameState.new()
+	if TutorialTake.named(asked) == null:
+		printerr(
+			(
+				"no tutorial take called '%s' — try one of: %s"
+				% [asked, ", ".join(TutorialTake.catalogue())]
+			)
+		)
+		get_tree().quit(1)
+		return TitleScreenGameState.new()
+	CarChoice.choose(TutorialTake.CAR_STYLE)
+	return TutorialTakeGameState.new()
 
 
 ## Replaces whatever is on screen with the scene [param state] names.

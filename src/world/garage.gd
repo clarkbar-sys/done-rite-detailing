@@ -829,6 +829,41 @@ func release_aim() -> void:
 		_probe.release()
 
 
+## Stands the player's eye at [param where], in world metres, on a room that has
+## one and is not walking it.
+##
+## [b]Who this is for.[/b] A tutorial take ([TutorialTake]) is one panel filmed from
+## one fixed spot for a few seconds, and the spot is worked out from the panel's own
+## box — which does not exist until the car has been parked, a frame after
+## [member eye_position] was read. So the shot cannot be an export on the scene
+## file; it has to be a place to put the eye once there is something to measure. It
+## is [method _stand] with the position handed in, and it goes through the same two
+## lines the standing shot always has.
+##
+## [b]Refused on a room that can be walked around[/b], and that is not politeness
+## either: the walk's circle, its radius and its height fences are all derived from
+## [member eye_position] once, in [method _take_up_the_walk], so an eye moved out
+## from under them would be walked straight back by the next push of the stick. A
+## room with a player in it steers; a room being filmed stands.
+func stand_at(where: Vector3) -> void:
+	if not first_person or _drive != null:
+		return
+	eye_position = where
+	_stand()
+
+
+## How wide the lens this room is looking through actually is, in degrees across the
+## frame — [Lens] has already narrowed the scene file's 75° to whatever the shape of
+## the glass allows.
+##
+## A number rather than the camera, for [method steer]'s reason: what is on the
+## other end of this is arithmetic about where to stand ([TutorialFraming]), and
+## handing out the [Camera3D] would let a caller move the shot instead of asking
+## about it.
+func eye_fov() -> float:
+	return _camera.fov
+
+
 ## What the aim is drawn with, or [code]null[/code] on a screen that never took up
 ## aiming — the title screen's showcase circuit has nobody pointing anything.
 ##
@@ -1459,7 +1494,7 @@ func _run_the_demo(delta: float) -> void:
 	# second copy of "which tool should the demo be holding" to fall out of step.
 	_view_model.belt().equip(_routine.tool())
 	_lead_the_eye(box.get_center())
-	_press_the_glass(_routine.aim_over(box))
+	press_the_glass(_routine.aim_over(box))
 
 
 ## Pushes the walk toward the panel at [param panel], in the two numbers a thumb
@@ -1494,8 +1529,15 @@ func _lead_the_eye(panel: Vector3) -> void:
 	)
 
 
-## Puts the demo's finger on the picture of [param work], or takes it off when
+## Puts a stand-in's finger on the picture of [param work], or takes it off when
 ## there is no picture of it to put a finger on.
+##
+## [b]Public, and it is not a second door.[/b] The demo below is no longer the only
+## thing that decides what a person would do next — [TutorialTake] films one pass of
+## one panel through the same three controls — and both need a point in the room
+## turned into a press on the glass. What is shared is the projection; what happens
+## after it is [method aim_at] either way, which is the paragraph below and the
+## reason there is no shortcut past it.
 ##
 ## [b]It really does press the glass.[/b] The obvious shortcut is a second
 ## entry point that takes a point in the world and skips the projection, and it is
@@ -1516,7 +1558,7 @@ func _lead_the_eye(panel: Vector3) -> void:
 ## In this container's own coordinates, which is what [method aim_at] takes:
 ## [method Camera3D.unproject_position] answers in the sub-viewport's pixels, and
 ## [method _picture_scale] is the ratio between the two.
-func _press_the_glass(work: Vector3) -> void:
+func press_the_glass(work: Vector3) -> void:
 	if _camera.is_position_behind(work):
 		release_aim()
 		return
