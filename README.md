@@ -232,7 +232,11 @@ installed system-wide — it all lands in `.godot-sdk/`. The
 
 ## Play it
 
-### 👉 [clarkbar-sys.github.io/done-rite-detailing](https://clarkbar-sys.github.io/done-rite-detailing/)
+### 👉 [clarkbar-sys.github.io/done-rite-detailing/play/](https://clarkbar-sys.github.io/done-rite-detailing/play/)
+
+The root of that address is [the detailing business](./site/) — the real one the
+game is named after, phone number and all — and the game is the page under it,
+reached by the badge in the site's corner. Business first, game one press away.
 
 That's the current `main`, in your browser, republished by CI on every push. No
 download, no `chmod`, nothing to install. It needs WebGL 2 and about 12 MB on
