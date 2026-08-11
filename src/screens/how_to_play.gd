@@ -1,23 +1,26 @@
-## The rules: one screen, no scrolling, no pages, and a way out at either end of
-## the bottom row.
+## The rules: one screen, no scrolling, three passes across the middle of it,
+## and a way out at either end of the bottom row.
 ##
-## [b]The brief is the shape.[/b] Four things the player can do, then the three
-## passes a panel goes through, then out — and all of it visible at once, because
-## a rules screen that scrolls is a rules screen the second half of which nobody
-## reads. "One screen" is therefore a constraint the layout is built against
-## rather than a description of it, and
-## [code]tests/integration/test_how_to_play.gd[/code] holds it to that by asking
-## every label whether it is showing all of its own lines.
+## [b]It used to be seven hundred characters and it is now about a hundred.[/b]
+## The first version of this screen was four rules and three passes in two
+## columns of body copy, and the two-column layout existed only because that was
+## the one way the sentences and the tap targets both fitted. #175 called that
+## what it was: a wall of text on the screen a player opens when they have
+## already decided to play. What replaces it is the thing the words were
+## describing — three numbered passes, three words each, in the order a panel
+## goes through them — and a button that opens a film of somebody doing it.
+## [WatchVideo] carries why the film is a link rather than something the game
+## plays, and owns the address; nothing on this side knows it.
 ##
-## [b]Which is what put the four rules in two columns.[/b] The drafted copy is
-## about seven hundred characters, the design is 1280x720, and the two buttons at
-## the bottom are held at [method TouchTarget.min_design_size] because a control
-## below it is one a thumb misses — that is not a guess, it is the bug the title
-## screen's Start button shipped with. Stacked in one column the paragraphs wrap
-## to roughly forty lines and either the type or the buttons has to give; in two
-## they wrap to fourteen, and the type gets bigger instead of smaller. The
-## trade is stated here because the mockup this screen is drawn from is a single
-## column, and this is the one place it does not follow it.
+## [b]The wall is gone and what it taught is not[/b], because everything below
+## was learned paying for it and every line of it is still load-bearing:
+##
+## [b]One screen, no scrolling, no pages.[/b] A rules screen that scrolls is a
+## rules screen the second half of which nobody reads — so "one screen" is a
+## constraint the layout is built against rather than a description of it, and
+## [code]tests/integration/test_how_to_play.gd[/code] still holds every label to
+## drawing all of its own lines. With three captions instead of four paragraphs
+## that gate is cheap to pass, which is the point of having cleared the room.
 ##
 ## [b]The bay is behind it, as it is behind every other screen.[/b] A still
 ## picture would be cheaper and would be the only place in the project where a
@@ -30,46 +33,52 @@
 ## to start should not have to go back to the menu to do it, so this screen has
 ## its own way into the game; and since it has two exits, the same rule the menu
 ## follows decides which is which. Main Menu is the quiet pill on the left, Play
-## is the accent on the right, and focus opens on Play.
+## is the accent on the right, and focus opens on Play. The watch button is a
+## third pill and it is [i]not[/i] on that row: it is not a way out, it is the
+## other half of what this screen is for, so it sits under the passes it
+## illustrates and leaves the bottom row saying exactly what it said before.
 ##
 ## [b]The type is not a fixed size, and this is the one screen in the game where
 ## that is true.[/b] The design is 1280x720 and project.godot stretches it
-## "expand", so a phone held upright is handed the design width and as much extra
-## design [i]height[/i] as its aspect asks for — 1280x2773 on a 1080x2340
+## "expand", so a phone held upright is handed the design width and as much
+## extra design [i]height[/i] as its aspect asks for — 1280x2773 on a 1080x2340
 ## handset. Laid out at the sizes the mockup uses, that is a readable sheet
 ## floating in two thousand pixels of nothing, and the copy on it is about six
 ## CSS pixels tall on the glass. The room is there; the words were not using it.
 ## [method _lay_out] is what spends it. See that method for how big, and
 ## [method _fits] for why the arithmetic is a square root.
 ##
+## [b]And gutting the copy is what made width the binding constraint.[/b] The
+## type grows until the sheet fills the screen it was given, so a screen with
+## less printed on it grows the type further — the wall of text ran out of
+## height at about 2.4x and three captions do not run out at all, they reach
+## [constant MAX_TYPE_SCALE]. What stops them first is the bottom row: the pills
+## say twelve and seven characters in a face that advances a whole em per
+## character, so past a certain size that row is wider than the sheet it is
+## printed on and the card grows sideways off both edges of the phone.
+## [method _fits_across] measures that and caps the factor at it — the type is
+## as big as the [i]shorter[/i] of the two rooms allows, which is the only
+## reading of "as big as it fits" that stays true on a screen of any shape.
+##
 ## Same split as every screen: the [code].tscn[/code] owns layout and the copy —
 ## what is on screen, how big, in what order — and this owns brand, sourced from
 ## [Brand]. The type scale sits on this side of that line for the reason the
-## colours do: it is one rule applied to sixteen controls, and sixteen numbers in
-## a scene file is not a rule, it is sixteen numbers.
+## colours do: it is one rule applied to every control on the screen, and a
+## scale factor written into a scene file per label is not a rule, it is a
+## column of numbers.
 extends GameScreen
 
-## The scene names its headings and its body text with these two node names, at
-## every depth, and [method _paint] colours them by looking for exactly that. See
-## that method for why sixteen labels are found rather than listed.
+## The scene names the passes' headings and their captions with these two node
+## names, at every depth, and [method _paint] colours them by looking for
+## exactly that. See that method for why they are found rather than listed.
 const HEADING: String = "Heading"
 const BODY: String = "Body"
 
-## How wide a screen has to be, against its own height, to keep the four rules in
-## two columns.
-##
-## Below this the sheet goes to one column, and it is a reflow rather than a
-## rescale because those are the only two ways to spend height and only one of
-## them helps: a column half as wide wraps the same sentence to twice as many
-## lines, so two columns on a tall screen would grow [i]downwards[/i] as the type
-## grew and reach a readable size no sooner. One column at the full width of the
-## sheet is also the layout the mockup draws — it did not fit at 720, and this is
-## the shape of screen where it does.
-const TWO_COLUMN_ASPECT: float = 1.2
-
 ## The most the type is allowed to grow, whatever the screen. A ceiling rather
 ## than a number anybody arrived at: nothing in the wild should reach it, and a
-## screen tall enough to ask for more than this is asking for a poster.
+## screen tall enough to ask for more than this is asking for a poster. Since
+## the copy went, the height on a tall phone reaches it — see
+## [method _fits_across] for what actually binds there.
 const MAX_TYPE_SCALE: float = 3.0
 
 ## How much of the room the sheet is allowed to fill once it has settled. The
@@ -81,9 +90,10 @@ const FILL: float = 0.92
 ## stops looking. See [method _process].
 const SETTLE_PASSES: int = 2
 
-## The least room left between the two pills at the bottom, in design pixels. It
-## is what stops [method _widest_button] handing each of them exactly half the
-## row and leaving them touching.
+## The least room left between two pills sharing a row, in design pixels. It is
+## what stops [method _widest_button] handing each of them exactly half the row
+## and leaving them touching, and it is the gap [method _fits_across] budgets
+## for when it asks whether that row still fits.
 const BUTTON_GAP: int = 48
 
 ## What every piece of type on this screen was authored at, by control, and what
@@ -98,11 +108,12 @@ var _settling: int = 0
 
 @onready var _card: PanelContainer = %Card
 @onready var _column: VBoxContainer = %Card/Column
-@onready var _rules: GridContainer = %Rules
+@onready var _strip: HBoxContainer = %Strip
 @onready var _rule: ColorRect = %Rule
 @onready var _title: Label = %Title
 @onready var _title_accent: Label = %TitleAccent
 @onready var _subtitle: Label = %Subtitle
+@onready var _watch: Button = %Watch
 @onready var _main_menu: Button = %MainMenu
 @onready var _play: Button = %Play
 
@@ -113,6 +124,7 @@ func _ready() -> void:
 	set_process(false)
 	_remember()
 	_dress()
+	_watch.pressed.connect(_on_watch_pressed)
 	_main_menu.pressed.connect(_on_main_menu_pressed)
 	_play.pressed.connect(_on_play_pressed)
 	# Every screen shape this can be opened at, and every one it can be turned
@@ -133,11 +145,11 @@ func _ready() -> void:
 func _remember() -> void:
 	for control: Control in _typeset(self):
 		_base_type[control] = control.get_theme_font_size("font_size")
-	for button: Button in [_main_menu, _play]:
+	for button: Button in _buttons():
 		_base_button[button] = button.custom_minimum_size
 
 
-## Everything on this screen that draws words: the labels and the two buttons.
+## Everything on this screen that draws words: the labels and the three buttons.
 ##
 ## A [Button] is not a [Label] and this is the second time that has mattered —
 ## the two glyphs Open Sans could not draw were both on a button, back when Open
@@ -152,8 +164,23 @@ static func _typeset(root: Node) -> Array[Control]:
 	return found
 
 
-## Chooses the shape of the sheet and the size of its type for the screen it has
-## actually been given, then arms the passes that correct the guess.
+## Every pill on the screen, in no particular order — the two exits and the one
+## that opens the film.
+func _buttons() -> Array[Button]:
+	var found: Array[Button] = [_watch, _main_menu, _play]
+	return found
+
+
+## The two exits, as the row they share. [method _fits_across] and
+## [method _widest_button] both need to know that they are two things dividing
+## one row rather than three things dividing the sheet.
+func _exits() -> Array[Button]:
+	var found: Array[Button] = [_main_menu, _play]
+	return found
+
+
+## Chooses the size of the type for the screen it has actually been given, then
+## arms the passes that correct the guess.
 ##
 ## [b]The correction has to happen on a later frame, not a later call.[/b] A
 ## container has not resized its children until it has been notified to sort
@@ -163,7 +190,6 @@ static func _typeset(root: Node) -> Array[Control]:
 ## version shipped nothing but looked right: it computed a correction off stale
 ## numbers, applied it, and left the type at the first estimate.
 func _lay_out() -> void:
-	_rules.columns = 2 if size.x >= size.y * TWO_COLUMN_ASPECT else 1
 	_scale_type(_fits(1.0, _design_height(), size.y))
 	_settling = SETTLE_PASSES
 	set_process(true)
@@ -214,26 +240,131 @@ func _correct() -> void:
 ## It is an under-estimate on purpose, and that is the direction to be wrong in:
 ## headings, buttons and separations grow linearly rather than quadratically, so
 ## the real sheet comes out a little shorter than this predicts and the error
-## lands in the margin instead of off the bottom of the screen.
+## lands in the margin instead of off the bottom of the screen. Since the
+## paragraphs went there is almost nothing left that wraps, so the estimate is
+## conservative nearly everywhere and the settle passes in [method _process] are
+## what actually land it — which is the same behaviour it always had, arriving
+## from underneath rather than from above.
 static func _fits(factor: float, written: float, room: float) -> float:
 	return clampf(factor * sqrt(room / written), 1.0, MAX_TYPE_SCALE)
 
 
-## Draws every word at [param factor] times the size the scene asked for.
+## The largest factor the rows that cannot wrap can be drawn at and still fit
+## [i]across[/i] the sheet: the two exits, the film button, and the three passes
+## side by side.
+##
+## The screen is only ever given extra height — "expand" hands a portrait phone
+## the design width and nothing more — so height is what [method _fits] spends
+## and width is a fixed budget the type is spending too. A pill is as wide as
+## the word on it, the display face advances a whole em per character, and the
+## two exits together are nineteen characters plus the gap between them: at 3x
+## that row is half again as wide as the sheet, and a row wider than the sheet
+## does not clip, it pushes the card out past both edges of the phone.
+##
+## Measured from the type rather than assumed, because the thing that decides it
+## is the [i]wording[/i] of two buttons, which is in the scene file and will
+## change without anybody thinking of this. The floor is 1.0 for
+## [method _fits]'s reason: a sheet whose own authored layout does not fit
+## across is a bug in the scene, and shrinking the type below what was drawn
+## would hide it.
+func _fits_across() -> float:
+	var alone: Array[Button] = [_watch]
+	var widest: float = maxf(_row_width(_exits()), _row_width(alone))
+	widest = maxf(widest, _strip_width())
+	if widest <= 0.0:
+		return MAX_TYPE_SCALE
+	return maxf(_row_room() / widest, 1.0)
+
+
+## How wide the row [param buttons] share has to be at the sizes the scene
+## authored, gaps included.
+func _row_width(buttons: Array[Button]) -> float:
+	var total: float = float(BUTTON_GAP) * float(buttons.size() - 1)
+	for button: Button in buttons:
+		total += _base_width(button)
+	return total
+
+
+## How wide one pill is at the size the scene authored it: the wider of the
+## minimum it was given and the room its own word needs.
+##
+## Both, because either can be the larger and the one that is larger is the one
+## that sets the width. Main Menu is 340 design pixels of minimum carrying 288
+## pixels of word; Play is 300 carrying 224. Grow the type and the words
+## overtake the minimums, which is exactly the case this arithmetic exists for.
+func _base_width(button: Button) -> float:
+	return maxf(_words_width(button), _base_button[button].x)
+
+
+## How wide the passes need their row to be at the sizes the scene authored.
+##
+## [b]The pills are not the only row on this sheet that cannot get narrower.[/b]
+## The three passes divide the row equally and each one carries a heading in the
+## display face, which does not wrap — so the row needs three of the widest of
+## them, plus the gaps, and a factor that ignored it would grow "2. SPONGE" out
+## of the third of the sheet it has been given. The captions underneath are left
+## out on purpose: they wrap, and a thing that wraps is not a thing that sets a
+## minimum width.
+##
+## The gap is read off the container rather than written down here, for
+## [method _design_height]'s reason: the scene owns the layout, and a copy of
+## its separation in this file is a copy that stops being true silently.
+func _strip_width() -> float:
+	var cells: int = _strip.get_child_count()
+	if cells < 1:
+		return 0.0
+	var widest: float = 0.0
+	for cell: Node in _strip.get_children():
+		for control: Control in _typeset(cell):
+			if control.name == HEADING:
+				widest = maxf(widest, _words_width(control))
+	var gaps: float = float(_strip.get_theme_constant("separation")) * float(cells - 1)
+	return float(cells) * widest + gaps
+
+
+## The room [param control]'s own words need at the size the scene authored it.
+##
+## Zero for anything this screen never wrote down a size for, which is nothing
+## it draws — [method _remember] walks the same set — and zero is the harmless
+## answer for whatever is not in it.
+func _words_width(control: Control) -> float:
+	var font: Font = control.get_theme_font("font")
+	if font == null or not _base_type.has(control):
+		return 0.0
+	return (
+		font
+		. get_string_size(_words_of(control), HORIZONTAL_ALIGNMENT_LEFT, -1.0, _base_type[control])
+		. x
+	)
+
+
+## What [param control] has written on it, whichever kind of control it is. A
+## [Button] is not a [Label] and both of them draw words — see
+## [method _typeset], which is where that distinction keeps mattering.
+static func _words_of(control: Control) -> String:
+	var label: Label = control as Label
+	if label != null:
+		return label.text
+	var button: Button = control as Button
+	return "" if button == null else button.text
+
+
+## Draws every word at [param factor] times the size the scene asked for, or at
+## what fits across the sheet if that is less.
 ##
 ## The buttons' minimum sizes go with it. A pill is a box around a word, and type
 ## grown to twice the size inside a box that stayed still is type that overflows
 ## its own button — which would also quietly walk the tap target back down
 ## towards the floor it is held above.
 ##
-## [b]Height by [param factor], width only as far as the sheet allows.[/b] The
-## two are not symmetrical: this screen is given extra [i]height[/i] and never
-## extra width, so a row of two pills whose widths both grew by two and a half is
-## a row half again as wide as the sheet it is printed on. That does not clip —
-## a minimum size propagates — it pushes the card out past both edges of the
-## phone, which is what the first version of this did. Half the row each is the
-## ceiling, and it is a ceiling rather than a share: below it the scene's own
-## widths are what they always were.
+## [b]Height by the factor, width only as far as the sheet allows.[/b] The two
+## are not symmetrical: this screen is given extra [i]height[/i] and never extra
+## width, so a row of two pills whose widths both grew by two and a half is a row
+## half again as wide as the sheet it is printed on. That does not clip — a
+## minimum size propagates — it pushes the card out past both edges of the
+## phone, which is what the first version of this did. A share of the row each
+## is the ceiling, and it is a ceiling rather than a share: below it the scene's
+## own widths are what they always were.
 ##
 ## The pills are re-cut afterwards because [method GameScreen.dress_loud] takes
 ## its corner radius from the height it is handed, and the height has just
@@ -257,31 +388,44 @@ static func _fits(factor: float, written: float, room: float) -> float:
 ## all on the grid, so a 16:9 screen — where the factor is small and the type is
 ## nearest its authored size — is nearly right; and the further from it a screen
 ## gets, the more the type is being grown for a reader holding a phone at arm's
-## length rather than examined at 1:1. Uneven pixels on a paragraph lose to a
-## paragraph nobody can read.
+## length rather than examined at 1:1. Uneven pixels on a caption lose to a
+## caption nobody can read.
 func _scale_type(factor: float) -> void:
+	var drawn: float = minf(factor, _fits_across())
 	for control: Control in _base_type:
 		control.add_theme_font_size_override(
-			"font_size", maxi(1, roundi(float(_base_type[control]) * factor))
+			"font_size", maxi(1, roundi(float(_base_type[control]) * drawn))
 		)
-	var ceiling: float = _widest_button()
 	for button: Button in _base_button:
 		var base: Vector2 = _base_button[button]
-		button.custom_minimum_size = Vector2(minf(base.x * factor, ceiling), base.y * factor)
+		var ceiling: float = _widest_button(1 if button == _watch else _exits().size())
+		button.custom_minimum_size = Vector2(minf(base.x * drawn, ceiling), base.y * drawn)
+	dress_quiet(_watch)
 	dress_quiet(_main_menu)
 	dress_loud(_play)
 
 
-## How wide either pill is allowed to get: half the sheet, less the gap between
-## them.
+## How wide any one pill is allowed to get on a row [param share] of them are
+## dividing between the gaps.
+##
+## The watch button is alone on its row and gets the lot; the two exits get half
+## each, less the gap. Passed rather than counted from the scene, because what
+## the number means is "how many things are competing for this row" and the
+## scene expresses that as which container a button is in — a fact this side can
+## read out of [method _exits] without walking the tree for it.
+func _widest_button(share: int) -> float:
+	var shared: float = _row_room() - float(BUTTON_GAP) * float(share - 1)
+	return maxf(shared / float(share), 1.0)
+
+
+## How wide a row on the sheet is.
 ##
 ## Falls back to the whole screen before the first layout, when the column has no
 ## width yet. That first answer is too generous and it does not matter — the
 ## passes in [method _process] run once the containers have sorted, and the
 ## ceiling is right from then on.
-func _widest_button() -> float:
-	var row: float = _column.size.x if _column.size.x > 0.0 else size.x
-	return maxf((row - float(BUTTON_GAP)) / 2.0, 1.0)
+func _row_room() -> float:
+	return _column.size.x if _column.size.x > 0.0 else size.x
 
 
 ## What the type is currently drawn at, relative to the scene's own numbers.
@@ -299,8 +443,8 @@ static func _design_height() -> float:
 	return str(ProjectSettings.get_setting("display/window/size/viewport_height", 720)).to_float()
 
 
-## Puts the brand on: the sheet the rules are printed on, the two pills, and the
-## three colours the type comes in.
+## Puts the brand on: the sheet the passes are printed on, the three pills, and
+## the three colours the type comes in.
 func _dress() -> void:
 	_card.add_theme_stylebox_override("panel", Brand.card())
 	_rule.color = Brand.RED
@@ -312,6 +456,7 @@ func _dress() -> void:
 	_subtitle.add_theme_font_override("font", Brand.BODY_FACE)
 	_paint(_card, HEADING, Brand.RED, Brand.DISPLAY_FACE)
 	_paint(_card, BODY, Brand.WHITE, Brand.BODY_FACE)
+	dress_quiet(_watch)
 	dress_quiet(_main_menu)
 	dress_loud(_play)
 
@@ -319,18 +464,21 @@ func _dress() -> void:
 ## Sets every [Label] named [param label_name] anywhere under [param root] in
 ## [param colour] and [param face].
 ##
-## Found rather than listed because there are fourteen of them. A screen of rules
-## is almost entirely labels, and a [code]@onready[/code] line per label would be
-## a second copy of the scene tree living in this file, out of date the first
-## time a row is added or reordered. What this walks instead is a convention the
-## scene states out loud in its own node names — [constant HEADING] and
-## [constant BODY] — which is one thing to keep true rather than fourteen.
+## Found rather than listed. There were fourteen of these when the rules were
+## paragraphs and there are six now, and the walk is worth keeping at six for
+## the reason it was worth having at fourteen: an [code]@onready[/code] line per
+## label is a second copy of the scene tree living in this file, out of date the
+## first time a step is added or reordered. What this walks instead is a
+## convention the scene states out loud in its own node names —
+## [constant HEADING] and [constant BODY] — which is one thing to keep true
+## rather than six.
 ##
 ## [b]Colour and face together, because on this screen they are one decision.[/b]
-## A heading is red and chunky and a paragraph is white and readable; those are
+## A heading is red and chunky and a caption is white and readable; those are
 ## not two rules that happen to agree, they are the two halves of "this is a
-## label and that is a sentence". Splitting them into two walks would let a row
-## end up red and readable, which is a heading that has stopped looking like one.
+## step and that is what it does". Splitting them into two walks would let a
+## step end up red and readable, which is a heading that has stopped looking
+## like one.
 ##
 ## The body face is set here even though [code]project.godot[/code] already makes
 ## it the default. Redundant on paper and not in practice: this screen is the one
@@ -344,6 +492,21 @@ static func _paint(root: Node, label_name: String, colour: Color, face: FontFile
 			label.add_theme_color_override("font_color", colour)
 			label.add_theme_font_override("font", face)
 		_paint(child, label_name, colour, face)
+
+
+## Out to the film, in a tab of its own, leaving the game exactly where it is.
+##
+## [b]The opening happens on this line and not one frame later.[/b] A browser
+## credits a page with a gesture for a few seconds after the player makes one,
+## and the first thing to ask spends it — so this handler cannot ring a bell,
+## fade anything, await anything or defer the call, because every one of those
+## is a chance for the tab to be blocked instead of opened, silently, on the
+## web build only. [method WatchVideo.open] is one call for the same reason.
+##
+## No bell and no fade either way round: nothing has started, the player is
+## coming straight back, and the theme should still be playing when they do.
+func _on_watch_pressed() -> void:
+	WatchVideo.open()
 
 
 ## Back to the menu, with nothing started and nothing stopped.

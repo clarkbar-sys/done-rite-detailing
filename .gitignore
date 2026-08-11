@@ -48,3 +48,10 @@ build/
 build_stamp.json
 # Godot 3 leftovers.
 .import/
+
+# ── TTS ───────────────────────────────────────────────────────
+# The Piper engine binary + voice model, pinned by sha256 in
+# scripts/fetch-tts.sh and fetched by `make narration`. Same treatment as the
+# toolchains above: ~90 MB of binary + model has no business in this repo's
+# history, and the pin in the script is the reviewable artefact instead.
+.piper/

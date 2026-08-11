@@ -69,7 +69,7 @@ size_flags_vertical = 4
 
 [node name="Column" type="VBoxContainer" parent="Frame/Sheet/Card"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 12
 
 ; A flow row and not an HBoxContainer, because the type on this screen is not a
 ; fixed size — how_to_play.gd grows it to use the height a tall screen hands
@@ -101,90 +101,24 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 6
 theme_override_font_sizes/font_size = 16
-text = "one screen, no scrolling — read it, then press Play"
+text = "three passes, in this order"
 
 [node name="Rule" type="ColorRect" parent="Frame/Sheet/Card/Column"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 3)
 layout_mode = 2
 
-; Two columns rather than four stacked rows. how_to_play.gd has the arithmetic:
-; in one column this copy wraps to roughly forty lines and either the type or
-; the buttons has to give.
-[node name="Rules" type="GridContainer" parent="Frame/Sheet/Card/Column"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/h_separation = 24
-theme_override_constants/v_separation = 10
-columns = 2
-
-[node name="Walk" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 2
-
-[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Walk"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "WALK ROUND THE CAR"
-
-[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Walk"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "Push the stick, bottom right, and you move at the speed you push it — let go and you stop. It raises and lowers your eye too. W/A/S/D or the arrow keys at a desk."
-autowrap_mode = 3
-
-[node name="Press" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 2
-
-[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Press"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "PRESS THE PAINT"
-
-[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Press"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "Press anywhere on the car and the tool in your hand swings to point at it, red crosshair where it lands. Holding is working, letting go stops. On a phone the aim sits a thumb's width above your finger, so you can see it."
-autowrap_mode = 3
-
-[node name="Belt" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 2
-
-[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Belt"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "FIVE TOOLS ON THE BELT"
-
-[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Belt"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "Tap T, bottom left, to roll the belt out: power wash, sponge, window cleaner, tyre & engine cleaner, drying rag. The wrong bottle for a surface does nothing at all."
-autowrap_mode = 3
-
-[node name="Paid" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Rules"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 2
-
-[node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Rules/Paid"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "GET PAID FOR IT"
-
-[node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Rules/Paid"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "Every scrap of dirt pays the moment it comes off, and finishing a patch pays a bonus on top. Keep cleaning without a pause and the bonus multiplies — the ding climbs with it."
-autowrap_mode = 3
-
-; The three passes, in the order a panel goes through them, as a strip rather
-; than a fifth rule: this is one sentence about the whole job and the four above
-; are four separate things you can do.
+; The whole of the rules, and there used to be seven hundred characters of them.
+; #175 has the argument; what is left is the one thing a new player has to know
+; that the bay does not teach by itself — that a panel goes water, then bottle,
+; then rag, and that a step out of order does nothing. Three numbers and six
+; words, which is short enough to read by accident, and the button under it is
+; for anybody who wants the rest.
+;
+; Numbered rather than arrowed. The order is the entire content of this strip,
+; and a row that reflows onto two lines on a narrow phone — which this one is
+; free to do, the captions wrap — would have its arrows pointing at the wrong
+; neighbours the moment it did. A "1." reads the same wherever it lands.
 [node name="Strip" type="HBoxContainer" parent="Frame/Sheet/Card/Column"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -197,13 +131,13 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Water"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "1. WATER"
+theme_override_font_sizes/font_size = 24
+text = "1. SPRAY"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Water"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "takes the mud off — any panel, one patch at a time."
+text = "mud off"
 autowrap_mode = 3
 
 [node name="Bottle" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Strip"]
@@ -213,13 +147,13 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Bottle"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "2. BOTTLE"
+theme_override_font_sizes/font_size = 24
+text = "2. SPONGE"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Bottle"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "onto the bare paint: sponge on body, cleaner on glass, tyre cleaner on wheels."
+text = "product on"
 autowrap_mode = 3
 
 [node name="Rag" type="VBoxContainer" parent="Frame/Sheet/Card/Column/Strip"]
@@ -229,20 +163,48 @@ theme_override_constants/separation = 2
 
 [node name="Heading" type="Label" parent="Frame/Sheet/Card/Column/Strip/Rag"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "3. RAG"
+theme_override_font_sizes/font_size = 24
+text = "3. BUFF"
 
 [node name="Body" type="Label" parent="Frame/Sheet/Card/Column/Strip/Rag"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "buffs the product out, which is the only way a panel is finished."
+text = "shine up"
 autowrap_mode = 3
+
+; The film, on a row of its own between the passes and the way out.
+;
+; Not on the bottom row with the two exits, and that is the placement decision
+; worth writing down: the bottom row is "leave this screen", it has been two
+; buttons at opposite ends since this screen shipped, and a third pill in the
+; middle of it would make the accent one of three rather than one of two. This
+; is the other half of what the screen is *for*, so it sits with the passes it
+; illustrates.
+;
+; Alone on its row, which is also what lets it be wide: how_to_play.gd caps a
+; pill at its share of the row it is on (see _widest_button), and this one's
+; share is all of it. Centred rather than stretched — a pill the width of the
+; card reads as a banner rather than a button.
+;
+; 10 px of margin either side for the ButtonRow's reason: a pill carries a 30 px
+; glow and a button flush with the card's inner edge throws red past its border.
+[node name="WatchRow" type="MarginContainer" parent="Frame/Sheet/Card/Column"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_right = 10
+
+[node name="Watch" type="Button" parent="Frame/Sheet/Card/Column/WatchRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(480, 164)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "Watch how it's done"
 
 ; Left and right only, and deliberately not top or bottom: a pill carries a
 ; 30 px glow (Brand.PILL_SHADOW_SIZE), so a button flush with the card's inner
 ; edge throws red past the card's border. Ten pixels is enough to keep the glow
-; on the sheet, and taking it horizontally costs the column no height it needs
-; for the copy.
+; on the sheet, and taking it horizontally costs the column no height it needs.
 [node name="ButtonRow" type="MarginContainer" parent="Frame/Sheet/Card/Column"]
 layout_mode = 2
 theme_override_constants/margin_left = 10
@@ -264,17 +226,19 @@ theme_override_constants/margin_right = 10
 ; The guillemets are in both. src/ui/car_arrow.gd reaches the same conclusion
 ; about the same expired reason.
 ;
-; Both buttons are held at 164 design px in their short dimension —
-; TouchTarget.min_design_size() for this design on a 375 px screen — which is
-; what stops the layout borrowing height from them when the copy above wants
-; more.
+; All three buttons on this screen are held at 164 design px in their short
+; dimension — TouchTarget.min_design_size() for this design on a 375 px screen —
+; which is what stops the layout borrowing height from them when something above
+; wants more.
 ;
 ; The two type sizes are 24 and 32 where they were 36 and 44, and the drop is
 ; arithmetic rather than taste: the display face advances a whole em per
 ; character, so "«  Main Menu" is 12 x size wide and nothing else. 24 puts it at
 ; 288 px inside a 340 px pill; 32 would put it at 384 and grow the button past
 ; the width the row was laid out for. Play is the larger of the two for the same
-; reason it is the red one.
+; reason it is the red one. The watch button above takes the smaller of the two
+; sizes for the same arithmetic — it says nineteen characters, which is 456 px
+; at 24 and would be 608 at 32.
 [node name="Buttons" type="HBoxContainer" parent="Frame/Sheet/Card/Column/ButtonRow"]
 unique_name_in_owner = true
 layout_mode = 2

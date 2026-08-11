@@ -1,38 +1,53 @@
-## Integration test for the how-to-play screen: that both exits lead where they
-## claim to, and that the whole of the copy is actually on the screen.
+## Integration test for the how-to-play screen: that the three passes are on it
+## and in order, that the film is one press away, and that both exits lead where
+## they claim to.
 ##
-## [b]The assertion that earns its line count is
-## [method test_every_word_of_the_rules_is_visible].[/b] "One screen, no
-## scrolling" is the brief, and it is the one property of this screen that cannot
-## be established by reading the file: a [Label] with
-## [constant TextServer.AUTOWRAP_WORD_SMART] on it and less height than its text
-## needs does not overflow, complain or resize — it silently draws the lines that
-## fit and drops the rest. So the screen would look finished, pass every other
-## test here, and be missing the last sentence of a rule. Godot will tell us how
-## many lines each label has and how many of them it managed to draw; those two
-## numbers agreeing, for every label on the screen, is the brief.
+## [b]This suite used to be mostly about a wall of text, and the wall is
+## gone.[/b] The assertions that asked "is every line of every paragraph
+## actually drawn" were the load-bearing ones when the screen carried seven
+## hundred characters of copy in two columns — an autowrapping [Label] with less
+## height than its text needs does not overflow, complain or resize, it silently
+## draws the lines that fit and drops the rest, so the screen would have looked
+## finished and been missing the last sentence of a rule. #226 replaced the copy
+## with three numbered passes and a link out to a film, so most of what that
+## gate was defending no longer exists. The gate stays — clipping is still
+## invisible and captions still wrap — but it is no longer what this file is
+## for.
 ##
-## It is therefore also the test that fails when the copy grows. That is
-## intended: a rules screen is a fixed amount of room, and the moment a sentence
-## no longer fits, somebody has to decide between the sentence and the type size
-## rather than find out in a browser.
+## [b]What it is for now is the shape.[/b] Three things can go wrong with a
+## screen this size and none of them is a compile error:
+## [method test_the_wall_of_text_stays_gone] is the one that would creep back,
+## [method test_the_three_passes_are_numbered_in_order] is the teaching the
+## screen has left, and
+## [method test_the_sheet_stays_inside_the_screen_sideways_on_a_phone_held_upright]
+## is the failure that arrived [i]with[/i] the gutting: less copy means the type
+## grows further, and past a certain size the row of pills is wider than the
+## sheet it is printed on. That one is measured here because
+## [code]how_to_play.gd[/code]'s answer to it — [code]_fits_across[/code] — is
+## arithmetic over the wording of two buttons, and wording changes.
 ##
-## [b]The other two are here because they were found in a browser, on a phone,
-## after this screen had already shipped once.[/b]
+## [b]And two are here because they were found in a browser, on a phone, after
+## this screen had already shipped once.[/b]
 ## [method test_the_font_can_draw_every_word] pins the glyphs: a character the
 ## face does not have is not an error — it is a tofu box on a released build.
 ## It was written when everything was drawn in Godot's built-in Open Sans and it
 ## is worth more since #174, not less: the game now ships two faces of its own,
 ## both of them pixel faces with far thinner glyph sets than a Google-scale web
-## sans, and this screen carries the guillemets and the em dashes.
-## [method test_the_sheet_fits_a_phone_held_upright] pins the
-## shape: the design is 16:9 and stretched "expand", so a portrait handset hands
-## this screen nearly four times the height it was laid out against, and every
-## other assertion in this file was made at exactly 1280x720, where that cannot
-## show up.
+## sans, and this screen carries the guillemets, an em dash and an apostrophe.
+## [method test_the_sheet_is_the_size_of_its_own_words_on_a_phone_held_upright]
+## pins the shape: the design is 16:9 and stretched "expand", so a portrait
+## handset hands this screen nearly four times the height it was laid out
+## against, and every other assertion in this file was made at exactly 1280x720,
+## where that cannot show up.
 extends GutTest
 
 const HOW_TO_PLAY: String = "res://src/screens/how_to_play.tscn"
+
+## The screen's own script, read as text by
+## [method test_the_film_is_opened_inside_the_press]. Source-scanning is a blunt
+## instrument and this is the one claim on this screen that nothing else can
+## make — see that test.
+const HOW_TO_PLAY_SCRIPT: String = "res://src/screens/how_to_play.gd"
 
 ## A portrait handset, in real pixels: a Pixel-class 1080x2340, which
 ## project.godot's "expand" resolves to 1280x2773 design pixels. The number that
@@ -40,14 +55,22 @@ const HOW_TO_PLAY: String = "res://src/screens/how_to_play.tscn"
 ## this screen in the shape the bug needed.
 const PORTRAIT: Vector2i = Vector2i(1080, 2340)
 
-## How much taller than its own content the sheet is allowed to be.
+## How much taller than its own content the sheet is allowed to be, and how far
+## apart two rows printed on it may drift.
 ##
-## Zero would be the honest number and is not quite reachable: a
-## [GridContainer] row is as tall as its tallest cell, so the shorter rule in
-## each row leaves a few pixels under it whatever the screen is. This is loose
-## enough for that and nowhere near loose enough for the two thousand pixels of
-## nothing the shipped version had.
+## Zero would be the honest number and is not quite reachable: a row of the
+## passes is as tall as its tallest cell, so a shorter caption leaves a few
+## pixels under it whatever the screen is. This is loose enough for that and
+## nowhere near loose enough for the two thousand pixels of nothing the shipped
+## version had.
 const SLACK: float = 32.0
+
+## Every word on the screen, added up. The copy this replaced was about seven
+## hundred characters; what is there now is under a hundred, and the budget is
+## somewhere between the two so that a caption can be reworded and a paragraph
+## cannot come back. See [method test_the_wall_of_text_stays_gone] for why that
+## is a test and not a note in a review.
+const COPY_BUDGET: int = 240
 
 ## The design the layout is built against, from project.godot. Read rather than
 ## written down here for [method TouchTarget.design_width]'s reason: a copy of
@@ -112,6 +135,16 @@ func _main_menu_button() -> Button:
 	return _screen.get_node("%MainMenu") as Button
 
 
+func _watch_button() -> Button:
+	return _screen.get_node("%Watch") as Button
+
+
+## The three pills, in the order the screen offers them.
+func _pills() -> Array[Button]:
+	var found: Array[Button] = [_watch_button(), _main_menu_button(), _play_button()]
+	return found
+
+
 func _design_height() -> float:
 	return str(ProjectSettings.get_setting(DESIGN_HEIGHT_SETTING, 720)).to_float()
 
@@ -145,10 +178,41 @@ func _typeset(root: Node) -> Array[Control]:
 	return found
 
 
-## One of the four rules' body paragraphs — any of them, since the type scale is
-## one rule applied to all of them.
+## The headings of the three passes, in the order the scene lays them out.
+func _pass_headings() -> Array[Label]:
+	var found: Array[Label] = []
+	var strip: HBoxContainer = _screen.get_node("%Strip") as HBoxContainer
+	for cell: Node in strip.get_children():
+		var heading: Label = cell.get_node_or_null("Heading") as Label
+		if heading != null:
+			found.append(heading)
+	return found
+
+
+## One of the passes' captions — any of them, since the type scale is one rule
+## applied to all of them.
 func _a_body() -> Label:
-	return _screen.get_node("%Rules/Walk/Body") as Label
+	return _screen.get_node("%Strip/Water/Body") as Label
+
+
+## The lines of [param source] that make up the function [param header] opens,
+## or [code]""[/code] if there is no such function.
+##
+## Stops at the next function [i]or the next doc comment[/i], so what comes back
+## is code and not the prose introducing whatever is written underneath it —
+## which matters because the thing being searched for is a word like
+## [code]await[/code], and a paragraph explaining why there is no await in this
+## handler would otherwise read as one.
+func _body_of(source: String, header: String) -> String:
+	var at: int = source.find(header)
+	if at < 0:
+		return ""
+	var ends: int = source.length()
+	for boundary: String in ["\nfunc ", "\n##"]:
+		var found: int = source.find(boundary, at + 1)
+		if found >= 0:
+			ends = mini(ends, found)
+	return source.substr(at, ends - at)
 
 
 ## What [param control] has written on it, whichever of the two it is.
@@ -163,14 +227,94 @@ func test_the_screen_is_a_game_screen() -> void:
 	assert_not_null(_screen, "the rules screen must instantiate as a GameScreen")
 
 
+# ---- what the screen teaches ---------------------------------------------------
+
+
+func test_the_wall_of_text_stays_gone() -> void:
+	# The regression this screen is one commit away from at any time. Nothing
+	# stops a paragraph being pasted back into the scene file: it would type-check,
+	# export, and fail nothing except the reason #175 was opened — a player who
+	# came to press Play being handed seven hundred characters to read first. So
+	# the budget is a number a test can hold, and a caption that has grown into a
+	# sentence has to argue with it.
+	var written: int = 0
+	for label: Label in _labels(_screen):
+		written += label.text.length()
+	assert_lt(
+		written,
+		COPY_BUDGET,
+		(
+			"the rules screen is back to %d characters of copy — the film is what the words were"
+			% written
+		)
+	)
+
+
+func test_the_three_passes_are_numbered_in_order() -> void:
+	# What the screen has left to teach on its own account, for the player who
+	# will not click out to a film: a panel goes water, then bottle, then rag,
+	# and the order is the whole content. Numbers rather than arrows because the
+	# row is free to reflow on a narrow screen, and both are asserted — the text
+	# says the order and the layout agrees with it, which is the pair that can
+	# come apart when somebody reorders the cells and not the labels.
+	var headings: Array[Label] = _pass_headings()
+	assert_eq(headings.size(), 3, "wash, cleaner, buff — three passes")
+	var previous: float = -1.0
+	for i: int in headings.size():
+		var heading: Label = headings[i]
+		assert_true(
+			heading.text.begins_with("%d." % (i + 1)),
+			'pass %d reads "%s" — the numbers are the order' % [i + 1, heading.text]
+		)
+		var at: float = heading.get_global_rect().position.x
+		assert_gt(at, previous, "the passes must read left to right: %s" % heading.text)
+		previous = at
+
+
+func test_the_film_is_one_press_away() -> void:
+	# The other half of what replaced the copy. The button is wired to exactly
+	# one thing, which is this screen's own handler — a second connection would
+	# mean two tabs, and none would mean a pill that looks pressable and is not.
+	var connections: Array = _watch_button().pressed.get_connections()
+	assert_eq(connections.size(), 1, "the watch button must do exactly one thing")
+	if connections.size() != 1:
+		return
+	var wiring: Dictionary = connections[0]
+	var to: Callable = wiring["callable"]
+	assert_eq(to.get_object(), _screen, "the press is the screen's to handle")
+	assert_eq(to.get_method(), "_on_watch_pressed")
+
+
+func test_the_film_is_opened_inside_the_press() -> void:
+	# Source-scanned, and it is the one claim about this screen that nothing
+	# else can make. A browser lets a page open a window only while it is still
+	# crediting a gesture the player made, and the first thing that waits spends
+	# it — so an await, a timer or a deferred call in this handler is not a
+	# delay, it is a popup blocked in silence, on the web build only, on a page
+	# CI cannot open. There is nothing to instrument: the failure is a tab that
+	# never appears. So what is checked is the shape of the handler itself.
+	var source: String = FileAccess.get_file_as_string(HOW_TO_PLAY_SCRIPT)
+	var body: String = _body_of(source, "func _on_watch_pressed")
+	assert_false(body.is_empty(), "%s must still handle the press" % HOW_TO_PLAY_SCRIPT)
+	if body.is_empty():
+		return
+	assert_true(body.contains("WatchVideo.open()"), "the press must open the film: %s" % body)
+	for waiting: String in ["await", "call_deferred", "create_timer", "create_tween"]:
+		assert_false(
+			body.contains(waiting),
+			"%s in the handler spends the gesture the browser opens the tab on" % waiting
+		)
+
+
 # ---- one screen, no scrolling ------------------------------------------------
 
 
-func test_every_word_of_the_rules_is_visible() -> void:
+func test_every_word_on_the_screen_is_visible() -> void:
 	# See this file's header. An autowrapping Label with too little height draws
-	# what fits and drops the rest, in silence.
+	# what fits and drops the rest, in silence. Cheap to pass now and kept for
+	# the same reason it was written: nothing else would ever mention it.
 	var labels: Array[Label] = _labels(_screen)
-	assert_gt(labels.size(), 10, "the rules screen should be mostly words")
+	assert_gte(labels.size(), 9, "the title, its caption and three passes of two labels each")
 	for label: Label in labels:
 		assert_eq(
 			label.get_visible_line_count(),
@@ -229,9 +373,11 @@ func test_the_font_can_draw_every_word() -> void:
 	#
 	# The buttons *and* the labels, and the buttons are the reason this comment
 	# says so: the first version of this test walked the labels only, which is
-	# every word on the screen except the two that were actually broken.
+	# every word on the screen except the two that were actually broken. The
+	# watch button is the newest reason to keep it — it says "it's", and an
+	# apostrophe is a glyph like any other.
 	var typeset: Array[Control] = _typeset(_screen)
-	assert_gt(typeset.size(), 10, "the rules screen should be mostly words")
+	assert_gte(typeset.size(), 12, "nine labels and three pills")
 	for control: Control in typeset:
 		var font: Font = control.get_theme_font("font")
 		var words: String = _words_of(control)
@@ -273,8 +419,30 @@ func test_the_sheet_is_the_size_of_its_own_words_on_a_phone_held_upright() -> vo
 	assert_lte(card.get_global_rect().end.y, _screen.size.y)
 
 
+func test_the_sheet_stays_inside_the_screen_sideways_on_a_phone_held_upright() -> void:
+	# The failure that arrived with the gutting, and the reason `_fits_across`
+	# exists. "Expand" hands a tall screen extra *height* and never extra width,
+	# so the type grows until the sheet is as tall as the phone — and with three
+	# captions instead of four paragraphs there is almost nothing to stop it
+	# reaching the ceiling. The display face advances a whole em per character,
+	# so at 3x the two exits are a row half again as wide as the sheet they are
+	# printed on. A row wider than the sheet does not clip: a minimum size
+	# propagates, and the card grows out past both edges of the phone.
+	get_tree().root.size = PORTRAIT
+	await wait_process_frames(3)
+	var card: Rect2 = (_screen.get_node("%Card") as PanelContainer).get_global_rect()
+	assert_gte(card.position.x, 0.0, "the sheet hangs off the left of the screen")
+	assert_lte(card.end.x, _screen.size.x, "the sheet hangs off the right of the screen")
+	for button: Button in _pills():
+		var pill: Rect2 = button.get_global_rect()
+		assert_gte(
+			pill.position.x, card.position.x, "%s hangs off the left of the sheet" % button.name
+		)
+		assert_lte(pill.end.x, card.end.x, "%s hangs off the right of the sheet" % button.name)
+
+
 func test_the_type_grows_into_the_room_a_phone_gives_it() -> void:
-	# The point of the whole exercise. At 1280x720 the type is the size the
+	# The point of the whole exercise. At 1280x720 the type is near the size the
 	# mockup draws; on a handset that hands this screen nearly four times the
 	# height, the sheet was a readable strip floating in two thousand pixels of
 	# nothing, and the copy was about six CSS pixels tall on the glass.
@@ -311,40 +479,29 @@ func test_the_type_goes_back_down_when_the_room_does() -> void:
 	)
 
 
-func test_the_rules_go_to_one_column_on_a_phone_held_upright() -> void:
-	# Reflow rather than rescale, and the two are not interchangeable: a column
-	# half as wide wraps the same sentence to twice as many lines, so two columns
-	# on a tall screen would grow downwards as fast as the type grew and reach a
-	# readable size no sooner. One column is also the layout the mockup draws —
-	# it did not fit at 720, and this is the shape of screen where it does.
-	var rules: GridContainer = _screen.get_node("%Rules") as GridContainer
-	assert_eq(rules.columns, 2, "a 16:9 screen keeps the two columns")
+func test_the_sheet_does_not_come_apart_on_a_phone_held_upright() -> void:
+	# The half of the portrait bug a card-sized assertion cannot see, and the
+	# half that was actually visible: the slack was absorbed *inside* the column,
+	# which packs its rows at the top. So the copy sat under the header, the
+	# buttons sat at the bottom of the phone, and there were two thousand pixels
+	# of black between them — with the card and the column both perfectly full
+	# the whole time. Now that the sheet carries three rows rather than five, the
+	# gap between any two consecutive ones is the same question asked cheaper.
 	get_tree().root.size = PORTRAIT
 	await wait_process_frames(3)
-	assert_eq(rules.columns, 1, "a phone held upright reads better in one")
-
-
-func test_the_rules_do_not_come_apart_on_a_phone_held_upright() -> void:
-	# The half of that bug a card-sized assertion cannot see, and the half that
-	# was actually visible: the slack was absorbed *inside* the column by the
-	# rules grid, which packs its rows at the top. So the four rules sat under
-	# the header, the strip and the buttons sat at the bottom of the phone, and
-	# there were two thousand pixels of black between them — with the card and
-	# the column both perfectly full the whole time.
-	get_tree().root.size = PORTRAIT
-	await wait_process_frames(2)
-	var rules: GridContainer = _screen.get_node("%Rules") as GridContainer
-	var strip: HBoxContainer = _screen.get_node("%Strip") as HBoxContainer
-	var written: float = 0.0
-	for cell: Node in rules.get_children():
-		var control: Control = cell as Control
-		if control != null:
-			written = maxf(written, control.get_global_rect().end.y)
-	assert_lte(
-		strip.get_global_rect().position.y - written,
-		SLACK,
-		"the rules and the passes came apart — there is a hole in the middle of the sheet"
-	)
+	var column: VBoxContainer = _screen.get_node("%Card/Column") as VBoxContainer
+	var previous: Control = null
+	for child: Node in column.get_children():
+		var row: Control = child as Control
+		if row == null:
+			continue
+		if previous != null:
+			assert_lte(
+				row.get_global_rect().position.y - previous.get_global_rect().end.y,
+				SLACK,
+				"there is a hole in the sheet above %s" % row.name
+			)
+		previous = row
 
 
 func test_nothing_is_clipped_on_a_phone_held_upright_either() -> void:
@@ -367,30 +524,40 @@ func test_nothing_is_clipped_on_a_phone_held_upright_either() -> void:
 # ---- the brand ----------------------------------------------------------------
 
 
-func test_the_rules_are_printed_on_a_brand_card() -> void:
+func test_the_passes_are_printed_on_a_brand_card() -> void:
 	# Without it the type is laid straight over a lit garage, a yellow truck and
 	# a green verge, which is the one way this palette fails.
 	var card: PanelContainer = _screen.get_node("%Card") as PanelContainer
 	var box: StyleBoxFlat = card.get_theme_stylebox("panel") as StyleBoxFlat
-	assert_not_null(box, "the rules must sit on a brand card")
+	assert_not_null(box, "the passes must sit on a brand card")
 	if box == null:
 		return
 	assert_eq(box.bg_color, Brand.PANEL, "the sheet must be the site's panel colour")
 
 
-func test_play_is_the_accent_and_main_menu_is_not() -> void:
+func test_play_is_the_accent_and_nothing_else_is() -> void:
+	# Three pills now, and still one red one. The watch button is the newest
+	# candidate for a second accent and is deliberately not one: the answer to
+	# "what do I press" on this screen is still Play, and a screen with two red
+	# pills on it leaves the eye with nowhere to land — the menu's argument,
+	# reached again with one more button.
 	var loud: StyleBoxFlat = _play_button().get_theme_stylebox("normal") as StyleBoxFlat
-	var quiet: StyleBoxFlat = _main_menu_button().get_theme_stylebox("normal") as StyleBoxFlat
 	assert_not_null(loud, "Play must be a brand pill, not the theme's button")
-	assert_not_null(quiet, "Main Menu must be a brand pill, not the theme's button")
-	if loud == null or quiet == null:
+	if loud == null:
 		return
 	assert_eq(loud.bg_color, Brand.RED, "starting the game is the answer, so it is red")
-	assert_eq(quiet.bg_color, Brand.PANEL, "going back is not a second accent")
+	for quiet_button: Button in [_main_menu_button(), _watch_button()]:
+		var quiet: StyleBoxFlat = quiet_button.get_theme_stylebox("normal") as StyleBoxFlat
+		assert_not_null(
+			quiet, "%s must be a brand pill, not the theme's button" % quiet_button.name
+		)
+		if quiet == null:
+			continue
+		assert_eq(quiet.bg_color, Brand.PANEL, "%s is not a second accent" % quiet_button.name)
 
 
 func test_every_face_of_every_button_is_dressed() -> void:
-	for button: Button in [_play_button(), _main_menu_button()]:
+	for button: Button in _pills():
 		for state: String in ["normal", "hover", "pressed", "focus"]:
 			assert_true(
 				button.has_theme_stylebox_override(state),
@@ -398,17 +565,30 @@ func test_every_face_of_every_button_is_dressed() -> void:
 			)
 
 
-func test_both_buttons_are_big_enough_for_a_finger() -> void:
+func test_every_button_is_big_enough_for_a_finger() -> void:
 	# This is also what holds the layout above honest: the buttons are the first
 	# thing a cramped column would borrow height from, and this is the floor
-	# they are not allowed to go below to make room for a sentence.
+	# they are not allowed to go below to make room for anything else.
 	var minimum: float = TouchTarget.min_design_size()
-	for button: Button in [_play_button(), _main_menu_button()]:
+	for button: Button in _pills():
 		assert_gte(button.size.x, minimum, "%s is too narrow to hit on a phone" % button.name)
 		assert_gte(button.size.y, minimum, "%s is too short to hit on a phone" % button.name)
 
 
-func test_the_headings_are_red_and_the_body_is_not() -> void:
+func test_every_button_is_big_enough_for_a_finger_on_a_phone_held_upright_too() -> void:
+	# The screen that grows its own type is the screen where a tap target can be
+	# walked backwards by a layout decision — a pill capped at its share of a row
+	# is a pill something else could cap to nothing. The floor is the floor in
+	# both shapes.
+	get_tree().root.size = PORTRAIT
+	await wait_process_frames(3)
+	var minimum: float = TouchTarget.min_design_size()
+	for button: Button in _pills():
+		assert_gte(button.size.x, minimum, "%s is too narrow to hit on a phone" % button.name)
+		assert_gte(button.size.y, minimum, "%s is too short to hit on a phone" % button.name)
+
+
+func test_the_headings_are_red_and_the_captions_are_not() -> void:
 	# The colours are applied in `_ready()` by walking for the scene's own node
 	# names, so this is where a renamed or re-nested row shows up: the label
 	# would simply keep the theme's default colour and nothing else would notice.
@@ -421,19 +601,15 @@ func test_the_headings_are_red_and_the_body_is_not() -> void:
 		elif label.name == "Body":
 			assert_eq(label.get_theme_color("font_color"), Brand.WHITE, "%s" % label.get_path())
 			whites += 1
-	assert_eq(reds, 7, "four rules and three passes, each with a heading")
-	assert_eq(whites, 7, "and each with a body")
+	assert_eq(reds, 3, "three passes, each with a heading")
+	assert_eq(whites, 3, "and each with a caption")
 
 
-func test_a_heading_is_chunky_and_a_sentence_is_readable() -> void:
+func test_a_heading_is_chunky_and_a_caption_is_readable() -> void:
 	# The same walk-by-node-name that colours this screen also sets its face, and
-	# for the same reason: on a rules sheet "heading" and "paragraph" are one
-	# decision made twice, and a row that came out red and readable is a heading
-	# that has stopped looking like one. This is also the screen where getting it
-	# backwards is worst — seven hundred characters of body copy in a face that
-	# advances a whole em per character does not wrap, it overflows, and
-	# `test_every_word_of_the_rules_is_visible` would report it as clipping with
-	# no hint as to why.
+	# for the same reason: "heading" and "caption" are one decision made twice,
+	# and a row that came out red and readable is a heading that has stopped
+	# looking like one.
 	var headings: int = 0
 	var bodies: int = 0
 	for label: Label in _labels(_screen):
@@ -443,8 +619,8 @@ func test_a_heading_is_chunky_and_a_sentence_is_readable() -> void:
 		elif label.name == "Body":
 			assert_eq(label.get_theme_font("font"), Brand.BODY_FACE, "%s" % label.get_path())
 			bodies += 1
-	assert_eq(headings, 7, "four rules and three passes, each with a heading")
-	assert_eq(bodies, 7, "and each with a body")
+	assert_eq(headings, 3, "three passes, each with a heading")
+	assert_eq(bodies, 3, "and each with a caption")
 	var title: Label = _screen.get_node("%Title") as Label
 	assert_eq(title.get_theme_font("font"), Brand.DISPLAY_FACE, "the title of the sheet")
 	var subtitle: Label = _screen.get_node("%Subtitle") as Label
