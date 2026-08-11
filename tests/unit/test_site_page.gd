@@ -26,13 +26,13 @@ const PAGE_PATH: String = "res://site/index.html"
 ## https://clarkbar-sys.github.io/done-rite-detailing/play/ would send every
 ## preview's badge to the live game instead of the one being reviewed — the
 ## exact bug a preview exists to catch, in the link the preview is for.
-const PLAY_HREF: String = "href=\"play/\""
+const PLAY_HREF: String = 'href="play/"'
 
 ## What must never appear. The game is ~40 MB and the homepage is a marketing
 ## page for a business whose front door is a phone number: the build is fetched
 ## when somebody presses the badge and at no other time. An iframe or a prefetch
 ## here is not a style question, it is the ordering rule from #75 being lost.
-const NEVER: Array[String] = ["<iframe", "rel=\"prefetch\"", "rel=\"preload\""]
+const NEVER: Array[String] = ["<iframe", 'rel="prefetch"', 'rel="preload"']
 
 ## The phone number, in the two forms the page offers it in. If a rework of this
 ## file drops one, the business has lost its front door and the game has become
@@ -56,7 +56,7 @@ func test_the_page_is_readable() -> void:
 
 ## The badge exists and points at the game, relatively.
 func test_the_badge_links_to_the_game() -> void:
-	assert_string_contains(_page, "class=\"play-badge\"", "the play badge is gone")
+	assert_string_contains(_page, 'class="play-badge"', "the play badge is gone")
 	assert_string_contains(_page, PLAY_HREF, "the badge must link to the relative play/")
 
 
@@ -65,8 +65,8 @@ func test_the_badge_links_to_the_game() -> void:
 ## rather than a back button away — and [code]rel="noopener"[/code] is what
 ## stops the opened page reaching back through [code]window.opener[/code].
 func test_the_badge_opens_a_new_tab_safely() -> void:
-	assert_string_contains(_page, "target=\"_blank\"", "the badge should open a new tab")
-	assert_string_contains(_page, "rel=\"noopener\"", "target=_blank without rel=noopener")
+	assert_string_contains(_page, 'target="_blank"', "the badge should open a new tab")
+	assert_string_contains(_page, 'rel="noopener"', "target=_blank without rel=noopener")
 
 
 ## The motion can be turned off. An animation that loops forever with no
