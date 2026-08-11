@@ -20,6 +20,8 @@
 #   make export-linux / export-web  the same two exports without re-running
 #                  `check` first — for CI, where `check` is already its own job
 #   make editor    open the project in the Godot editor
+#   make narration video/narration.md -> build/narration/<take>.wav, offline
+#                  TTS via Piper (see scripts/fetch-tts.sh / narrate.sh)
 #
 # There is deliberately no `make coverage`. GDScript has no line-coverage
 # instrumentation this project is willing to gate on; `make tested` is what
@@ -37,6 +39,8 @@ SDK        := .godot-sdk
 GODOT      := $(SDK)/bin/godot
 GUT        := addons/gut
 GUT_PLUGIN := $(GUT)/plugin.cfg
+TTS_DIR    := .piper
+PIPER      := $(TTS_DIR)/piper/piper
 BUILD_DIR  := build/linux
 TARGET     := $(BUILD_DIR)/done-rite-detailing.x86_64
 PRESET     := Linux
@@ -74,7 +78,7 @@ SOURCES := $(shell find . -name '*.gd' \
              -not -path './.godot/*' -not -path './.godot-sdk/*' \
              -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-.PHONY: all sdk editor-sdk gut-sdk web-template import check smoke gut tested lint format test build build-web export-linux export-web stamp run editor clean distclean
+.PHONY: all sdk editor-sdk gut-sdk web-template import check smoke gut tested lint format test build build-web export-linux export-web stamp run editor tts-sdk narration clean distclean
 
 all: check build
 
@@ -432,6 +436,25 @@ run: import
 editor: import
 	$(GODOT) --editor --path .
 
+# ---- narration ---------------------------------------------------------------
+
+# The Piper TTS engine + voice model (~90 MB), pinned by sha256 in
+# scripts/fetch-tts.sh. Same treatment as sdk/gut-sdk above: fetched on
+# demand, gitignored, never installed system-wide. A real file target so the
+# fetch happens once; fetch-tts.sh does its own idempotency check.
+tts-sdk: $(PIPER)
+
+$(PIPER): scripts/fetch-tts.sh
+	@scripts/fetch-tts.sh $(TTS_DIR)
+
+# video/narration.md -> build/narration/<take>.wav, one file per `## <take>`
+# section, plus build/narration/timings.tsv (per-take duration, for the
+# caption/assembly stage). No Godot involved — scripts/narrate.sh drives
+# Piper directly — so this has no `import` prerequisite, unlike the targets
+# above it.
+narration: $(PIPER)
+	@scripts/narrate.sh
+
 # ---- housekeeping ----------------------------------------------------------
 
 clean:
@@ -439,4 +462,4 @@ clean:
 
 # Also drops the downloaded toolchains (forces a re-fetch/reinstall next time).
 distclean: clean
-	rm -rf $(SDK) $(LINT_VENV) $(GUT)
+	rm -rf $(SDK) $(LINT_VENV) $(GUT) $(TTS_DIR)
