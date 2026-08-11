@@ -22,6 +22,9 @@
 #   make editor    open the project in the Godot editor
 #   make narration video/narration.md -> build/narration/<take>.wav, offline
 #                  TTS via Piper (see scripts/fetch-tts.sh / narrate.sh)
+#   make footage   film every tutorial take -> build/footage/<take>/, real
+#                  game frames via Godot's Movie Maker mode. Minutes, not
+#                  seconds; never part of `make test`
 #
 # There is deliberately no `make coverage`. GDScript has no line-coverage
 # instrumentation this project is willing to gate on; `make tested` is what
@@ -78,7 +81,7 @@ SOURCES := $(shell find . -name '*.gd' \
              -not -path './.godot/*' -not -path './.godot-sdk/*' \
              -not -path './addons/*' -not -path './build/*' 2>/dev/null | sed 's|^\./||')
 
-.PHONY: all sdk editor-sdk gut-sdk web-template import check smoke gut tested lint format test build build-web export-linux export-web stamp run editor tts-sdk narration clean distclean
+.PHONY: all sdk editor-sdk gut-sdk web-template import check smoke gut tested lint format test build build-web export-linux export-web stamp run editor tts-sdk narration footage clean distclean
 
 all: check build
 
@@ -454,6 +457,122 @@ $(PIPER): scripts/fetch-tts.sh
 # above it.
 narration: $(PIPER)
 	@scripts/narrate.sh
+
+# ---- footage ---------------------------------------------------------------
+
+# Film every tutorial take -> build/footage/<take>/, using Godot's Movie Maker
+# mode. The other half of `narration` above and the reason #221 exists: what
+# comes out is the shipped game playing itself through the same input paths a
+# thumb uses (src/core/tutorial_take.gd), recorded frame by frame, so the clip
+# in the How to Play video is the game rather than a re-creation of it.
+#
+# `make footage` does the lot; `make footage TAKES=sponge` re-records one.
+# scripts/capture-footage.sh is the loop — one Godot process per take, because
+# Movie Maker is a property of the process and a take ends by quitting it.
+#
+# NOT A GATE, AND NOT ON `make test`. Measured end to end on a four-core box: a
+# full catalogue is 61.5 s of video, 3,691 frames, 2.2 GB on disk and 25 and a
+# half minutes of software rasterizing (3:07 water, 4:24 sponge, 4:26 glass,
+# 5:36 rag, 7:56 full). Nothing about a pull request should wait for that.
+#
+# ---------------------------------------------------------------------------
+# WHY THERE IS NO --headless HERE, MEASURED. Movie Maker takes each frame from
+# the main viewport's texture, and the headless display server has no textures
+# to take. `--headless --write-movie out.avi` does not decline: it prints
+# "Movie Maker mode enabled", then `ERROR: Parameter "t" is null. at:
+# texture_2d_get (servers/rendering/dummy/storage/texture_storage.h:110)` and
+# crashes with signal 11. Verified on this Godot, twice. So a machine with no
+# display needs a virtual one, and `xvfb-run -a` is it.
+#
+# WHY COMPATIBILITY, AND WHY THAT IS A FEATURE. `--rendering-driver opengl3
+# --rendering-method gl_compatibility` under Xvfb lands on Mesa's llvmpipe
+# ("OpenGL API 4.5 (Core Profile) Mesa ... llvmpipe" in the log), which is a
+# software rasterizer and is why a 7.5 s clip takes minutes. The alternative
+# would be Forward+/Vulkan through lavapipe, and it is the wrong picture as
+# well as the harder dependency: the web build renders Compatibility (see
+# CLAUDE.md), so this footage matches what a player who follows the video link
+# actually sees rather than the Forward+ desktop look nobody in the audience is
+# running.
+#
+# WHY THE VIRTUAL SCREEN IS GIVEN A SIZE. `-s "-screen 0 720x1280x24"`. The
+# default xvfb-run screen (1280x1024x8) did render — measured, no errors, and
+# the frames still came out at the recorded size, because they come from the
+# viewport texture and not from the X drawable. It is pinned anyway so that the
+# capture does not depend on the host's xvfb default and no part of the window
+# is hanging off the virtual screen while llvmpipe draws it.
+#
+# 720x1280, AND IT IS NOT SET BY --resolution. That flag is ignored by Movie
+# Maker, and so is DisplayServer.window_set_size(); the recorded size is the
+# project's viewport size. scripts/capture-footage.sh has the measurements and
+# the one lever that does work (a res://override.cfg it writes and removes).
+# The number itself is TutorialFraming.FRAME, read out of the game by
+# scripts/shot-list.gd rather than copied — the framing was computed for a 9:16
+# phone and a landscape capture would be a shot of somewhere else.
+#
+# --fixed-fps 60, WHICH MOVIE MAKER WOULD HAVE FORCED ANYWAY. Measured: a run
+# without the flag still prints "@ 60 FPS" and produces 60 frames per second of
+# clip, because `editor/movie_writer/fps` defaults to 60 and Movie Maker
+# forces a fixed timestep regardless. It is passed explicitly so the frame rate
+# is this harness's number rather than a project setting nobody set, and
+# because 60 is the same 1/60 delta `make gut` pins the suite to and the same
+# one the shipped game sees. TutorialTake's clock is fed that delta, so a take
+# that says 7.5 s is 451 frames — the +1 is the boot frame Movie Maker records
+# before the mud lands.
+#
+# PNG FRAMES + WAV, NOT THE MJPEG .avi. Movie Maker picks its writer from the
+# extension, and both were measured on the water take (451 frames, 720x1280, a
+# four-core box):
+#
+#     .png    3m05s wall, 298 ms/frame encoding, 255 MB
+#     .avi    1m05s wall,  18 ms/frame encoding,  34 MB
+#
+# Rendering costs the same either way (~15 ms/frame on the GPU side of
+# llvmpipe, either way); the whole difference is that deflate is slow and JPEG
+# is not.
+#
+# The .avi is 3x faster and 7x smaller and it is still the wrong master. It
+# is JPEG at Godot's default quality, and this game's art is flat quantised
+# bands (src/world/grime.gdshader) with hard edges — the exact thing JPEG rings
+# around — which the delivery encode in #224 would then compress a second time.
+# PNG keeps the render lossless, `ffmpeg -framerate 60 -start_number 0 -i
+# build/footage/<take>/frame%08d.png -i build/footage/<take>/frame.wav` reads
+# it directly, and when two runs disagree a frame sequence names the frame that
+# diverged where a single container only says the file changed. The cost is
+# wall time and disk on a machine that is already spending both, and both are
+# recoverable with `make clean`.
+#
+# DETERMINISM, MEASURED — AND IT IS NOT YET WHOLE. #222 asked for "two runs of
+# the same commit produce identical frame sequences". Two `make footage
+# TAKES=water` runs on this commit gave 451 frames each, an identical
+# frame.wav, and 384 of the 451 PNGs differing. Amplifying the difference into
+# an image says exactly where: every differing pixel is inside the water
+# droplet cloud, and the car, the grime mask, the sky, the trees, the tool and
+# the camera are byte-identical the whole way through. So the take itself — the
+# clock, the sweep, the buckets in GrimeMap — really is reproducible, and the
+# spray is not: a GPUParticles3D seeds itself from the engine RNG, which Godot
+# randomizes at startup, and there is no command-line flag for that seed. The
+# fix is `use_fixed_seed` on the three GPUParticles3D emitters in src/world/
+# (the property exists in this Godot), which is a change to what every player
+# sees and belongs in its own issue rather than in a capture harness. Recorded
+# rather than quietly rounded off: a clip is reproducible except for where the
+# water lands.
+#
+# THE WAV IS SILENCE, AND THAT IS #221's DECISION RATHER THAN A FAULT HERE.
+# Movie Maker writes the game's own mix, but src/screens/tutorial_take_screen.
+# tscn instances the bay with `noisy = false` — the scene file records the
+# measurement, which is that switching the ToolRacket on ends every take with
+# "2 ObjectDB instances were leaked at exit". So frame.wav is a correctly-timed
+# silent track (verified: 7.517 s stereo 48 kHz, peak amplitude 0, for a 7.5 s
+# take), which is exactly what the assembly stage wants to lay narration onto.
+# The day a take should carry tool noise, the change is in that scene, not in
+# this recipe.
+# ---------------------------------------------------------------------------
+#
+# Depends on `import` for the reason everything else does — scripts/
+# shot-list.gd reads TutorialTake, which is a global class name only after the
+# project has been imported.
+footage: import
+	@scripts/capture-footage.sh $(TAKES)
 
 # ---- housekeeping ----------------------------------------------------------
 
