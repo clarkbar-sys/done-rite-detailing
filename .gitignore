@@ -46,6 +46,12 @@ addons/gut/
 # Exported games and the export-time provenance stamp.
 build/
 build_stamp.json
+# The project-settings override scripts/capture-footage.sh writes for the
+# length of a Movie Maker run and removes on the way out — it is the only lever
+# that sets the recorded resolution (the Makefile's `footage` note has the
+# measurements). Ignored so a capture killed with -9 leaves a stray file rather
+# than a dirty tree; delete it and re-run.
+/override.cfg
 # Godot 3 leftovers.
 .import/
 
