@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.16.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.15.0...v1.16.0) (2026-08-12)
+
+
+### Features
+
+* movie-maker capture harness for tutorial takes ([#236](https://github.com/clarkbar-sys/done-rite-detailing/issues/236)) ([57d88b8](https://github.com/clarkbar-sys/done-rite-detailing/commit/57d88b8f2eedd51e578df824758afb4e0f6532f3)), closes [#222](https://github.com/clarkbar-sys/done-rite-detailing/issues/222)
+* narration pipeline — markdown script to TTS voiceover ([#229](https://github.com/clarkbar-sys/done-rite-detailing/issues/229)) ([e48efd3](https://github.com/clarkbar-sys/done-rite-detailing/commit/e48efd3065eaa7486e677608c454180a889b7c8a))
+* replace How to Play text wall with a video link button ([#231](https://github.com/clarkbar-sys/done-rite-detailing/issues/231)) ([f9e193b](https://github.com/clarkbar-sys/done-rite-detailing/commit/f9e193b14c86ab4dfc94af71329c0a3ae7c69571)), closes [#226](https://github.com/clarkbar-sys/done-rite-detailing/issues/226)
+* **site:** serve the detailing business at the root, the game at /play/ ([#228](https://github.com/clarkbar-sys/done-rite-detailing/issues/228)) ([bceebed](https://github.com/clarkbar-sys/done-rite-detailing/commit/bceebedbb78fc25e58c6b2005f882440a3e66fb3))
+* tutorial takes — scripted per-step demo routines ([#221](https://github.com/clarkbar-sys/done-rite-detailing/issues/221)) ([#232](https://github.com/clarkbar-sys/done-rite-detailing/issues/232)) ([0db4b4f](https://github.com/clarkbar-sys/done-rite-detailing/commit/0db4b4f7980c577373e5eabfcb7dbad385372667))
+
+
+### Bug Fixes
+
+* align narration take names with the [#221](https://github.com/clarkbar-sys/done-rite-detailing/issues/221) tutorial-take catalogue ([#234](https://github.com/clarkbar-sys/done-rite-detailing/issues/234)) ([9dc99a2](https://github.com/clarkbar-sys/done-rite-detailing/commit/9dc99a2807bb76c54d2d7bbe6d78c020f6bfaef2))
+* **site:** sit the play badge in the topbar on phones ([#235](https://github.com/clarkbar-sys/done-rite-detailing/issues/235)) ([2a4363e](https://github.com/clarkbar-sys/done-rite-detailing/commit/2a4363e6c76395582d2b3406be3d63a939bee2d0))
+
 ## [1.15.0](https://github.com/clarkbar-sys/done-rite-detailing/compare/v1.14.0...v1.15.0) (2026-08-10)
 
 
