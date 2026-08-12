@@ -44,12 +44,21 @@ wiring.
 - **It is a link, never an embed.** No `<iframe>`, no `prefetch`, no script.
   The game is ~40 MB; a visitor who came for a phone number must not pay for it
   existing. Pressing the badge is the only thing that fetches the build.
-- **It never covers the phone number.** The topbar's red `Call 330-780-4778`
-  button sits in the top-right corner, so the badge hangs *below* the 74 px
-  header rather than in it, at `z-index: 49` — under that bar, not over it. On
-  a phone it also shrinks to icon + "Play": it is `position: fixed`, so at some
-  scroll position it is over every band on the page, and at full width it
-  clipped the hero's eyebrow. What it covers now is the right margin.
+- **It never covers the phone number.** On a desktop the topbar's red
+  `Call 330-780-4778` button sits in the top-right corner, so the badge hangs
+  *below* the 74 px header rather than in it, at `z-index: 49` — under that
+  bar, not over it.
+- **On a phone it is not floating at all — it is in the bar.** That corner is
+  free at this width: the Call button is `display: none` (the bottom
+  `.mobile-bar` carries Call and Text) and the nav links went at 900 px, so
+  what the desktop rule had to dodge is empty black header. `position: static`
+  makes the badge a flex item of `.nav`, beside the brand, which is what fixes
+  the problem it had while floating — being fixed, it sat over some band of
+  the page at every scroll position, and at full width it clipped the hero's
+  eyebrow. It shrinks to icon + "Play", keeps its 48 px height, and the brand
+  gets `min-width: 0` so a narrow phone wraps the tagline rather than pushing
+  the badge off the edge. The bob goes with the float: a pill bouncing inside
+  a 66 px bar reads as broken rather than as an invitation.
 
 Both are asserted in `tests/unit/test_site_page.gd`, and neither is something a
 type check or an export could have failed on — same reasoning as
