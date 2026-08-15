@@ -1,13 +1,36 @@
 # Done Rite Detailing
 
-> A game built with the [Godot](https://godotengine.org) engine.
+> The website for a real mobile detailing business — with a car-detailing game
+> inside it.
 
 [![CI (Godot)](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml/badge.svg)](https://github.com/clarkbar-sys/done-rite-detailing/actions/workflows/ci-godot.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 ## Overview
 
-Done Rite Detailing is an in-development game: a Godot 4 project that
+**Done Rite Mobile Detailing & Car Wash** is a real business that details cars
+at your home or office, and this repository is what it publishes: the business's
+own page at the root, and the game named after it one press underneath.
+
+The front door is [`site/`](./site/) — what the service is, why you would book
+it, and the number to call or text, on a single hand-written page with no
+framework, no dependencies and no build step. A visitor who came for a phone
+number gets a phone number; the game is a link in the corner and never an
+embed, so nobody pays a 12 MB download for its existence. The page is served
+from where the game already is, which is the whole reason the two live in one
+repository: one CI run publishes the business and the thing it is advertising
+with, and neither can drift from the other. The badge and the phone number it is
+forbidden to cover are asserted by `tests/unit/test_site_page.gd`, so the game's
+own test suite is what keeps the front door honest.
+[`site/README.md`](./site/README.md) is the rule for that folder — *as it is*,
+one file, no toolchain.
+
+Everything else in this repository is the game behind that badge.
+
+## The game
+
+Done Rite Detailing is an in-development game: a [Godot](https://godotengine.org)
+4 project that
 type-checks, boots headlessly, and exports a playable build — in your browser,
 or as a Linux binary — from CI. It opens on a title screen with the game
 already being played behind the card — a filthy car being washed, cleaned and
@@ -230,18 +253,22 @@ installed system-wide — it all lands in `.godot-sdk/`. The
 [GUT](https://github.com/bitwes/Gut) test addon gets the same treatment via
 [`scripts/fetch-gut.sh`](./scripts/fetch-gut.sh) and lands in `addons/gut/`.
 
-## Play it
+## Visit it
 
-### 👉 [clarkbar-sys.github.io/done-rite-detailing/play/](https://clarkbar-sys.github.io/done-rite-detailing/play/)
+### 🚗 The business — [clarkbar-sys.github.io/done-rite-detailing/](https://clarkbar-sys.github.io/done-rite-detailing/)
 
-The root of that address is [the detailing business](./site/) — the real one the
-game is named after, phone number and all — and the game is the page under it,
+### 🎮 The game — [/play/](https://clarkbar-sys.github.io/done-rite-detailing/play/)
+
+One address, two pages. The root is [the detailing business](./site/) — what it
+does, and the phone number to book it — and the game is the page under it,
 reached by the badge in the site's corner. Business first, game one press away.
 
-That's the current `main`, in your browser, republished by CI on every push. No
-download, no `chmod`, nothing to install. It needs WebGL 2 and about 12 MB on
-the first load; there is no service worker, so a refresh always gets the newest
-build rather than a cached one.
+Both are the current `main`, republished by CI on every push — the same run that
+builds the game copies the site over it, so a pull request previews the whole
+arrangement rather than a bare game. Playing needs no download, no `chmod` and
+nothing to install: WebGL 2 and about 12 MB on the first load. There is no
+service worker, so a refresh always gets the newest build rather than a cached
+one.
 
 Those 12 MB are the first thing the game asks of anybody, so they are spent
 looking at the business rather than at the engine. The page you wait on is the
@@ -278,6 +305,10 @@ There are no Windows or macOS builds, deliberately — the
 would change that. The web build is the answer in the meantime.
 
 ## Development
+
+None of this is needed to work on the business's page: `site/index.html` is one
+file with its CSS inline, so open it in a browser and edit it. What follows is
+the game.
 
 Needs `bash`, `curl`, `unzip`, `git`, `make` and `python3` (the last only for
 `make lint` / `make format`). The first command downloads Godot (~76 MB) and
@@ -332,6 +363,7 @@ different one, so bump `GODOT_COMMIT` there in the same change.
 ```
 project.godot          engine + project settings (typed-GDScript gates live here)
 export_presets.cfg     export targets; "Linux" for `make build`, "Web" for `make build-web`
+site/                  the detailing business's page — the published root, the game under it
 assets/brand/          the logo the game shares with the business it is named after
 assets/brand/fonts/    the two pixel faces the game is set in, with their licences
 assets/models/cars/    the ten cars the bay parks, baked out of the pack credited below
@@ -379,7 +411,7 @@ Releases are automated with
 it bumps the version (including `config/version` in `project.godot`) and updates
 [CHANGELOG.md](./CHANGELOG.md). Merge that PR to tag the release; the same
 workflow then exports the game — the Linux binary and the web bundle — and
-attaches both to the release. The [link above](#play-it) is always current
+attaches both to the release. The [links above](#visit-it) are always current
 `main`; a release asset is the version you can still get back to in a year.
 
 ## Security
